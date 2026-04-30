@@ -194,7 +194,7 @@
                         <outlet property="pumpIDTextField" destination="HeG-VF-L5P" id="sXe-xX-ZXp"/>
                         <outlet property="regionAndColorPickerCell" destination="Soc-3y-BXi" id="aKr-pu-Pn2"/>
                         <segue destination="oBL-lh-SHI" kind="show" identifier="Sentry" id="cli-lc-XTA"/>
-                        <segue destination="Fps-h3-V4K" kind="show" identifier="Continue" id="7vf-at-3Tu"/>
+                        <segue destination="Nwf-TJ-KmJ" kind="show" identifier="Continue" id="7vf-at-3Tu"/>
                     </connections>
                 </tableViewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="dGB-ob-oLq" userLabel="First Responder" sceneMemberID="firstResponder"/>
@@ -384,7 +384,7 @@
                     <connections>
                         <outlet property="activityIndicator" destination="2E9-Lq-TJh" id="E97-gS-bwM"/>
                         <outlet property="loadingLabel" destination="E30-Ia-bWz" id="1N2-QM-2MC"/>
-                        <segue destination="Fps-h3-V4K" kind="show" identifier="Continue" id="e53-KL-ULn"/>
+                        <segue destination="Nwf-TJ-KmJ" kind="show" identifier="Continue" id="e53-KL-ULn"/>
                     </connections>
                 </tableViewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="Jv9-mz-xiC" userLabel="First Responder" sceneMemberID="firstResponder"/>

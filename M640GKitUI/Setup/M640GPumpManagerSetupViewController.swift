@@ -55,11 +55,7 @@ public class M640GPumpManagerSetupViewController: RileyLinkManagerSetupViewContr
 
      3. (Optional) Connect Devices
 
-     4. Time
-
-     5. Basal Rates & Delivery Limits
-
-     6. Pump Setup Complete
+     4. Pump Setup Complete
 
      */
 
@@ -79,8 +75,6 @@ public class M640GPumpManagerSetupViewController: RileyLinkManagerSetupViewContr
             vc.basalSchedule = basalSchedule
         case let vc as M640GPumpSentrySetupViewController:
             vc.pumpManager = pumpManager
-        case is M640GPumpClockSetupViewController:
-            break
         case let vc as M640GPumpSetupCompleteViewController:
             vc.pumpImage = pumpManager?.state.largePumpImage
         default:
