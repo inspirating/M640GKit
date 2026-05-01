@@ -1,18 +1,19 @@
 import Combine
 import OSLog
 
-class DanaLogger {
+class MedtrumLogger {
     private let logger: Logger
     private let fileManager = FileManager.default
 
     init(category: String) {
-        logger = Logger(subsystem: "com.randallknutson.M640GKit", category: category)
+        logger = Logger(subsystem: "org.nightscout.MedtrumKit", category: category)
     }
 
     public func debug(_ msg: String, file: String = #file, _ function: String = #function, _ line: Int = #line) {
-        #if M640GKit_DEBUG_LOGGING
+        #if MEDTRUM_DEBUG_LOGS
             let message = "\(file.file) - \(function)#\(line): \(msg)"
             logger.debug("\(message, privacy: .public)")
+            writeToFile(message, .debug)
         #endif
     }
 
@@ -63,15 +64,15 @@ class DanaLogger {
     }
 
     private var logFile: String {
-        getDocumentsDirectory().appendingPathComponent("M640GKit/dana_log.txt").path
+        getDocumentsDirectory().appendingPathComponent("medtrumkit/medtrumkit_log.txt").path
     }
 
     private var logDir: String {
-        getDocumentsDirectory().appendingPathComponent("M640GKit").path
+        getDocumentsDirectory().appendingPathComponent("medtrumkit").path
     }
 
     private var logFilePrev: String {
-        getDocumentsDirectory().appendingPathComponent("M640GKit/dana_log_prev.txt").path
+        getDocumentsDirectory().appendingPathComponent("medtrumkit/medtrumkit_log_prev.txt").path
     }
 
     private func getDocumentsDirectory() -> URL {

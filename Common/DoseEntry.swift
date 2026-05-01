@@ -10,13 +10,10 @@ public extension DoseEntry {
         insulinType: InsulinType?,
         startDate: Date = Date.now
     ) -> DoseEntry {
-        var endTime = Date.now
-        endTime.addTimeInterval(duration)
-
-        return DoseEntry(
+        DoseEntry(
             type: .bolus,
             startDate: startDate,
-            endDate: endTime,
+            endDate: Date.now.addingTimeInterval(duration),
             value: units,
             unit: .units,
             deliveredUnits: deliveredUnits,
@@ -55,6 +52,7 @@ public extension DoseEntry {
             endDate: startDate + duration,
             value: absoluteUnit,
             unit: .unitsPerHour,
+            deliveredUnits: nil,
             insulinType: insulinType,
             automatic: true,
             isMutable: true
@@ -72,17 +70,14 @@ public extension DoseEntry {
     }
 
     static func resume(insulinType: InsulinType?, resumeDate: Date = Date.now) -> DoseEntry {
-        DoseEntry(
-            resumeDate: resumeDate,
-            insulinType: insulinType
-        )
+        DoseEntry(resumeDate: resumeDate, insulinType: insulinType)
     }
 
     static func suspend(suspendDate: Date = Date.now) -> DoseEntry {
         DoseEntry(suspendDate: suspendDate)
     }
-    
+
     private static func roundBasalRate(_ rate: Double) -> Double {
-        M640GKitPumpManager.onboardingSupportedBasalRates.last(where: { $0 <= rate }) ?? 0
+        MedtrumPumpManager.onboardingSupportedBasalRates.last(where: { $0 <= rate }) ?? 0
     }
 }
