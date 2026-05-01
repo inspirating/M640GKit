@@ -6,17 +6,17 @@
 //
 
 import HealthKit
-import RileyLinkBLEKit
+import ESP32Kit
 
 
-extension RileyLinkDeviceStatus {
+extension ESP32DeviceStatus {
     func device(pumpID: String, pumpModel: PumpModel) -> HKDevice {
         return HKDevice(
             name: name,
             manufacturer: "Medtronic",
             model: pumpModel.rawValue,
             hardwareVersion: nil,
-            firmwareVersion: version,
+            firmwareVersion: firmwareVersion,
             softwareVersion: String(M640GKitVersionNumber),
             localIdentifier: pumpID,
             udiDeviceIdentifier: nil

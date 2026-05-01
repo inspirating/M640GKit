@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import RileyLinkBLEKit
+import ESP32Kit
 
 public protocol PumpMessageSender {
     /// - Throws: LocalizedError

@@ -7,8 +7,7 @@
 //
 
 import Foundation
-import RileyLinkKit
-import RileyLinkBLEKit
+import ESP32Kit
 import os.log
 import LoopKit
 
@@ -18,11 +17,11 @@ public protocol PumpOpsDelegate: AnyObject, CommsLogger {
 }
 
 public protocol PumpOps {
-    func runSession(withName name: String, using device: RileyLinkDevice, _ block: @escaping (_ session: PumpOpsSession) -> Void)
+    func runSession(withName name: String, using device: ESP32Device, _ block: @escaping (_ session: PumpOpsSession) -> Void)
 }
 
 extension PumpOps {
-    public func runSession(withName name: String, usingSelector deviceSelector: @escaping (_ completion: @escaping (_ device: RileyLinkDevice?) -> Void) -> Void, _ block: @escaping (_ session: PumpOpsSession?) -> Void) {
+    public func runSession(withName name: String, usingSelector deviceSelector: @escaping (_ completion: @escaping (_ device: ESP32Device?) -> Void) -> Void, _ block: @escaping (_ session: PumpOpsSession?) -> Void) {
         deviceSelector { (device) in
             guard let device = device else {
                 block(nil)
@@ -43,11 +42,10 @@ public class M640GPumpOps: PumpOps {
 
     private let configuredDevices: Locked<Set<UUID>> = Locked(Set())
 
-    // Isolated to RileyLinkDeviceManager.sessionQueue
-    private var sessionDevice: RileyLinkDevice?
+    private var sessionDevice: ESP32Device?
 
     private weak var delegate: PumpOpsDelegate?
-    
+
     public init(pumpSettings: PumpSettings, pumpState: PumpState?, delegate: PumpOpsDelegate?) {
         self.pumpSettings = pumpSettings
         self.delegate = delegate
@@ -61,7 +59,7 @@ public class M640GPumpOps: PumpOps {
         }
     }
 
-    public func runSession(withName name: String, using device: RileyLinkDevice, _ block: @escaping (_ session: PumpOpsSession) -> Void) {
+    public func runSession(withName name: String, using device: ESP32Device, _ block: @escaping (_ session: PumpOpsSession) -> Void) {
         device.runSession(withName: name) { (commandSession) in
             let minimedPumpMessageSender = M640GPumpMessageSender(commandSession: commandSession, commsLogger: self.delegate)
             let session = PumpOpsSession(settings: self.pumpSettings, pumpState: self.pumpState.value, messageSender: minimedPumpMessageSender, delegate: self)
@@ -77,18 +75,16 @@ public class M640GPumpOps: PumpOps {
         }
     }
 
-    // Must be called from within the RileyLinkDevice sessionQueue
-    private func configureDevice(_ device: RileyLinkDevice, with session: PumpOpsSession) {
+    private func configureDevice(_ device: ESP32Device, with session: PumpOpsSession) {
         guard !self.configuredDevices.value.contains(device.peripheralIdentifier) else {
             return
         }
 
-        log.default("Configuring RileyLinkDevice: %{public}@", String(describing: device.deviceURI))
+        log.default("Configuring ESP32Device: %{public}@", String(describing: device.deviceURI))
 
         do {
             _ = try session.configureRadio(for: pumpSettings.pumpRegion, frequency: pumpState.value.lastValidFrequency)
         } catch let error {
-            // Ignore the error and let the block run anyway
             log.error("Error configuring device: %{public}@", String(describing: error))
             return
         }
@@ -102,7 +98,7 @@ public class M640GPumpOps: PumpOps {
     }
 
     @objc private func deviceRadioConfigDidChange(_ note: Notification) {
-        guard let device = note.object as? RileyLinkDevice else {
+        guard let device = note.object as? ESP32Device else {
             return
         }
 

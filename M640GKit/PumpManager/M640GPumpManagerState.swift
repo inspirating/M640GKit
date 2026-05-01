@@ -6,8 +6,7 @@
 //
 
 import LoopKit
-//import RileyLinkKit
-//import RileyLinkBLEKit
+import ESP32Kit
 
 public struct ReconciledDoseMapping: Equatable {
     let startTime: Date
@@ -303,7 +302,7 @@ public struct M640GPumpManagerState: RawRepresentable, Equatable {
 
 
 extension M640GPumpManagerState {
-    static let idleListeningEnabledDefaults: RileyLinkBluetoothDevice.IdleListeningState = .enabled(timeout: .minutes(4), channel: 0)
+    static let idleListeningEnabledDefaults: IdleListeningState = .enabled(timeout: .minutes(4), channel: 0)
 }
 
 

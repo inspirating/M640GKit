@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import RileyLinkBLEKit
+import ESP32Kit
 
 
 /// An error that occurs during a command run

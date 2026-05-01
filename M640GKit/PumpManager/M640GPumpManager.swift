@@ -7,22 +7,21 @@
 
 import HealthKit
 import LoopKit
-import RileyLinkKit
-import RileyLinkBLEKit
+import ESP32Kit
 import os.log
 
 public protocol M640GPumpManagerStateObserver: AnyObject {
     func didUpdatePumpManagerState(_ state: M640GPumpManagerState)
 }
 
-public class M640GPumpManager: RileyLinkPumpManager {
-    
+public class M640GPumpManager: ESP32PumpManager {
+
     public static let pluginIdentifier = "M640G500"
 
     // Primarily used for testing
     public let dateGenerator: () -> Date
-        
-    public init(state: M640GPumpManagerState, rileyLinkDeviceProvider: RileyLinkDeviceProvider, pumpOps: PumpOps? = nil, dateGenerator: @escaping () -> Date = Date.init) {
+
+    public init(state: M640GPumpManagerState, esp32DeviceProvider: ESP32BluetoothDeviceProvider, pumpOps: PumpOps? = nil, dateGenerator: @escaping () -> Date = Date.init) {
         self.lockedState = Locked(state)
 
         self.dateGenerator = dateGenerator
@@ -37,15 +36,15 @@ public class M640GPumpManager: RileyLinkPumpManager {
             localIdentifier: state.pumpID,
             udiDeviceIdentifier: nil
         )
-        
-        super.init(rileyLinkDeviceProvider: rileyLinkDeviceProvider)
+
+        super.init(esp32DeviceProvider: esp32DeviceProvider)
 
         // Pump communication
         let idleListeningEnabled = state.pumpModel.hasMySentry && state.useMySentry
 
         self.pumpOps = pumpOps ?? M640GPumpOps(pumpSettings: state.pumpSettings, pumpState: state.pumpState, delegate: self)
 
-        self.rileyLinkDeviceProvider.idleListeningState = idleListeningEnabled ? M640GPumpManagerState.idleListeningEnabledDefaults : .disabled
+        self.esp32DeviceProvider?.idleListeningState = idleListeningEnabled ? M640GPumpManagerState.idleListeningEnabledDefaults : .disabled
     }
 
     public required convenience init?(rawState: PumpManager.RawStateValue) {
@@ -55,9 +54,9 @@ public class M640GPumpManager: RileyLinkPumpManager {
             return nil
         }
 
-        let deviceProvider = RileyLinkBluetoothDeviceProvider(autoConnectIDs: connectionManagerState.autoConnectIDs)
+        let deviceProvider = ESP32BluetoothDeviceProvider(autoConnectIDs: connectionManagerState.autoConnectIDs)
 
-        self.init(state: state, rileyLinkDeviceProvider: deviceProvider)
+        self.init(state: state, esp32DeviceProvider: deviceProvider)
         
         deviceProvider.delegate = self
     }
@@ -207,7 +206,7 @@ public class M640GPumpManager: RileyLinkPumpManager {
         }
     }
 
-    override public func device(_ device: RileyLinkDevice, didReceivePacket packet: RFPacket) {
+    override public func device(_ device: ESP32Device, didReceivePacket packet: RFPacket) {
         device.assertOnSessionQueue()
 
         guard let data = M640GPacket(encodedData: packet.data)?.data,
@@ -233,12 +232,12 @@ public class M640GPumpManager: RileyLinkPumpManager {
         }
     }
 
-    override public func deviceTimerDidTick(_ device: RileyLinkDevice) {
+    override public func deviceTimerDidTick(_ device: ESP32Device) {
         pumpDelegate.notify { (delegate) in
             delegate?.pumpManagerBLEHeartbeatDidFire(self)
         }
     }
-    
+
     public var rileyLinkBatteryAlertLevel: Int? {
         get {
             return state.rileyLinkBatteryAlertLevel
@@ -249,8 +248,8 @@ public class M640GPumpManager: RileyLinkPumpManager {
             }
         }
     }
-    
-    public override func device(_ device: RileyLinkDevice, didUpdateBattery level: Int) {
+
+    public override func device(_ device: ESP32Device, didUpdateBattery level: Int) {
         let repeatInterval: TimeInterval = .hours(1)
         
         if let alertLevel = state.rileyLinkBatteryAlertLevel,
@@ -286,19 +285,33 @@ public class M640GPumpManager: RileyLinkPumpManager {
     }
 }
 
+extension M640GPumpManager: ESP32BluetoothDeviceProviderDelegate {
+    public func bluetoothDeviceProvider(_ provider: ESP32BluetoothDeviceProvider, didDiscover device: ESP32Device) {
+    }
+
+    public func bluetoothDeviceProvider(_ provider: ESP32BluetoothDeviceProvider, didConnect device: ESP32Device) {
+    }
+
+    public func bluetoothDeviceProvider(_ provider: ESP32BluetoothDeviceProvider, didDisconnect device: ESP32Device) {
+    }
+
+    public func bluetoothDeviceProviderDidUpdateState(_ provider: ESP32BluetoothDeviceProvider) {
+    }
+}
+
 extension M640GPumpManager {
     /**
-     Attempts to fix an extended communication failure between a RileyLink device and the pump
+     Attempts to fix an extended communication failure between a ESP32 device and the pump
 
-     - parameter device: The RileyLink device
+     - parameter device: The ESP32 device
      */
-    private func troubleshootPumpComms(using device: RileyLinkDevice) {
+    private func troubleshootPumpComms(using device: ESP32Device) {
         device.assertOnSessionQueue()
 
         // Ensuring timer tick is enabled will allow more tries to bring the pump data up-to-date.
         updateBLEHeartbeatPreference()
 
-        // How long we should wait before we re-tune the RileyLink
+        // How long we should wait before we re-tune the ESP32
         let tuneTolerance = TimeInterval(minutes: 14)
 
         let lastTuned = state.lastTuned ?? .distantPast
@@ -310,7 +323,7 @@ extension M640GPumpManager {
                     self.log.default("Device %{public}@ auto-tuned to %{public}@ MHz", device.name ?? "", String(describing: scanResult.bestFrequency))
                 } catch let error {
                     self.log.error("Device %{public}@ auto-tune failed with error: %{public}@", device.name ?? "", String(describing: error))
-                    self.rileyLinkDeviceProvider.deprioritize(device, completion: nil)
+                    self.esp32DeviceProvider?.deprioritize(device, completion: nil)
                     if let error = error as? LocalizedError {
                         self.pumpDelegate.notify { (delegate) in
                             delegate?.pumpManager(self, didError: PumpManagerError.communication(M640GPumpManagerError.tuneFailed(error)))
@@ -319,7 +332,7 @@ extension M640GPumpManager {
                 }
             }
         } else {
-            rileyLinkDeviceProvider.deprioritize(device, completion: nil)
+            esp32DeviceProvider?.deprioritize(device, completion: nil)
         }
     }
 
@@ -356,7 +369,7 @@ extension M640GPumpManager {
     }
 
     private func setSuspendResumeState(state: SuspendResumeMessageBody.SuspendResumeState, insulinType: InsulinType, completion: @escaping (M640GPumpManagerError?) -> Void) {
-        rileyLinkDeviceProvider.getDevices { (devices) in
+        esp32DeviceProvider?.getDevices { (devices) in
             guard let device = devices.firstConnected else {
                 completion(M640GPumpManagerError.noRileyLink)
                 return
@@ -390,12 +403,12 @@ extension M640GPumpManager {
 
      This message has two important pieces of info about the pump: reservoir volume and battery.
 
-     Because the RileyLink must actively listen for these packets, they are not a reliable heartbeat. However, we can still use them to assert glucose data is current.
+     Because the ESP32 must actively listen for these packets, they are not a reliable heartbeat. However, we can still use them to assert glucose data is current.
 
      - parameter status: The status message body
-     - parameter device: The RileyLink that received the message
+     - parameter device: The ESP32 that received the message
      */
-    private func updatePumpStatus(_ status: MySentryPumpStatusMessageBody, from device: RileyLinkDevice) {
+    private func updatePumpStatus(_ status: MySentryPumpStatusMessageBody, from device: ESP32Device) {
         device.assertOnSessionQueue()
 
         log.default("MySentry message received")
@@ -406,7 +419,7 @@ extension M640GPumpManager {
         let timeZone = state.timeZone
         pumpDateComponents.timeZone = timeZone
         glucoseDateComponents?.timeZone = timeZone
-        
+
         checkRileyLinkBattery()
 
         // The pump sends the same message 3x, so ignore it if we've already seen it.
@@ -419,7 +432,7 @@ extension M640GPumpManager {
             log.error("Ignored MySentry status due to date mismatch: %{public}@ in %{public}", String(describing: pumpDate), String(describing: timeZone))
             return
         }
-        
+
         recents.latestPumpStatusFromMySentry = status
 
         switch status.glucose {
@@ -481,7 +494,7 @@ extension M640GPumpManager {
 
     
     private func checkRileyLinkBattery() {
-        rileyLinkDeviceProvider.getDevices { devices in
+        esp32DeviceProvider?.getDevices { devices in
             for device in devices {
                 device.updateBatteryLevel()
             }
@@ -732,12 +745,12 @@ extension M640GPumpManager {
             return
         }
         
-        rileyLinkDeviceProvider.getDevices { (devices) in
+        esp32DeviceProvider?.getDevices { (devices) in
             guard let device = devices.firstConnected else {
                 completion(PumpManagerError.connection(M640GPumpManagerError.noRileyLink))
                 return
             }
-            
+
             self.pumpOps.runSession(withName: "Fetch Pump History", using: device) { (session) in
                 do {
                     guard let startDate = self.pumpDelegate.call({ (delegate) in
@@ -867,7 +880,7 @@ extension M640GPumpManager {
     // Safe to call from any thread
     private var isPumpDataStale: Bool {
         // How long should we wait before we poll for new pump data?
-        let pumpStatusAgeTolerance = rileyLinkDeviceProvider.idleListeningEnabled ? TimeInterval(minutes: 6) : TimeInterval(minutes: 4)
+        let pumpStatusAgeTolerance = esp32DeviceProvider?.idleListeningEnabled ?? false ? TimeInterval(minutes: 6) : TimeInterval(minutes: 4)
 
         return isReservoirDataOlderThan(timeIntervalSinceNow: -pumpStatusAgeTolerance)
     }
@@ -890,7 +903,7 @@ extension M640GPumpManager {
 
     private func updateBLEHeartbeatPreference() {
         // Must not be called on the delegate's queue
-        rileyLinkDeviceProvider.timerTickEnabled = isPumpDataStale || pumpDelegate.call({ (delegate) -> Bool in
+        esp32DeviceProvider?.timerTickEnabled = isPumpDataStale || pumpDelegate.call({ (delegate) -> Bool in
             return delegate?.pumpManagerMustProvideBLEHeartbeat(self) == true
         })
     }
@@ -935,7 +948,7 @@ extension M640GPumpManager {
             }
             if oldValue != newValue {
                 let useIdleListening = state.pumpModel.hasMySentry && state.useMySentry
-                self.rileyLinkDeviceProvider.idleListeningState = useIdleListening ? M640GPumpManagerState.idleListeningEnabledDefaults : .disabled
+                self.esp32DeviceProvider?.idleListeningState = useIdleListening ? M640GPumpManagerState.idleListeningEnabledDefaults : .disabled
             }
         }
     }
@@ -1146,14 +1159,14 @@ extension M640GPumpManager: PumpManager {
     }
 
     public func setMustProvideBLEHeartbeat(_ mustProvideBLEHeartbeat: Bool) {
-        rileyLinkDeviceProvider.timerTickEnabled = isPumpDataStale || mustProvideBLEHeartbeat
+        esp32DeviceProvider?.timerTickEnabled = isPumpDataStale || mustProvideBLEHeartbeat
     }
 
     /**
      Ensures pump data is current by either waking and polling, or ensuring we're listening to sentry packets.
      */
     public func ensureCurrentPumpData(completion: ((Date?) -> Void)?) {
-        rileyLinkDeviceProvider.assertIdleListening(forcingRestart: true)
+        esp32DeviceProvider?.assertIdleListening(forcingRestart: true)
 
         guard isPumpDataStale else {
             log.default("Pump data is not stale: lastSync = %{public}@", String(describing: self.lastSync))
@@ -1166,7 +1179,7 @@ extension M640GPumpManager: PumpManager {
     }
 
     private func refreshPumpData(_ completion: ((Date?) -> Void)?) {
-        rileyLinkDeviceProvider.getDevices { (devices) in
+        esp32DeviceProvider?.getDevices { (devices) in
             guard let device = devices.firstConnected else {
                 let error = PumpManagerError.connection(M640GPumpManagerError.noRileyLink)
                 self.log.error("No devices found while fetching pump data")
@@ -1254,7 +1267,7 @@ extension M640GPumpManager: PumpManager {
         }
 
 
-        pumpOps.runSession(withName: "Bolus", usingSelector: rileyLinkDeviceProvider.firstConnectedDevice) { (session) in
+        pumpOps.runSession(withName: "Bolus", usingSelector: esp32DeviceProvider?.firstConnectedDevice) { (session) in
 
             guard let session = session else {
                 completion(.connection(M640GPumpManagerError.noRileyLink))
@@ -1354,7 +1367,7 @@ extension M640GPumpManager: PumpManager {
             return
         }
 
-        pumpOps.runSession(withName: "Set Temp Basal", usingSelector: rileyLinkDeviceProvider.firstConnectedDevice) { (session) in
+        pumpOps.runSession(withName: "Set Temp Basal", usingSelector: esp32DeviceProvider?.firstConnectedDevice) { (session) in
             guard let session = session else {
                 completion(.connection(M640GPumpManagerError.noRileyLink))
                 return
@@ -1439,7 +1452,7 @@ extension M640GPumpManager: PumpManager {
     public func setMaximumTempBasalRate(_ rate: Double) { }
 
     public func syncBasalRateSchedule(items scheduleItems: [RepeatingScheduleValue<Double>], completion: @escaping (Result<BasalRateSchedule, Error>) -> Void) {
-        pumpOps.runSession(withName: "Save Basal Profile", usingSelector: rileyLinkDeviceProvider.firstConnectedDevice) { (session) in
+        pumpOps.runSession(withName: "Save Basal Profile", usingSelector: esp32DeviceProvider?.firstConnectedDevice) { (session) in
             guard let session = session else {
                 completion(.failure(PumpManagerError.connection(M640GPumpManagerError.noRileyLink)))
                 return
@@ -1460,7 +1473,7 @@ extension M640GPumpManager: PumpManager {
     }
 
     public func syncDeliveryLimits(limits deliveryLimits: DeliveryLimits, completion: @escaping (Result<DeliveryLimits, Error>) -> Void) {
-        pumpOps.runSession(withName: "Save Settings", usingSelector: rileyLinkDeviceProvider.firstConnectedDevice) { (session) in
+        pumpOps.runSession(withName: "Save Settings", usingSelector: esp32DeviceProvider?.firstConnectedDevice) { (session) in
             guard let session = session else {
                 completion(.failure(PumpManagerError.connection(M640GPumpManagerError.noRileyLink)))
                 return
@@ -1492,7 +1505,7 @@ extension M640GPumpManager: PumpManager {
     }
 
     public func setTime(completion: @escaping (PumpManagerError?) -> Void) {
-        pumpOps.runSession(withName: "Set time", usingSelector: rileyLinkDeviceProvider.firstConnectedDevice) { (session) in
+        pumpOps.runSession(withName: "Set time", usingSelector: esp32DeviceProvider?.firstConnectedDevice) { (session) in
             do {
                 guard let session = session else {
                     throw PumpManagerError.connection(M640GPumpManagerError.noRileyLink)
@@ -1577,7 +1590,7 @@ extension M640GPumpManager: CGMManager {
     }
 
     public func fetchNewDataIfNeeded(_ completion: @escaping (CGMReadingResult) -> Void) {
-        rileyLinkDeviceProvider.getDevices { (devices) in
+        esp32DeviceProvider?.getDevices { (devices) in
             guard let device = devices.firstConnected else {
                 completion(.error(PumpManagerError.connection(M640GPumpManagerError.noRileyLink)))
                 return

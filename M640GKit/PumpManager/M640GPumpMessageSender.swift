@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import RileyLinkBLEKit
+import ESP32Kit
 import os.log
 
 
@@ -31,7 +31,7 @@ struct M640GPumpMessageSender: PumpMessageSender {
         try commandSession.resetRadioConfig()
     }
 
-    func updateRegister(_ address: RileyLinkBLEKit.CC111XRegister, value: UInt8) throws {
+    func updateRegister(_ address: CC111XRegister, value: UInt8) throws {
         try commandSession.updateRegister(address, value: value)
     }
 
@@ -39,11 +39,11 @@ struct M640GPumpMessageSender: PumpMessageSender {
         try commandSession.setBaseFrequency(frequency)
     }
 
-    func listen(onChannel channel: Int, timeout: TimeInterval) throws -> RileyLinkBLEKit.RFPacket? {
+    func listen(onChannel channel: Int, timeout: TimeInterval) throws -> RFPacket? {
         return try commandSession.listen(onChannel: channel, timeout: timeout)
     }
 
-    func getRileyLinkStatistics() throws -> RileyLinkBLEKit.RileyLinkStatistics {
+    func getRileyLinkStatistics() throws -> RileyLinkStatistics {
         return try commandSession.getRileyLinkStatistics()
     }
 

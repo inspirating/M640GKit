@@ -8,7 +8,7 @@
 
 import Foundation
 import LoopKit
-import RileyLinkBLEKit
+import ESP32Kit
 
 
 public protocol PumpOpsSessionDelegate: AnyObject {
