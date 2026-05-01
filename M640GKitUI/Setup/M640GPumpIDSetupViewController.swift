@@ -9,12 +9,11 @@ import UIKit
 import LoopKit
 import LoopKitUI
 import M640GKit
-import RileyLinkKit
 
 
 class M640GPumpIDSetupViewController: SetupTableViewController {
 
-    var rileyLinkPumpManager: RileyLinkPumpManager!
+    var esp32PumpManager: M640GPumpManager!
 
     private enum RegionCode: String {
         case northAmerica = "NA"
@@ -96,7 +95,7 @@ class M640GPumpIDSetupViewController: SetupTableViewController {
                 pumpModel: pumpModel,
                 pumpFirmwareVersion: pumpFirmwareVersion,
                 pumpRegion: pumpRegion,
-                rileyLinkConnectionState: rileyLinkPumpManager.rileyLinkConnectionManagerState,
+                rileyLinkConnectionState: esp32PumpManager.rileyLinkConnectionManagerState,
                 timeZone: timeZone,
                 suspendState: .resumed(Date()),
                 insulinType: insulinType,
@@ -114,7 +113,7 @@ class M640GPumpIDSetupViewController: SetupTableViewController {
 
         return M640GPumpManager(
             state: pumpManagerState,
-            rileyLinkDeviceProvider: rileyLinkPumpManager.rileyLinkDeviceProvider)
+            esp32DeviceProvider: esp32PumpManager.esp32DeviceProvider)
     }
 
     // MARK: -
@@ -250,7 +249,7 @@ class M640GPumpIDSetupViewController: SetupTableViewController {
 
         let pumpOps = M640GPumpOps(pumpSettings: settings, pumpState: pumpState, delegate: self)
         self.pumpOps = pumpOps
-        pumpOps.runSession(withName: "Pump ID Setup", usingSelector: rileyLinkPumpManager.rileyLinkDeviceProvider.firstConnectedDevice, { (session) in
+        pumpOps.runSession(withName: "Pump ID Setup", usingSelector: esp32PumpManager.esp32DeviceProvider?.firstConnectedDevice, { (session) in
             guard let session = session else {
                 DispatchQueue.main.async {
                     self.lastError = PumpManagerError.connection(M640GPumpManagerError.noRileyLink)

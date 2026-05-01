@@ -30,8 +30,8 @@ public class M640GPumpManagerSetupViewController: RileyLinkManagerSetupViewContr
         }
         navigationBar.shadowImage = UIImage()
         
-        if let pumpIDSetupVC = topViewController as? M640GPumpIDSetupViewController, let rileyLinkPumpManager = rileyLinkPumpManager {
-            pumpIDSetupVC.rileyLinkPumpManager = rileyLinkPumpManager
+        if let pumpIDSetupVC = topViewController as? M640GPumpIDSetupViewController, let esp32PumpManager = pumpManager {
+            pumpIDSetupVC.esp32PumpManager = esp32PumpManager
         }
 
     }
@@ -69,7 +69,7 @@ public class M640GPumpManagerSetupViewController: RileyLinkManagerSetupViewContr
         // Set state values
         switch viewController {
         case let vc as M640GPumpIDSetupViewController:
-            vc.rileyLinkPumpManager = rileyLinkPumpManager
+            vc.esp32PumpManager = pumpManager
             vc.maxBolusUnits = maxBolusUnits
             vc.maxBasalRateUnitsPerHour = maxBasalRateUnitsPerHour
             vc.basalSchedule = basalSchedule
