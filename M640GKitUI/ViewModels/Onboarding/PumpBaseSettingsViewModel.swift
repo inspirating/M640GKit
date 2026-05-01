@@ -51,10 +51,11 @@ class PumpBaseSettingsViewModel: ObservableObject {
         }
 
         pumpManager.state.pumpSN = snData
-        guard pumpManager.state.model != "INVALID" else {
-            errorMessage = "Incorrect serial number received"
-            return
-        }
+        // 绕过序列号验证,直接进入下一个页面
+        // guard pumpManager.state.model != "INVALID" else {
+        //     errorMessage = "Incorrect serial number received"
+        //     return
+        // }
 
         errorMessage = ""
 
