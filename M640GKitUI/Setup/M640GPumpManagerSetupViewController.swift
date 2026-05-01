@@ -73,8 +73,6 @@ public class M640GPumpManagerSetupViewController: RileyLinkManagerSetupViewContr
             vc.maxBolusUnits = maxBolusUnits
             vc.maxBasalRateUnitsPerHour = maxBasalRateUnitsPerHour
             vc.basalSchedule = basalSchedule
-        case let vc as M640GPumpSentrySetupViewController:
-            vc.pumpManager = pumpManager
         case let vc as M640GPumpSetupCompleteViewController:
             vc.pumpImage = pumpManager?.state.largePumpImage
         default:
