@@ -1,16 +1,16 @@
 import Combine
 import OSLog
 
-class MedtrumLogger {
+class M640GKitLogger {
     private let logger: Logger
     private let fileManager = FileManager.default
 
     init(category: String) {
-        logger = Logger(subsystem: "org.nightscout.MedtrumKit", category: category)
+        logger = Logger(subsystem: "org.nightscout.M640GKit", category: category)
     }
 
     public func debug(_ msg: String, file: String = #file, _ function: String = #function, _ line: Int = #line) {
-        #if MEDTRUM_DEBUG_LOGS
+        #if M640GKit_DEBUG_LOGS
             let message = "\(file.file) - \(function)#\(line): \(msg)"
             logger.debug("\(message, privacy: .public)")
             writeToFile(message, .debug)
@@ -64,15 +64,15 @@ class MedtrumLogger {
     }
 
     private var logFile: String {
-        getDocumentsDirectory().appendingPathComponent("medtrumkit/medtrumkit_log.txt").path
+        getDocumentsDirectory().appendingPathComponent("M640GKit/M640GKit_log.txt").path
     }
 
     private var logDir: String {
-        getDocumentsDirectory().appendingPathComponent("medtrumkit").path
+        getDocumentsDirectory().appendingPathComponent("M640GKit").path
     }
 
     private var logFilePrev: String {
-        getDocumentsDirectory().appendingPathComponent("medtrumkit/medtrumkit_log_prev.txt").path
+        getDocumentsDirectory().appendingPathComponent("M640GKit/M640GKit_log_prev.txt").path
     }
 
     private func getDocumentsDirectory() -> URL {

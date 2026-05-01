@@ -1626,7 +1626,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "激活补丁"
+            "value" : "激活补�?
           }
         }
       }
@@ -1692,7 +1692,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "でパッチが作動した。"
+            "value" : "でパッチが作動した�?
           }
         },
         "nb" : {
@@ -1926,7 +1926,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "年龄："
+            "value" : "年龄�?
           }
         }
       }
@@ -2142,7 +2142,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "警告：1日の最大インスリン量"
+            "value" : "警告�?日の最大インスリン�?
           }
         },
         "nb" : {
@@ -2292,7 +2292,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アラート：1時間ごとの最大インスリン量"
+            "value" : "アラート�?時間ごとの最大インスリン�?
           }
         },
         "nb" : {
@@ -2370,7 +2370,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cảnh báo: Liều insulin tối đa mỗi giờ"
+            "value" : "Cảnh báo: Liều insulin tối đa mỗi gi�?
           }
         },
         "zh-Hans" : {
@@ -2381,152 +2381,152 @@
         }
       }
     },
-    "Are you sure you want to stop using Medtrum TouchCare Nano 200u/300u?" : {
+    "Are you sure you want to stop using M640GKit TouchCare Nano 200u/300u?" : {
       "comment" : "Message for PumpManager deletion action sheet",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "هل أنت متأكد من أنك تريد التوقف عن استخدام Medtrum TouchCare Nano 200u/300u؟"
+            "value" : "هل أنت متأكد من أنك تريد التوقف عن استخدام M640GKit TouchCare Nano 200u/300u؟"
           }
         },
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Are you sure you want to stop using Medtrum TouchCare Nano 200u/300u?"
+            "value" : "Are you sure you want to stop using M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Er du sikker på, at du vil stoppe med at bruge Medtrum TouchCare Nano 200u/300u?"
+            "value" : "Er du sikker på, at du vil stoppe med at bruge M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sind Sie sicher, dass Sie die Verwendung von Medtrum TouchCare Nano 200u/300u beenden möchten?"
+            "value" : "Sind Sie sicher, dass Sie die Verwendung von M640GKit TouchCare Nano 200u/300u beenden möchten?"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Are you sure you want to stop using Medtrum TouchCare Nano 200u/300u?"
+            "value" : "Are you sure you want to stop using M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "¿Está seguro de que desea dejar de usar Medtrum TouchCare Nano 200u/300u?"
+            "value" : "¿Está seguro de que desea dejar de usar M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Oletko varma, että haluat lopettaa Medtrum TouchCare Nano 200u/300u?"
+            "value" : "Oletko varma, että haluat lopettaa M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Êtes-vous sûr de vouloir arrêter d'utiliser Medtrum TouchCare Nano 200u/300u?"
+            "value" : "Êtes-vous sûr de vouloir arrêter d'utiliser M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sei sicuro di voler smettere di usare Medtrum TouchCare Nano 200u/300u?"
+            "value" : "Sei sicuro di voler smettere di usare M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Medtrum TouchCare Nano 200u/300uの使用を中止してもよろしいですか？"
+            "value" : "M640GKit TouchCare Nano 200u/300uの使用を中止してもよろしいですか�?
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Er du sikker på at du ønsker å slutte med Medtrum TouchCare Nano 200u/300u?"
+            "value" : "Er du sikker på at du ønsker å slutte med M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "nb-NO" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Er du sikker på at du vil slutte å bruke Medtrum TouchCare Nano 200u/300u?"
+            "value" : "Er du sikker på at du vil slutte å bruke M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Weet je zeker dat je geen gebruik meer wilt maken van Medtrum TouchCare Nano 200u/300u?"
+            "value" : "Weet je zeker dat je geen gebruik meer wilt maken van M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Czy na pewno chcesz przerwać stosowanie Medtrum TouchCare Nano 200u/300?"
+            "value" : "Czy na pewno chcesz przerwać stosowanie M640GKit TouchCare Nano 200u/300?"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tem certeza que deseja parar de usar o Medtrum TouchCare Nano 200u/300u?"
+            "value" : "Tem certeza que deseja parar de usar o M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sigur doriți să opriți utilizarea Medtrum TouchCare Nano 200u/300u?"
+            "value" : "Sigur doriți să opriți utilizarea M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Вы уверены, что хотите прекратить использование Medtrum TouchCare Nano 200u/300u?"
+            "value" : "Вы уверены, что хотите прекратить использование M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Naozaj chcete prestať používať Medtrum TouchCare Nano 200U/300U?"
+            "value" : "Naozaj chcete prestať používať M640GKit TouchCare Nano 200U/300U?"
           }
         },
         "sl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ste prepričani, da želite prenehati uporabljati zdravilo Medtrum TouchCare Nano 200u/300u?"
+            "value" : "Ste prepričani, da želite prenehati uporabljati zdravilo M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Är du säker på att du vill sluta använda Medtrum TouchCare Nano 200u/300u?"
+            "value" : "Är du säker på att du vill sluta använda M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Medtrum TouchCare Nano 200u/300u kullanmayı bırakmak istediğinizden emin misiniz?"
+            "value" : "M640GKit TouchCare Nano 200u/300u kullanmayı bırakmak istediğinizden emin misiniz?"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ви впевнені, що хочете припинити використання Medtrum TouchCare Nano 200u/300u?"
+            "value" : "Ви впевнені, що хочете припинити використання M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Are you sure you want to stop using Medtrum TouchCare Nano 200u/300u?"
+            "value" : "Are you sure you want to stop using M640GKit TouchCare Nano 200u/300u?"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "您确定要停止使用Medtrum TouchCare Nano 200u/300u？"
+            "value" : "您确定要停止使用M640GKit TouchCare Nano 200u/300u�?
           }
         }
       }
@@ -2676,7 +2676,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你确定吗？"
+            "value" : "你确定吗�?
           }
         }
       }
@@ -2742,7 +2742,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプを本体に取り付ける。"
+            "value" : "ポンプを本体に取り付ける�?
           }
         },
         "nb" : {
@@ -2826,7 +2826,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将水泵附加到身体上。"
+            "value" : "将水泵附加到身体上�?
           }
         }
       }
@@ -2976,7 +2976,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "验证并停用补丁"
+            "value" : "验证并停用补�?
           }
         }
       }
@@ -3042,7 +3042,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "バッテリー"
+            "value" : "バッテリ�?
           }
         },
         "nb" : {
@@ -3126,7 +3126,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "电量："
+            "value" : "电量�?
           }
         }
       }
@@ -3342,7 +3342,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "キャンセル"
+            "value" : "キャンセ�?
           }
         },
         "nb" : {
@@ -3492,7 +3492,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "今すぐパッチを交換してください。インスリンの投与は、%@ またはインスリンの残りがなくなると停止します。"
+            "value" : "今すぐパッチを交換してください。インスリンの投与は�?@ またはインスリンの残りがなくなると停止します�?
           }
         },
         "nb" : {
@@ -3570,13 +3570,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Thay miếng dán ngay. Việc cung cấp insulin sẽ dừng lại sau %@ hoặc khi hết insulin."
+            "value" : "Thay miếng dán ngay. Việc cung cấp insulin s�?dừng lại sau %@ hoặc khi hết insulin."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "现在就更换补丁。胰岛素输送将在 %@ 或胰岛素耗尽时停止。"
+            "value" : "现在就更换补丁。胰岛素输送将�?%@ 或胰岛素耗尽时停止�?
           }
         }
       }
@@ -3642,7 +3642,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "でチェックした。"
+            "value" : "でチェックした�?
           }
         },
         "nb" : {
@@ -3726,7 +3726,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "检查地点"
+            "value" : "检查地�?
           }
         }
       }
@@ -4092,7 +4092,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプベースをパッチに接続する。"
+            "value" : "ポンプベースをパッチに接続する�?
           }
         },
         "nb" : {
@@ -4176,7 +4176,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将您的泵库连接到补丁。"
+            "value" : "将您的泵库连接到补丁�?
           }
         }
       }
@@ -4326,7 +4326,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已连接"
+            "value" : "已连�?
           }
         }
       }
@@ -4392,7 +4392,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "続ける"
+            "value" : "続け�?
           }
         },
         "nb" : {
@@ -4542,7 +4542,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "現在、あなたはハートビートモードを使用していません。ハートビートは、 %%1$@ をバックグラウンドで実行し続けるために必要です。この機能を有効にしておくことをお勧めします。"
+            "value" : "現在、あなたはハートビートモードを使用していません。ハートビートは�?%%1$@ をバックグラウンドで実行し続けるために必要です。この機能を有効にしておくことをお勧めします�?
           }
         },
         "nb" : {
@@ -4626,7 +4626,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "目前，您没有使用心动模式。需要心动才能保持 %%1$@ 在后台运行。 建议保持启用此功能"
+            "value" : "目前，您没有使用心动模式。需要心动才能保�?%%1$@ 在后台运行�?建议保持启用此功�?
           }
         }
       }
@@ -4692,7 +4692,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "現在、あなたはハートビートモードを使用しています。これは、 %%1$@ をバックグラウンドで実行し続けるために必要です。お使いの CGM がすでにハートビートを提供している場合、これは興味深いかもしれません。この機能は有効にしておくことをお勧めします。"
+            "value" : "現在、あなたはハートビートモードを使用しています。これは�?%%1$@ をバックグラウンドで実行し続けるために必要です。お使い�?CGM がすでにハートビートを提供している場合、これは興味深いかもしれません。この機能は有効にしておくことをお勧めします�?
           }
         },
         "nb" : {
@@ -4776,7 +4776,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "目前，您正在使用心跳模式。这需要保持 %%1$@ 在后台运行。 如果您的 CGM 已经提供了一个心声，这可能是有趣的。建议保持启用此功能"
+            "value" : "目前，您正在使用心跳模式。这需要保�?%%1$@ 在后台运行�?如果您的 CGM 已经提供了一个心声，这可能是有趣的。建议保持启用此功能"
           }
         }
       }
@@ -4842,7 +4842,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "日"
+            "value" : "�?
           }
         },
         "nb" : {
@@ -4926,7 +4926,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "天"
+            "value" : "�?
           }
         }
       }
@@ -4992,7 +4992,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "日"
+            "value" : "�?
           }
         },
         "nb" : {
@@ -5076,7 +5076,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "天"
+            "value" : "�?
           }
         }
       }
@@ -5142,7 +5142,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチの無効化"
+            "value" : "パッチの無効�?
           }
         },
         "nb" : {
@@ -5292,7 +5292,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチの無効化"
+            "value" : "パッチの無効�?
           }
         },
         "nb" : {
@@ -5442,7 +5442,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "で活動停止"
+            "value" : "で活動停�?
           }
         },
         "nb" : {
@@ -5526,7 +5526,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "停用于"
+            "value" : "停用�?
           }
         }
       }
@@ -6492,7 +6492,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチはまだボディに貼り付けないでください"
+            "value" : "パッチはまだボディに貼り付けないでくださ�?
           }
         },
         "nb" : {
@@ -6576,7 +6576,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "尚未将补丁附加到正文中"
+            "value" : "尚未将补丁附加到正文�?
           }
         }
       }
@@ -6876,7 +6876,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "补丁过期于"
+            "value" : "补丁过期�?
           }
         }
       }
@@ -6942,7 +6942,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "延長パッチは期限切れ。ベーサルのみ。"
+            "value" : "延長パッチは期限切れ。ベーサルのみ�?
           }
         },
         "nb" : {
@@ -7020,13 +7020,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bản vá mở rộng đã hết hạn. Chỉ còn bản vá cơ bản."
+            "value" : "Bản vá m�?rộng đã hết hạn. Ch�?còn bản vá cơ bản."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "扩展补丁已过期。仅限基质。"
+            "value" : "扩展补丁已过期。仅限基质�?
           }
         }
       }
@@ -7092,7 +7092,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチにインスリンを注入する。注：活性化には最低70Uが必要です。"
+            "value" : "パッチにインスリンを注入する。注：活性化には最�?0Uが必要です�?
           }
         },
         "nb" : {
@@ -7176,7 +7176,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "用绝缘填充补丁。注意：激活至少需要70U。"
+            "value" : "用绝缘填充补丁。注意：激活至少需�?0U�?
           }
         }
       }
@@ -7242,7 +7242,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "注射器にインスリンを入れる"
+            "value" : "注射器にインスリンを入れ�?
           }
         },
         "nb" : {
@@ -7470,7 +7470,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Buộc gỡ bỏ"
+            "value" : "Buộc g�?b�?
           }
         },
         "zh-Hans" : {
@@ -7542,7 +7542,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "プライミングに戻る"
+            "value" : "プライミングに戻�?
           }
         },
         "nb" : {
@@ -7692,7 +7692,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプベースに戻る"
+            "value" : "ポンプベースに戻�?
           }
         },
         "nb" : {
@@ -7776,7 +7776,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "返回泵基地"
+            "value" : "返回泵基�?
           }
         }
       }
@@ -7842,7 +7842,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "時"
+            "value" : "�?
           }
         },
         "nb" : {
@@ -8142,7 +8142,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "インフォメーション"
+            "value" : "インフォメーショ�?
           }
         },
         "nb" : {
@@ -8526,7 +8526,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "硫化物交付"
+            "value" : "硫化物交�?
           }
         }
       }
@@ -8592,7 +8592,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "インスリンは中断している！"
+            "value" : "インスリンは中断している�?
           }
         },
         "nb" : {
@@ -8670,13 +8670,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Insulin đã bị ngừng!"
+            "value" : "Insulin đã b�?ngừng!"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "胰岛素已暂停使用！"
+            "value" : "胰岛素已暂停使用�?
           }
         }
       }
@@ -8742,7 +8742,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "インスリン残量"
+            "value" : "インスリン残�?
           }
         },
         "nb" : {
@@ -8826,7 +8826,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "剩余硫化物"
+            "value" : "剩余硫化�?
           }
         }
       }
@@ -9042,7 +9042,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "最初に無効化することをお勧めします。"
+            "value" : "最初に無効化することをお勧めします�?
           }
         },
         "nb" : {
@@ -9126,7 +9126,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "建议先停用"
+            "value" : "建议先停�?
           }
         }
       }
@@ -9426,7 +9426,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "光和蜂鸣声"
+            "value" : "光和蜂鸣�?
           }
         }
       }
@@ -9642,7 +9642,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ライトオンリー"
+            "value" : "ライトオンリ�?
           }
         },
         "nb" : {
@@ -9726,7 +9726,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "仅灯光"
+            "value" : "仅灯�?
           }
         }
       }
@@ -9792,7 +9792,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ライト、バイブレーション、ビープ音"
+            "value" : "ライト、バイブレーション、ビープ�?
           }
         },
         "nb" : {
@@ -9876,7 +9876,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "灯光、振动和蜂鸣声"
+            "value" : "灯光、振动和蜂鸣�?
           }
         }
       }
@@ -10026,7 +10026,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "装载量"
+            "value" : "装载�?
           }
         }
       }
@@ -10092,7 +10092,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチに接続する前に、シリアル番号が正しいことを確認してください。"
+            "value" : "パッチに接続する前に、シリアル番号が正しいことを確認してください�?
           }
         },
         "nb" : {
@@ -10176,7 +10176,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在连接到补丁前，请确保序列号正确。"
+            "value" : "在连接到补丁前，请确保序列号正确�?
           }
         }
       }
@@ -10242,7 +10242,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプ時間を手動で同期"
+            "value" : "ポンプ時間を手動で同�?
           }
         },
         "nb" : {
@@ -10320,13 +10320,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Đồng bộ hóa thời gian bơm theo cách thủ công"
+            "value" : "Đồng b�?hóa thời gian bơm theo cách th�?công"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "手动同步泵时间"
+            "value" : "手动同步泵时�?
           }
         }
       }
@@ -10392,7 +10392,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "1日の最大インスリン量"
+            "value" : "1日の最大インスリン�?
           }
         },
         "nb" : {
@@ -10542,7 +10542,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "1時間当たりの最大インスリン量"
+            "value" : "1時間当たりの最大インスリン�?
           }
         },
         "nb" : {
@@ -10626,7 +10626,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "最大每小时绝缘数"
+            "value" : "最大每小时绝缘�?
           }
         }
       }
@@ -10842,7 +10842,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "議事録"
+            "value" : "議事�?
           }
         },
         "nb" : {
@@ -11292,7 +11292,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチなし"
+            "value" : "パッチな�?
           }
         },
         "nb" : {
@@ -11376,7 +11376,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无补丁"
+            "value" : "无补�?
           }
         }
       }
@@ -11526,7 +11526,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "否，保持原来的状态"
+            "value" : "否，保持原来的状�?
           }
         }
       }
@@ -11670,7 +11670,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Không, giữ nguyên bơm như hiện tại."
+            "value" : "Không, gi�?nguyên bơm như hiện tại."
           }
         },
         "zh-Hans" : {
@@ -11976,7 +11976,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "补丁激活"
+            "value" : "补丁激�?
           }
         }
       }
@@ -12192,7 +12192,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチ期限切れ"
+            "value" : "パッチ期限切�?
           }
         },
         "nb" : {
@@ -12276,7 +12276,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "补丁已过期"
+            "value" : "补丁已过�?
           }
         }
       }
@@ -12342,7 +12342,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチは期限切れ。基礎のみ。"
+            "value" : "パッチは期限切れ。基礎のみ�?
           }
         },
         "nb" : {
@@ -12420,13 +12420,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bản vá đã hết hạn. Chỉ áp dụng cho cơ bản."
+            "value" : "Bản vá đã hết hạn. Ch�?áp dụng cho cơ bản."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "补丁已过期。仅限基质。"
+            "value" : "补丁已过期。仅限基质�?
           }
         }
       }
@@ -12642,7 +12642,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチが中断されました。xxx0xx}の上限を超えた。U を超えました。リミットを増やせば、今すぐアラートを解除できる。待っていれば、十分な時間が経過した時点でパッチが再開される。"
+            "value" : "パッチが中断されました。xxx0xx}の上限を超えた。U を超えました。リミットを増やせば、今すぐアラートを解除できる。待っていれば、十分な時間が経過した時点でパッチが再開される�?
           }
         },
         "nb" : {
@@ -12720,13 +12720,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quá trình cập nhật bị tạm dừng. Đã vượt quá giới hạn %lld U. Nếu bạn tăng giới hạn, bạn có thể xóa cảnh báo ngay bây giờ. Nếu bạn chờ, quá trình cập nhật sẽ tiếp tục khi đủ thời gian trôi qua."
+            "value" : "Quá trình cập nhật b�?tạm dừng. Đã vượt quá giới hạn %lld U. Nếu bạn tăng giới hạn, bạn có th�?xóa cảnh báo ngay bây gi�? Nếu bạn ch�? quá trình cập nhật s�?tiếp tục khi đ�?thời gian trôi qua."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "补丁程序已暂停。已超出 %lld 个 U 的限制。如果您提高限制，即可立即清除此警告。如果您稍等片刻，补丁程序将在足够长的时间后恢复运行。"
+            "value" : "补丁程序已暂停。已超出 %lld �?U 的限制。如果您提高限制，即可立即清除此警告。如果您稍等片刻，补丁程序将在足够长的时间后恢复运行�?
           }
         }
       }
@@ -12792,7 +12792,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチ寿命"
+            "value" : "パッチ寿�?
           }
         },
         "nb" : {
@@ -12876,7 +12876,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "补丁生存期"
+            "value" : "补丁生存�?
           }
         }
       }
@@ -13092,7 +13092,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチ設定"
+            "value" : "パッチ設�?
           }
         },
         "nb" : {
@@ -13242,7 +13242,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチ状態"
+            "value" : "パッチ状�?
           }
         },
         "nb" : {
@@ -13326,7 +13326,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "补丁状态"
+            "value" : "补丁状�?
           }
         }
       }
@@ -13392,7 +13392,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチ・タイム"
+            "value" : "パッチ・タイ�?
           }
         },
         "nb" : {
@@ -13542,7 +13542,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "注射器をパッチの中に入れ、1～2ダッシュ分の空気を抜く。"
+            "value" : "注射器をパッチの中に入れ�?�?ダッシュ分の空気を抜く�?
           }
         },
         "nb" : {
@@ -13626,7 +13626,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将注射器放在补丁中，然后拉出1到2破碎的空气。"
+            "value" : "将注射器放在补丁中，然后拉出1�?破碎的空气�?
           }
         }
       }
@@ -13692,7 +13692,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ニードルボタンを押し、プライミングを開始する。"
+            "value" : "ニードルボタンを押し、プライミングを開始する�?
           }
         },
         "nb" : {
@@ -13776,7 +13776,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "按下针头按钮并启动初始化过程。"
+            "value" : "按下针头按钮并启动初始化过程�?
           }
         }
       }
@@ -13842,7 +13842,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "針ボタンを押して針を挿入します。Activate \"をクリックし、アクティベーションを完了します。"
+            "value" : "針ボタンを押して針を挿入します。Activate \"をクリックし、アクティベーションを完了します�?
           }
         },
         "nb" : {
@@ -13890,7 +13890,7 @@
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stlačte tlačidlo ihly, aby ste vložili ihlu. Kliknite na „Aktivovať“, aby ste dokončili proces aktivácie."
+            "value" : "Stlačte tlačidlo ihly, aby ste vložili ihlu. Kliknite na „Aktivovať�? aby ste dokončili proces aktivácie."
           }
         },
         "sl" : {
@@ -13926,7 +13926,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "按下针键插入针头。点击“激活”来完成激活过程。"
+            "value" : "按下针键插入针头。点击“激活”来完成激活过程�?
           }
         }
       }
@@ -13992,7 +13992,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "前パッチの詳細"
+            "value" : "前パッチの詳�?
           }
         },
         "nb" : {
@@ -14076,7 +14076,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "之前的补丁详情"
+            "value" : "之前的补丁详�?
           }
         }
       }
@@ -14142,7 +14142,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプベースファームウェア"
+            "value" : "ポンプベースファームウェ�?
           }
         },
         "nb" : {
@@ -14226,7 +14226,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "泵底座固件"
+            "value" : "泵底座固�?
           }
         }
       }
@@ -14292,7 +14292,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプベースモデル"
+            "value" : "ポンプベースモデ�?
           }
         },
         "nb" : {
@@ -14442,7 +14442,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプベースの設定"
+            "value" : "ポンプベースの設�?
           }
         },
         "nb" : {
@@ -14742,7 +14742,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "再接続"
+            "value" : "再接�?
           }
         },
         "nb" : {
@@ -14892,7 +14892,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "再接続..."
+            "value" : "再接�?.."
           }
         },
         "nb" : {
@@ -15192,7 +15192,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチから安全カバーを外す。"
+            "value" : "パッチから安全カバーを外す�?
           }
         },
         "nb" : {
@@ -15276,7 +15276,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "从补丁中移除安全封面。"
+            "value" : "从补丁中移除安全封面�?
           }
         }
       }
@@ -15420,7 +15420,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hãy thay miếng dán ngay bây giờ!"
+            "value" : "Hãy thay miếng dán ngay bây gi�?"
           }
         },
         "zh-Hans" : {
@@ -15492,7 +15492,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "リザーバ低 (%lld U)"
+            "value" : "リザーバ�?(%lld U)"
           }
         },
         "nb" : {
@@ -15570,13 +15570,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mức nước thấp trong hồ chứa (%lld U)"
+            "value" : "Mức nước thấp trong h�?chứa (%lld U)"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "水库低位（%lld U）"
+            "value" : "水库低位�?lld U�?
           }
         }
       }
@@ -15642,7 +15642,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "保存して続ける"
+            "value" : "保存して続け�?
           }
         },
         "nb" : {
@@ -15726,7 +15726,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "保存并继续"
+            "value" : "保存并继�?
           }
         }
       }
@@ -15792,7 +15792,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "予定ベース"
+            "value" : "予定ベー�?
           }
         },
         "nb" : {
@@ -15942,7 +15942,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "インスリンの種類を選ぶ"
+            "value" : "インスリンの種類を選�?
           }
         },
         "nb" : {
@@ -16092,7 +16092,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "使用するインスリンの種類を選択する。"
+            "value" : "使用するインスリンの種類を選択する�?
           }
         },
         "nb" : {
@@ -16176,7 +16176,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择您将使用的绝缘类型"
+            "value" : "选择您将使用的绝缘类�?
           }
         }
       }
@@ -16326,12 +16326,12 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "序列号"
+            "value" : "序列�?
           }
         }
       }
     },
-    "Share Medtrum patch logs" : {
+    "Share M640GKit patch logs" : {
       "comment" : "Share logs",
       "extractionState" : "manual",
       "localizations" : {
@@ -16344,139 +16344,139 @@
         "cs" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Share Medtrum patch logs"
+            "value" : "Share M640GKit patch logs"
           }
         },
         "da" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Del Medtrum patch logs"
+            "value" : "Del M640GKit patch logs"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Medtrum Patchlogs teilen"
+            "value" : "M640GKit Patchlogs teilen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Share Medtrum patch logs"
+            "value" : "Share M640GKit patch logs"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compartir registros de parche Medtrum"
+            "value" : "Compartir registros de parche M640GKit"
           }
         },
         "fi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Jaa Medtrum laastari lokit"
+            "value" : "Jaa M640GKit laastari lokit"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Partager les rustines de Medtrum"
+            "value" : "Partager les rustines de M640GKit"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Condividi i log delle patch Medtrum"
+            "value" : "Condividi i log delle patch M640GKit"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Medtrumのパッチログを共有する"
+            "value" : "M640GKitのパッチログを共有す�?
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Del «Medtrum feilloggene»"
+            "value" : "Del «M640GKit feilloggene»"
           }
         },
         "nb-NO" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Del Medtrums oppdateringslogger"
+            "value" : "Del M640GKits oppdateringslogger"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deel Medtrum patch-logs"
+            "value" : "Deel M640GKit patch-logs"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Udostępnij dzienniki aplikacji Medtrum"
+            "value" : "Udostępnij dzienniki aplikacji M640GKit"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compartilhar registros de correções Medtrum"
+            "value" : "Compartilhar registros de correções M640GKit"
           }
         },
         "ro" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Distribuie jurnalele plasturelui Medtrum"
+            "value" : "Distribuie jurnalele plasturelui M640GKit"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Поделиться журналами Medtrum"
+            "value" : "Поделиться журналами M640GKit"
           }
         },
         "sk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zdieľať logy náplaste Medtrum"
+            "value" : "Zdieľať logy náplaste M640GKit"
           }
         },
         "sl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Skupna raba dnevnikov popravkov Medtrum"
+            "value" : "Skupna raba dnevnikov popravkov M640GKit"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dela Medtrum-patch loggar"
+            "value" : "Dela M640GKit-patch loggar"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Medtrum yama günlüklerini paylaşın"
+            "value" : "M640GKit yama günlüklerini paylaşın"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Поділіться журналами виправлень Medtrum"
+            "value" : "Поділіться журналами виправлень M640GKit"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Share Medtrum patch logs"
+            "value" : "Share M640GKit patch logs"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "分享移宇泵日志"
+            "value" : "分享移宇泵日�?
           }
         }
       }
@@ -16776,7 +16776,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "开始设置"
+            "value" : "开始设�?
           }
         }
       }
@@ -16842,7 +16842,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ステータス"
+            "value" : "ステータ�?
           }
         },
         "nb" : {
@@ -16926,7 +16926,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "状态"
+            "value" : "状�?
           }
         }
       }
@@ -16992,7 +16992,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチデータの同期"
+            "value" : "パッチデータの同�?
           }
         },
         "nb" : {
@@ -17292,7 +17292,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチは3日と8時間のみ使用することを意図しています。この時間を超えると、パッチが信頼できなくなることがあります。これは推奨されません。通常の寿命の使用を検討してください。最新世代のポンプベースの新しいファームウェアは、5日（120時間）後にボーラスコマンドをブロックすることがありますのでご注意ください。"
+            "value" : "パッチは3日と8時間のみ使用することを意図しています。この時間を超えると、パッチが信頼できなくなることがあります。これは推奨されません。通常の寿命の使用を検討してください。最新世代のポンプベースの新しいファームウェアは�?日（120時間）後にボーラスコマンドをブロックすることがありますのでご注意ください�?
           }
         },
         "nb" : {
@@ -17370,13 +17370,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Miếng dán này được thiết kế để sử dụng trong vòng 3 ngày và 8 giờ. Việc sử dụng quá thời gian này có thể khiến miếng dán trở nên không đáng tin cậy. Điều này KHÔNG được khuyến nghị. Hãy xem xét việc sử dụng thời gian sử dụng thông thường. Xin lưu ý rằng firmware mới trong thế hệ mới nhất của bơm cơ sở có thể chặn các lệnh bolus sau 5 ngày (120 giờ). "
+            "value" : "Miếng dán này được thiết k�?đ�?s�?dụng trong vòng 3 ngày và 8 gi�? Việc s�?dụng quá thời gian này có th�?khiến miếng dán tr�?nên không đáng tin cậy. Điều này KHÔNG được khuyến ngh�? Hãy xem xét việc s�?dụng thời gian s�?dụng thông thường. Xin lưu ý rằng firmware mới trong th�?h�?mới nhất của bơm cơ s�?có th�?chặn các lệnh bolus sau 5 ngày (120 gi�?. "
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "药贴只能使用 3 天 8 小时。超过这个时间可能会导致贴片变得不可靠。不建议这样做。请考虑使用正常使用寿命。请注意，最新一代泵底座中的新固件可能会在 5 天（120 小时）后阻止栓塞命令。 "
+            "value" : "药贴只能使用 3 �?8 小时。超过这个时间可能会导致贴片变得不可靠。不建议这样做。请考虑使用正常使用寿命。请注意，最新一代泵底座中的新固件可能会�?5 天（120 小时）后阻止栓塞命令�?"
           }
         }
       }
@@ -17592,7 +17592,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプの時刻は現在時刻とは異なります。ポンプの時刻はスケジュールされた治療設定を制御します。ポンプ時刻の行までスクロールして、時差を確認し、ポンプを設定してください。"
+            "value" : "ポンプの時刻は現在時刻とは異なります。ポンプの時刻はスケジュールされた治療設定を制御します。ポンプ時刻の行までスクロールして、時差を確認し、ポンプを設定してください�?
           }
         },
         "nb" : {
@@ -17670,13 +17670,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Thời gian trên máy bơm của bạn khác với thời gian hiện tại. Thời gian trên máy bơm của bạn điều khiển các cài đặt điều trị theo lịch trình. Cuộn xuống hàng \"Thời gian máy bơm\" để xem sự chênh lệch thời gian và cấu hình máy bơm của bạn."
+            "value" : "Thời gian trên máy bơm của bạn khác với thời gian hiện tại. Thời gian trên máy bơm của bạn điều khiển các cài đặt điều tr�?theo lịch trình. Cuộn xuống hàng \"Thời gian máy bơm\" đ�?xem s�?chênh lệch thời gian và cấu hình máy bơm của bạn."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "泵上的时间与当前时间不同。泵上的时间控制着您的计划治疗设置。向下滚动到泵时间行，查看时差并配置您的泵。"
+            "value" : "泵上的时间与当前时间不同。泵上的时间控制着您的计划治疗设置。向下滚动到泵时间行，查看时差并配置您的泵�?
           }
         }
       }
@@ -17742,7 +17742,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "検出された時間変化"
+            "value" : "検出された時間変�?
           }
         },
         "nb" : {
@@ -17826,7 +17826,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "检测到的时间变化"
+            "value" : "检测到的时间变�?
           }
         }
       }
@@ -17976,7 +17976,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "切换心跳动模式"
+            "value" : "切换心跳动模�?
           }
         }
       }
@@ -18270,13 +18270,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sử dụng theo trách nhiệm của bạn!"
+            "value" : "S�?dụng theo trách nhiệm của bạn!"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "使用风险自负！"
+            "value" : "使用风险自负�?
           }
         }
       }
@@ -18342,7 +18342,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "寿命延長の使用"
+            "value" : "寿命延長の使�?
           }
         },
         "nb" : {
@@ -18420,7 +18420,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sử dụng tuổi thọ kéo dài "
+            "value" : "S�?dụng tuổi th�?kéo dài "
           }
         },
         "zh-Hans" : {
@@ -18492,7 +18492,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "通常の寿命 (3d 8h) を使用"
+            "value" : "通常の寿�?(3d 8h) を使�?
           }
         },
         "nb" : {
@@ -18642,7 +18642,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "振動とビープ音"
+            "value" : "振動とビープ�?
           }
         },
         "nb" : {
@@ -18726,7 +18726,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "振动和睡眠"
+            "value" : "振动和睡�?
           }
         }
       }
@@ -18876,7 +18876,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "仅振动"
+            "value" : "仅振�?
           }
         }
       }
@@ -19092,7 +19092,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ボタンをクリックすると、バイオメトリクスのプロンプトが表示されます。完了すると、パッチは無効化され、新しいパッチをペアリングするよう促されます。"
+            "value" : "ボタンをクリックすると、バイオメトリクスのプロンプトが表示されます。完了すると、パッチは無効化され、新しいパッチをペアリングするよう促されます�?
           }
         },
         "nb" : {
@@ -19176,7 +19176,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "点击按钮时，您将获得生物计提示。 完成后，补丁将被停用，您将被提示配对一个新补丁。"
+            "value" : "点击按钮时，您将获得生物计提示�?完成后，补丁将被停用，您将被提示配对一个新补丁�?
           }
         }
       }
@@ -19326,7 +19326,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "是，禁用心跳动模式"
+            "value" : "是，禁用心跳动模�?
           }
         }
       }
@@ -19620,19 +19620,19 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vâng, Đồng bộ hóa với thời gian hiện tại"
+            "value" : "Vâng, Đồng b�?hóa với thời gian hiện tại"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "是，与当前时间同步"
+            "value" : "是，与当前时间同�?
           }
         }
       }
     },
     "You will start by setting up your insulin type & basic patch settings before activating your patch." : {
-      "comment" : "Welcome text for MedtrumKit",
+      "comment" : "Welcome text for M640GKit",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
@@ -19692,7 +19692,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチを有効にする前に、まずインスリンの種類と基本的なパッチの設定を行います。"
+            "value" : "パッチを有効にする前に、まずインスリンの種類と基本的なパッチの設定を行います�?
           }
         },
         "nb" : {
@@ -19776,7 +19776,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在激活补丁之前，您将先设置您的绝缘类型和基本补丁设置。"
+            "value" : "在激活补丁之前，您将先设置您的绝缘类型和基本补丁设置�?
           }
         }
       }
@@ -19842,7 +19842,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチの残り時間は %%i 時間です。"
+            "value" : "パッチの残り時間�?%%i 時間です�?
           }
         },
         "nb" : {
@@ -20142,7 +20142,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチが1日の上限に達しました！"
+            "value" : "パッチが1日の上限に達しました�?
           }
         },
         "nb" : {
@@ -20370,7 +20370,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bản vá của bạn đã đạt đến giới hạn tối đa hàng giờ!"
+            "value" : "Bản vá của bạn đã đạt đến giới hạn tối đa hàng gi�?"
           }
         },
         "zh-Hans" : {
@@ -20442,7 +20442,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチが故障状態です！"
+            "value" : "パッチが故障状態です�?
           }
         },
         "nb" : {
@@ -20520,7 +20520,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bản vá của bạn đang ở trạng thái Lỗi!"
+            "value" : "Bản vá của bạn đang �?trạng thái Lỗi!"
           }
         },
         "zh-Hans" : {
@@ -20892,7 +20892,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "パッチの有効期限はもうすぐ切れる！"
+            "value" : "パッチの有効期限はもうすぐ切れる�?
           }
         },
         "nb" : {
@@ -20976,7 +20976,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "您的补丁即将过期！"
+            "value" : "您的补丁即将过期�?
           }
         }
       }

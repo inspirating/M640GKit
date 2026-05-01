@@ -4,7 +4,7 @@ import LoopKit
 public class UnfinalizedDose {
     public typealias RawValue = [String: Any]
 
-    private let logger = MedtrumLogger(category: "UnfinalizedDose")
+    private let logger = M640GKitLogger(category: "UnfinalizedDose")
 
     public let type: DoseType
     public let startDate: Date

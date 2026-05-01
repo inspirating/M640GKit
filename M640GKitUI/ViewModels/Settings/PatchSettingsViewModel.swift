@@ -1,0 +1,184 @@
+import LoopKit
+
+class PatchSettingsViewModel: ObservableObject {
+    @Published var maxHourlyInsulin: Double = 0 {
+        didSet { checkDirtyState() }
+    }
+
+    @Published var maxDailyInsulin: Double = 0 {
+        didSet { checkDirtyState() }
+    }
+
+    @Published var alarmSettings = Double(AlarmSettings.BeepOnly.rawValue) {
+        didSet { checkDirtyState() }
+    }
+
+    @Published var expirationTimer: Double = 1 {
+        didSet { checkDirtyState() }
+    }
+
+    @Published var notificationAfterActivation: Double = 70 {
+        didSet { checkDirtyState() }
+    }
+
+    @Published var lowReservoirNotification: Double = 0 {
+        didSet { checkDirtyState() }
+    }
+
+    @Published var isDirty: Bool = false
+    @Published var is300u: Bool = false
+    @Published var isUpdating = false
+    @Published var noActivePatch = false
+    @Published var errorMessage: String = ""
+
+    var allowedOptionsDaily: [Double] = []
+    var allowedOptionsHourly: [Double] = []
+
+    let updatePatch: Bool
+    let nextStep: (() -> Void)?
+
+    private let processQueue = DispatchQueue(label: "com.nightscout.M640GKit.patchSettingsViewModel")
+    private let pumpManager: M640GKitPumpManager?
+    init(_ pumpManager: M640GKitPumpManager?, updatePatch: Bool, nextStep: (() -> Void)?) {
+        self.pumpManager = pumpManager
+        self.updatePatch = updatePatch
+        self.nextStep = nextStep
+
+        guard let pumpManager = pumpManager else {
+            return
+        }
+
+        updateState(pumpManager.state)
+        pumpManager.addStatusObserver(self, queue: processQueue)
+    }
+
+    deinit {
+        pumpManager?.removeStatusObserver(self)
+    }
+
+    var alarmOptions: [Double] {
+        // Hide all options with light & vibrations
+        // This feature is discontinued
+        Array(6 ... 7).map({ Double($0) })
+    }
+
+    func save() {
+        guard let pumpManager = pumpManager else {
+            return
+        }
+
+        if !updatePatch || noActivePatch {
+            updateState(pumpManager: pumpManager)
+            nextStep?()
+            return
+        }
+
+        AuthorizeBiometrics.authenticate { success in
+            guard success else {
+                DispatchQueue.main.async {
+                    self.errorMessage = LocalizedString("Authentication failure", comment: "auth failed")
+                }
+                return
+            }
+
+            DispatchQueue.main.async {
+                self.updateState(pumpManager: pumpManager)
+                self.isUpdating = true
+            }
+
+            pumpManager.updatePatchSettings { result in
+                DispatchQueue.main.async {
+                    self.isUpdating = false
+                    switch result {
+                    case let .failure(error):
+                        self.errorMessage = error.localizedDescription
+                        return
+                    case .success:
+                        self.nextStep?()
+                        return
+                    }
+                }
+            }
+        }
+    }
+
+    func checkDirtyState() {
+        guard let pumpManager = pumpManager else {
+            return
+        }
+
+        DispatchQueue.main.async {
+            self.isDirty = (
+                pumpManager.state.maxDailyInsulin != self.maxDailyInsulin ||
+                    pumpManager.state.maxHourlyInsulin != self.maxHourlyInsulin ||
+                    pumpManager.state.alarmSetting.rawValue != UInt8(self.alarmSettings) ||
+                    Double(pumpManager.state.expiryMode.timer) != self.expirationTimer ||
+                    pumpManager.state.notificationAfterActivation.hours != self.notificationAfterActivation ||
+                    (pumpManager.state.lowReservoirWarning ?? 0) != self.lowReservoirNotification
+            )
+        }
+    }
+
+    private func updateState(pumpManager: M640GKitPumpManager) {
+        pumpManager.state.maxHourlyInsulin = maxHourlyInsulin
+        pumpManager.state.maxDailyInsulin = maxDailyInsulin
+        pumpManager.state.alarmSetting = AlarmSettings(rawValue: UInt8(alarmSettings)) ?? .None
+        pumpManager.state.expiryMode = expirationTimer == 1 ? .default : .extended
+        pumpManager.state.notificationAfterActivation = .hours(notificationAfterActivation)
+
+        if lowReservoirNotification == 0 {
+            pumpManager.state.lowReservoirWarning = nil
+        } else {
+            pumpManager.state.lowReservoirWarning = lowReservoirNotification
+        }
+
+        pumpManager.notifyStateDidChange()
+
+        NotificationManager.activatePatchExpiredNotification(after: .hours(notificationAfterActivation))
+    }
+}
+
+extension PatchSettingsViewModel: PumpManagerStatusObserver {
+    func pumpManager(
+        _ pumpManager: any LoopKit.PumpManager,
+        didUpdate _: LoopKit.PumpManagerStatus,
+        oldStatus _: LoopKit.PumpManagerStatus
+    ) {
+        guard let pumpManager = pumpManager as? M640GKitPumpManager else {
+            return
+        }
+
+        updateState(pumpManager.state)
+    }
+
+    func updateState(_ state: M640GKitPumpState) {
+        DispatchQueue.main.async {
+            self.noActivePatch = state.patchId.isEmpty
+            self.maxHourlyInsulin = state.maxHourlyInsulin
+            self.maxDailyInsulin = state.maxDailyInsulin
+            self.alarmSettings = Double(state.alarmSetting.rawValue)
+            self.expirationTimer = Double(state.expiryMode.timer)
+            self.notificationAfterActivation = state.notificationAfterActivation.hours
+            self.lowReservoirNotification = state.lowReservoirWarning ?? 0
+
+            if state.pumpSN.isEmpty {
+                // If no serial number is available, we should show the options that are supported by both 200u & 300u
+                self.is300u = false
+                self.allowedOptionsDaily = Array(1 ... 36).map({ Double($0) * 5 })
+                self.allowedOptionsHourly = [1, 2, 5, 10, 15, 20, 25, 30, 35, 40]
+
+            } else {
+                self.is300u = state.pumpName.contains("300U")
+
+                if self.is300u {
+                    self.allowedOptionsDaily = Array(1 ... 54).map({ Double($0) * 5 })
+                    self.allowedOptionsHourly = [1, 2, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]
+
+                } else {
+                    self.allowedOptionsDaily = Array(1 ... 36).map({ Double($0) * 5 })
+                    self.allowedOptionsHourly = [1, 2, 5, 10, 15, 20, 25, 30, 35, 40]
+                }
+            }
+        }
+    }
+}
