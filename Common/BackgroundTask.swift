@@ -35,7 +35,7 @@ class BackgroundTask {
 
     private func playAudio() {
         do {
-            let bundle = Bundle(for: DanaKitHUDProvider.self).path(forResource: "blank", ofType: "wav")
+            let bundle = Bundle(for: M640GKitHUDProvider.self).path(forResource: "blank", ofType: "wav")
             let alertSound = URL(fileURLWithPath: bundle!)
             // try AVAudioSession.sharedInstance().setCategory(AVAudioSession.Category.playback)
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: .mixWithOthers)

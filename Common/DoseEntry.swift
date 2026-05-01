@@ -83,6 +83,6 @@ public extension DoseEntry {
     }
     
     private static func roundBasalRate(_ rate: Double) -> Double {
-        DanaKitPumpManager.onboardingSupportedBasalRates.last(where: { $0 <= rate }) ?? 0
+        M640GKitPumpManager.onboardingSupportedBasalRates.last(where: { $0 <= rate }) ?? 0
     }
 }

@@ -6,11 +6,11 @@ class DanaLogger {
     private let fileManager = FileManager.default
 
     init(category: String) {
-        logger = Logger(subsystem: "com.randallknutson.DanaKit", category: category)
+        logger = Logger(subsystem: "com.randallknutson.M640GKit", category: category)
     }
 
     public func debug(_ msg: String, file: String = #file, _ function: String = #function, _ line: Int = #line) {
-        #if DANAKIT_DEBUG_LOGGING
+        #if M640GKit_DEBUG_LOGGING
             let message = "\(file.file) - \(function)#\(line): \(msg)"
             logger.debug("\(message, privacy: .public)")
         #endif
@@ -63,15 +63,15 @@ class DanaLogger {
     }
 
     private var logFile: String {
-        getDocumentsDirectory().appendingPathComponent("danakit/dana_log.txt").path
+        getDocumentsDirectory().appendingPathComponent("M640GKit/dana_log.txt").path
     }
 
     private var logDir: String {
-        getDocumentsDirectory().appendingPathComponent("danakit").path
+        getDocumentsDirectory().appendingPathComponent("M640GKit").path
     }
 
     private var logFilePrev: String {
-        getDocumentsDirectory().appendingPathComponent("danakit/dana_log_prev.txt").path
+        getDocumentsDirectory().appendingPathComponent("M640GKit/dana_log_prev.txt").path
     }
 
     private func getDocumentsDirectory() -> URL {

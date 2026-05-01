@@ -1,7 +1,7 @@
 import Foundation
 
 private enum FrameworkBundle {
-    static let main = Bundle(for: DanaKitHUDProvider.self)
+    static let main = Bundle(for: M640GKitHUDProvider.self)
 }
 
 func LocalizedString(_ key: String, tableName: String? = nil, value: String? = nil, comment: String) -> String {

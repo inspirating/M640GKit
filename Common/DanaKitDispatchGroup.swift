@@ -1,4 +1,4 @@
-final class DanaKitDispatchGroup {
+final class M640GKitDispatchGroup {
     private let group = DispatchGroup()
     private let lock = NSLock()
     private var count = 0

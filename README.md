@@ -1,4 +1,4 @@
-# DanaKit
+# M640GKit
 
 Dana-I/Dana-RS Bluetooth PumpManager For Loop.
 
@@ -10,10 +10,10 @@ If you are encountering issues, please review the FAQ page first: https://loopki
 
 ### How to enable BLE debug logging
 
-Click on DanaKit in your project explorer in XCode.
-Go to Project -> DanaKit -> Build settings
+Click on M640GKit in your project explorer in XCode.
+Go to Project -> M640GKit -> Build settings
 
-Scroll down to `Swift Compiler - Custom Flags` and add `DANAKIT_DEBUG_LOGGING` to your `Active Compilation Conditions` and rebuild your app!
+Scroll down to `Swift Compiler - Custom Flags` and add `M640GKit_DEBUG_LOGGING` to your `Active Compilation Conditions` and rebuild your app!
 
 ## For more information
 

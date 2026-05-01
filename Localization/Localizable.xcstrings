@@ -71,7 +71,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : " が使えるようになった！"
+            "value" : " が使えるようになった�?
           }
         },
         "nb" : {
@@ -137,13 +137,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : " đã sẵn sàng để sử dụng!"
+            "value" : " đã sẵn sàng đ�?s�?dụng!"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : " 即可使用！"
+            "value" : " 即可使用�?
           }
         }
       }
@@ -281,13 +281,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : ". Vui lòng vào cài đặt Bluetooth, quên thiết bị này rồi thử lại"
+            "value" : ". Vui lòng vào cài đặt Bluetooth, quên thiết b�?này rồi th�?lại"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请前往您的蓝牙设置，忽略此设备，然后重试"
+            "value" : "请前往您的蓝牙设置，忽略此设备，然后重�?
           }
         }
       }
@@ -931,7 +931,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "12秒/U"
+            "value" : "12�?U"
           }
         },
         "nb" : {
@@ -1003,7 +1003,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "12 秒/U"
+            "value" : "12 �?U"
           }
         }
       }
@@ -1147,7 +1147,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "12 小时制"
+            "value" : "12 小时�?
           }
         }
       }
@@ -1435,7 +1435,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "24 小时制"
+            "value" : "24 小时�?
           }
         }
       }
@@ -1507,7 +1507,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "30秒/U"
+            "value" : "30�?U"
           }
         },
         "nb" : {
@@ -1579,7 +1579,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "30 秒/U"
+            "value" : "30 �?U"
           }
         }
       }
@@ -1651,7 +1651,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "60秒/U"
+            "value" : "60�?U"
           }
         },
         "nb" : {
@@ -1723,7 +1723,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "60 秒/U"
+            "value" : "60 �?U"
           }
         }
       }
@@ -1795,7 +1795,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "血糖値チェックリマインダーがポンプに設定され、作動しています。リマインダーを外すか、血糖値をポンプに知らせてください。"
+            "value" : "血糖値チェックリマインダーがポンプに設定され、作動しています。リマインダーを外すか、血糖値をポンプに知らせてください�?
           }
         },
         "nb" : {
@@ -1867,7 +1867,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "您的血糖泵中已设置了血糖检查提醒器并已触发。请将其移除或向血糖泵提供您的血糖值"
+            "value" : "您的血糖泵中已设置了血糖检查提醒器并已触发。请将其移除或向血糖泵提供您的血糖�?
           }
         }
       }
@@ -1939,7 +1939,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ボーラスタイムアウトが有効である。ループサイクルはタイムアウトが解除されるまで完了しない。"
+            "value" : "ボーラスタイムアウトが有効である。ループサイクルはタイムアウトが解除されるまで完了しない�?
           }
         },
         "nb" : {
@@ -2005,13 +2005,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Thời gian chờ bolus đang hoạt động. Chu kỳ vòng lặp không thể hoàn tất cho đến khi thời gian chờ không hoạt động"
+            "value" : "Thời gian ch�?bolus đang hoạt động. Chu k�?vòng lặp không th�?hoàn tất cho đến khi thời gian ch�?không hoạt động"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "大剂量推注超时，Loop 将在该超时状态解除后恢复正常工作。"
+            "value" : "大剂量推注超时，Loop 将在该超时状态解除后恢复正常工作�?
           }
         }
       }
@@ -2083,7 +2083,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプがビジー状態のため、アクションはキャンセルされました。"
+            "value" : "ポンプがビジー状態のため、アクションはキャンセルされました�?
           }
         },
         "nb" : {
@@ -2149,7 +2149,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hành động đã bị hủy, vì máy bơm đang bận"
+            "value" : "Hành động đã b�?hủy, vì máy bơm đang bận"
           }
         },
         "zh-Hans" : {
@@ -2227,7 +2227,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "インスリンの種類とボーラス速度を設定した後、見つかったすべての Dana ポンプの画面が表示されます。 %@とリンクさせたいポンプを選択してください。"
+            "value" : "インスリンの種類とボーラス速度を設定した後、見つかったすべての Dana ポンプの画面が表示されます�?%@とリンクさせたいポンプを選択してください�?
           }
         },
         "nb" : {
@@ -2293,13 +2293,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sau khi thiết lập loại insulin và tốc độ bolus, bạn sẽ thấy màn hình với tất cả các máy bơm Dana được tìm thấy. Chọn máy bơm bạn muốn liên kết với %@."
+            "value" : "Sau khi thiết lập loại insulin và tốc đ�?bolus, bạn s�?thấy màn hình với tất c�?các máy bơm Dana được tìm thấy. Chọn máy bơm bạn muốn liên kết với %@."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "设置完胰岛素类型和注射速度后，您将看到一个显示所有已找到的 Dana 泵的屏幕。选择要链接到 %@的泵。"
+            "value" : "设置完胰岛素类型和注射速度后，您将看到一个显示所有已找到�?Dana 泵的屏幕。选择要链接到 %@的泵�?
           }
         }
       }
@@ -2443,7 +2443,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "警报声"
+            "value" : "警报�?
           }
         }
       }
@@ -2515,7 +2515,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプからのアラート処理中に不明なエラーが発生しました。このエラーを報告してください。"
+            "value" : "ポンプからのアラート処理中に不明なエラーが発生しました。このエラーを報告してください�?
           }
         },
         "nb" : {
@@ -2581,13 +2581,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Đã xảy ra lỗi không xác định trong quá trình xử lý cảnh báo từ máy bơm. Vui lòng báo cáo lỗi này"
+            "value" : "Đã xảy ra lỗi không xác định trong quá trình x�?lý cảnh báo t�?máy bơm. Vui lòng báo cáo lỗi này"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在处理泵发出的警报时发生了未知错误。请报告此"
+            "value" : "在处理泵发出的警报时发生了未知错误。请报告�?
           }
         }
       }
@@ -2725,13 +2725,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bạn có chắc chắn muốn ngừng sử dụng Dana-i không?"
+            "value" : "Bạn có chắc chắn muốn ngừng s�?dụng Dana-i không?"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "您确定要停止使用 Dana-i/RS？"
+            "value" : "您确定要停止使用 Dana-i/RS�?
           }
         }
       }
@@ -2803,7 +2803,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "世界へ"
+            "value" : "世界�?
           }
         },
         "nb" : {
@@ -2875,7 +2875,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "背光开启时间"
+            "value" : "背光开启时�?
           }
         }
       }
@@ -3019,7 +3019,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "基础率"
+            "value" : "基础�?
           }
         }
       }
@@ -3091,7 +3091,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ベース比較"
+            "value" : "ベース比�?
           }
         },
         "nb" : {
@@ -3163,7 +3163,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "基础率比较"
+            "value" : "基础率比�?
           }
         }
       }
@@ -3235,7 +3235,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "基礎限界に到達"
+            "value" : "基礎限界に到�?
           }
         },
         "nb" : {
@@ -3307,7 +3307,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "达到基本基础率上限"
+            "value" : "达到基本基础率上�?
           }
         }
       }
@@ -3445,13 +3445,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Phác đồ liều nền"
+            "value" : "Phác đ�?liều nền"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "基础率配置"
+            "value" : "基础率配�?
           }
         }
       }
@@ -3739,7 +3739,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "电池没电了。请立即更换！"
+            "value" : "电池没电了。请立即更换�?
           }
         }
       }
@@ -3811,7 +3811,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "バッテリー残量"
+            "value" : "バッテリー残�?
           }
         },
         "nb" : {
@@ -3955,7 +3955,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "血糖測定"
+            "value" : "血糖測�?
           }
         },
         "nb" : {
@@ -4027,7 +4027,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "血糖测量"
+            "value" : "血糖测�?
           }
         }
       }
@@ -4171,7 +4171,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "大剂量"
+            "value" : "大剂�?
           }
         }
       }
@@ -4309,13 +4309,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cả hai"
+            "value" : "C�?hai"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "两者"
+            "value" : "两�?
           }
         }
       }
@@ -4387,7 +4387,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "キャンセル"
+            "value" : "キャンセ�?
           }
         },
         "nb" : {
@@ -4531,7 +4531,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "カニューレ年齢"
+            "value" : "カニューレ年�?
           }
         },
         "nb" : {
@@ -4675,7 +4675,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "カニューレのみ"
+            "value" : "カニューレの�?
           }
         },
         "nb" : {
@@ -4741,13 +4741,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chỉ Cannula"
+            "value" : "Ch�?Cannula"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "仅套管"
+            "value" : "仅套�?
           }
         }
       }
@@ -4963,7 +4963,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "シャフトのチェック"
+            "value" : "シャフトのチェッ�?
           }
         },
         "nb" : {
@@ -5035,7 +5035,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "检查推杆"
+            "value" : "检查推�?
           }
         }
       }
@@ -5107,7 +5107,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプをチェックし、もう一度試す"
+            "value" : "ポンプをチェックし、もう一度試�?
           }
         },
         "nb" : {
@@ -5173,13 +5173,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kiểm tra máy bơm và thử lại"
+            "value" : "Kiểm tra máy bơm và th�?lại"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "检查泵，然后再试一次"
+            "value" : "检查泵，然后再试一�?
           }
         }
       }
@@ -5251,7 +5251,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "リザーバーと輸液を確認し、もう一度試してください。"
+            "value" : "リザーバーと輸液を確認し、もう一度試してください�?
           }
         },
         "nb" : {
@@ -5317,13 +5317,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hãy Kiểm tra bình chứa và dây truyền và thử lại"
+            "value" : "Hãy Kiểm tra bình chứa và dây truyền và th�?lại"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "检查储液器和输液器，然后再试一次"
+            "value" : "检查储液器和输液器，然后再试一�?
           }
         }
       }
@@ -5395,7 +5395,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "でチェックした。"
+            "value" : "でチェックした�?
           }
         },
         "nb" : {
@@ -5467,7 +5467,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同步于"
+            "value" : "同步�?
           }
         }
       }
@@ -5539,7 +5539,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "チェックサムに失敗しました。再試行してください。"
+            "value" : "チェックサムに失敗しました。再試行してください�?
           }
         },
         "nb" : {
@@ -5605,13 +5605,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kiểm tra tổng không thành công. Hãy thử lại"
+            "value" : "Kiểm tra tổng không thành công. Hãy th�?lại"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "校验失败。重试"
+            "value" : "校验失败。重�?
           }
         }
       }
@@ -5683,7 +5683,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Danaポンプをお選びください"
+            "value" : "Danaポンプをお選びくださ�?
           }
         },
         "nb" : {
@@ -5755,13 +5755,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择您的德纳泵"
+            "value" : "选择您的德纳�?
           }
         }
       }
     },
     "Configuration" : {
-      "comment" : "The title of the configuration section in DanaKit settings",
+      "comment" : "The title of the configuration section in M640GKit settings",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
@@ -5905,7 +5905,7 @@
       }
     },
     "Connected" : {
-      "comment" : "DanaKit connected",
+      "comment" : "M640GKit connected",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
@@ -6043,7 +6043,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已连接"
+            "value" : "已连�?
           }
         }
       }
@@ -6259,7 +6259,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "続ける"
+            "value" : "続け�?
           }
         },
         "nb" : {
@@ -6481,7 +6481,7 @@
       }
     },
     "Dana-i" : {
-      "comment" : "dana-i option text for DanaKitSetupView",
+      "comment" : "dana-i option text for M640GKitSetupView",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
@@ -6547,7 +6547,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ダナアイ"
+            "value" : "ダナア�?
           }
         },
         "nb" : {
@@ -6691,7 +6691,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dana-RS v3が見つかった！"
+            "value" : "Dana-RS v3が見つかった�?
           }
         },
         "nb" : {
@@ -6763,13 +6763,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "发现 Dana-RS v3！"
+            "value" : "发现 Dana-RS v3�?
           }
         }
       }
     },
     "DanaRS-v3" : {
-      "comment" : "danaRS v3 option text for DanaKitSetupView",
+      "comment" : "danaRS v3 option text for M640GKitSetupView",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
@@ -6979,7 +6979,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "日"
+            "value" : "�?
           }
         },
         "nb" : {
@@ -7195,7 +7195,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "删除泵"
+            "value" : "删除�?
           }
         }
       }
@@ -7339,7 +7339,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "删除泵"
+            "value" : "删除�?
           }
         }
       }
@@ -7411,7 +7411,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "配送スピード"
+            "value" : "配送スピー�?
           }
         },
         "nb" : {
@@ -7621,7 +7621,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tắt đồng bộ bolus?"
+            "value" : "Tắt đồng b�?bolus?"
           }
         },
         "zh-Hans" : {
@@ -7633,7 +7633,7 @@
       }
     },
     "Disconnect from pump" : {
-      "comment" : "DanaKit disconnect",
+      "comment" : "M640GKit disconnect",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
@@ -7699,7 +7699,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプから切り離す"
+            "value" : "ポンプから切り離�?
           }
         },
         "nb" : {
@@ -7765,19 +7765,19 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ngắt kết nối từ máy bơm"
+            "value" : "Ngắt kết nối t�?máy bơm"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "断开泵连接"
+            "value" : "断开泵连�?
           }
         }
       }
     },
     "Disconnected" : {
-      "comment" : "DanaKit disconnected",
+      "comment" : "M640GKit disconnected",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
@@ -7903,7 +7903,7 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Від’єднано"
+            "value" : "Від’єднан�?
           }
         },
         "vi" : {
@@ -7921,7 +7921,7 @@
       }
     },
     "Disconnecting..." : {
-      "comment" : "DanaKit disconnecting",
+      "comment" : "M640GKit disconnecting",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
@@ -8131,7 +8131,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプが特定の時間切断された場合に通知を受け取りたいですか？"
+            "value" : "ポンプが特定の時間切断された場合に通知を受け取りたいですか�?
           }
         },
         "nb" : {
@@ -8197,13 +8197,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bạn có muốn nhận thông báo khi máy bơm không được ngắt kết nối trong một khoảng thời gian cụ thể không?"
+            "value" : "Bạn có muốn nhận thông báo khi máy bơm không được ngắt kết nối trong một khoảng thời gian c�?th�?không?"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "您是否希望在泵断开连接较长时间后收到通知？"
+            "value" : "您是否希望在泵断开连接较长时间后收到通知�?
           }
         }
       }
@@ -8417,7 +8417,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ペアリング中、Dana-iにはペアリングのプロンプトが表示され、iPhoneにはペアリングコードのプロンプトが表示されます。あなたのポンプでOKを選択し、iPhoneの画面に6桁のコードを入力します。その後、 %@ 、Dana-iと通信する準備が整います。"
+            "value" : "ペアリング中、Dana-iにはペアリングのプロンプトが表示され、iPhoneにはペアリングコードのプロンプトが表示されます。あなたのポンプでOKを選択し、iPhoneの画面に6桁のコードを入力します。その後�?%@ 、Dana-iと通信する準備が整います�?
           }
         },
         "nb" : {
@@ -8483,13 +8483,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trong quá trình ghép nối, Dana-i của bạn sẽ hiển thị lời nhắc ghép nối trong khi iPhone của bạn sẽ hiển thị lời nhắc nhập mã ghép nối. Trên máy bơm của bạn, hãy chọn OK và nhập mã gồm 6 chữ số vào màn hình trên iPhone của bạn. Sau đó, %@ đã sẵn sàng giao tiếp với Dana-i của bạn"
+            "value" : "Trong quá trình ghép nối, Dana-i của bạn s�?hiển th�?lời nhắc ghép nối trong khi iPhone của bạn s�?hiển th�?lời nhắc nhập mã ghép nối. Trên máy bơm của bạn, hãy chọn OK và nhập mã gồm 6 ch�?s�?vào màn hình trên iPhone của bạn. Sau đó, %@ đã sẵn sàng giao tiếp với Dana-i của bạn"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在配对过程中，您的 Dana-i 将显示配对提示，而您的 iPhone 将显示配对代码提示。选择 \"OK（确定）\"，然后在 iPhone 的屏幕上输入 6 位数的密码。之后， %@ ，即可与您的 Dana-i 进行通信。"
+            "value" : "在配对过程中，您�?Dana-i 将显示配对提示，而您�?iPhone 将显示配对代码提示。选择 \"OK（确定）\"，然后在 iPhone 的屏幕上输入 6 位数的密码。之后， %@ ，即可与您的 Dana-i 进行通信�?
           }
         }
       }
@@ -8621,19 +8621,19 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Під час процесу сполучення ваш DanaRS v1 відображатиме запит на сполучення, а ваш iPhone – запит на код сполучення. На помпі виберіть OK та введіть код на iPhone. Після цього Loop буде готовий до зв’язку з вашим DanaRS v1."
+            "value" : "Під час процесу сполучення ваш DanaRS v1 відображатиме запит на сполучення, а ваш iPhone �?запит на код сполучення. На помпі виберіть OK та введіть код на iPhone. Після цього Loop буде готовий до зв’язк�?з вашим DanaRS v1."
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trong quá trình ghép đôi, DanaRS v1 của bạn sẽ hiển thị một thông báo ghép đôi, trong khi iPhone sẽ hiển thị thông báo nhập mã ghép đôi. Trên bơm, hãy chọn OK và nhập mã đó trên iPhone của bạn. Sau đó, Loop sẽ sẵn sàng giao tiếp với DanaRS v1"
+            "value" : "Trong quá trình ghép đôi, DanaRS v1 của bạn s�?hiển th�?một thông báo ghép đôi, trong khi iPhone s�?hiển th�?thông báo nhập mã ghép đôi. Trên bơm, hãy chọn OK và nhập mã đó trên iPhone của bạn. Sau đó, Loop s�?sẵn sàng giao tiếp với DanaRS v1"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在配对过程中，您的 DanaRS v1 将显示配对提示，而您的 iPhone 将显示配对代码提示。在泵上选择 \"OK（确定）\"，然后在 iPhone 上键入代码。之后，Loop 就可以与 DanaRS v1 通信了。"
+            "value" : "在配对过程中，您�?DanaRS v1 将显示配对提示，而您�?iPhone 将显示配对代码提示。在泵上选择 \"OK（确定）\"，然后在 iPhone 上键入代码。之后，Loop 就可以与 DanaRS v1 通信了�?
           }
         }
       }
@@ -8705,7 +8705,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ペアリング中、DanaRS v3にはペアリングのプロンプトが表示され、iPhoneにはペアリングコードのプロンプトが表示されます。ポンプでOKを選択し、iPhoneにコードを入力します。その後、LoopはDanaRS v1と通信できます。"
+            "value" : "ペアリング中、DanaRS v3にはペアリングのプロンプトが表示され、iPhoneにはペアリングコードのプロンプトが表示されます。ポンプでOKを選択し、iPhoneにコードを入力します。その後、LoopはDanaRS v1と通信できます�?
           }
         },
         "nb" : {
@@ -8765,19 +8765,19 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Під час процесу сполучення ваш DanaRS v3 відображатиме запит на сполучення, а ваш iPhone – запит на код сполучення. На помпі виберіть OK та введіть код на iPhone. Після цього Loop буде готовий до зв’язку з вашим DanaRS v1."
+            "value" : "Під час процесу сполучення ваш DanaRS v3 відображатиме запит на сполучення, а ваш iPhone �?запит на код сполучення. На помпі виберіть OK та введіть код на iPhone. Після цього Loop буде готовий до зв’язк�?з вашим DanaRS v1."
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trong quá trình ghép đôi, DanaRS v3 của bạn sẽ hiển thị một thông báo ghép đôi, trong khi iPhone sẽ hiển thị thông báo nhập mã ghép đôi. Trên bơm, hãy chọn OK và nhập mã đó trên iPhone của bạn. Sau đó, Loop sẽ sẵn sàng giao tiếp với DanaRS v1"
+            "value" : "Trong quá trình ghép đôi, DanaRS v3 của bạn s�?hiển th�?một thông báo ghép đôi, trong khi iPhone s�?hiển th�?thông báo nhập mã ghép đôi. Trên bơm, hãy chọn OK và nhập mã đó trên iPhone của bạn. Sau đó, Loop s�?sẵn sàng giao tiếp với DanaRS v1"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在配对过程中，你的 DanaRS v3 胰岛素泵会显示一个配对提示，而你的 iPhone 会显示输入配对码的提示。在胰岛素泵上选择“确定”，然后在 iPhone 上输入该配对码。完成后，Loop 将准备好与 DanaRS v1 通讯。"
+            "value" : "在配对过程中，你�?DanaRS v3 胰岛素泵会显示一个配对提示，而你�?iPhone 会显示输入配对码的提示。在胰岛素泵上选择“确定”，然后�?iPhone 上输入该配对码。完成后，Loop 将准备好�?DanaRS v1 通讯�?
           }
         }
       }
@@ -8909,19 +8909,19 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Під час процесу створення пари на вашому DanaRS v3 відображатиметься запит на створення пари, а на вашому iPhone – два коди сполучення. На помпі виберіть OK і введіть два коди на своєму iPhone. Після цього %@ готовий до зв’язку з DanaRS v3"
+            "value" : "Під час процесу створення пари на вашому DanaRS v3 відображатиметься запит на створення пари, а на вашому iPhone �?два коди сполучення. На помпі виберіть OK і введіть два коди на своєму iPhone. Після цього %@ готовий до зв’язк�?з DanaRS v3"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trong quá trình ghép đôi, DanaRS v3 của bạn sẽ hiển thị lời nhắc ghép đôi, trong khi iPhone của bạn sẽ hiển thị lời nhắc yêu cầu nhập hai mã ghép đôi. Trên bơm, hãy chọn OK và nhập hai mã đó trên iPhone của bạn. Sau đó, %@ đã sẵn sàng để giao tiếp với DanaRS v3 của bạn"
+            "value" : "Trong quá trình ghép đôi, DanaRS v3 của bạn s�?hiển th�?lời nhắc ghép đôi, trong khi iPhone của bạn s�?hiển th�?lời nhắc yêu cầu nhập hai mã ghép đôi. Trên bơm, hãy chọn OK và nhập hai mã đó trên iPhone của bạn. Sau đó, %@ đã sẵn sàng đ�?giao tiếp với DanaRS v3 của bạn"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在配对过程中，你的 DanaRS v3 胰岛素泵会显示一个配对提示，而你的 iPhone 会显示两个配对码的输入框。在胰岛素泵上选择“确定”，然后在 iPhone 上输入这两个配对码。完成后，%@ 将准备好与 DanaRS v3 通讯。"
+            "value" : "在配对过程中，你�?DanaRS v3 胰岛素泵会显示一个配对提示，而你�?iPhone 会显示两个配对码的输入框。在胰岛素泵上选择“确定”，然后�?iPhone 上输入这两个配对码。完成后�?@ 将准备好�?DanaRS v3 通讯�?
           }
         }
       }
@@ -8993,7 +8993,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ペアリング中、DanaRS v3にはペアリングのプロンプトが表示され、iPhoneには2つのペアリングコードを入力するプロンプトが表示されます。ポンプでOKを選択し、iPhoneに2つのコードを入力します。その後、LoopはDanaRS v3と通信できるようになります。"
+            "value" : "ペアリング中、DanaRS v3にはペアリングのプロンプトが表示され、iPhoneには2つのペアリングコードを入力するプロンプトが表示されます。ポンプでOKを選択し、iPhone�?つのコードを入力します。その後、LoopはDanaRS v3と通信できるようになります�?
           }
         },
         "nb" : {
@@ -9053,19 +9053,19 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Під час процесу сполучення ваш DanaRS v3 відобразить запит на сполучення, а ваш iPhone – запит на два коди сполучення. На помпі виберіть OK та введіть два коди на iPhone. Після цього Loop буде готовий до зв’язку з вашим DanaRS v3."
+            "value" : "Під час процесу сполучення ваш DanaRS v3 відобразить запит на сполучення, а ваш iPhone �?запит на два коди сполучення. На помпі виберіть OK та введіть два коди на iPhone. Після цього Loop буде готовий до зв’язк�?з вашим DanaRS v3."
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Trong quá trình ghép đôi, DanaRS v3 của bạn sẽ hiển thị một thông báo ghép đôi, trong khi iPhone sẽ hiển thị thông báo nhập hai mã ghép đôi. Trên bơm, hãy chọn OK và nhập hai mã đó trên iPhone của bạn. Sau đó, Loop sẽ sẵn sàng giao tiếp với DanaRS v3"
+            "value" : "Trong quá trình ghép đôi, DanaRS v3 của bạn s�?hiển th�?một thông báo ghép đôi, trong khi iPhone s�?hiển th�?thông báo nhập hai mã ghép đôi. Trên bơm, hãy chọn OK và nhập hai mã đó trên iPhone của bạn. Sau đó, Loop s�?sẵn sàng giao tiếp với DanaRS v3"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在配对过程中，您的 DanaRS v3 将显示配对提示，而您的 iPhone 将显示两个配对代码的提示。在泵上选择 \"OK（确定）\"，然后在 iPhone 上键入这两个代码。之后，Loop 就可以与 DanaRS v3 通信了。"
+            "value" : "在配对过程中，您�?DanaRS v3 将显示配对提示，而您�?iPhone 将显示两个配对代码的提示。在泵上选择 \"OK（确定）\"，然后在 iPhone 上键入这两个代码。之后，Loop 就可以与 DanaRS v3 通信了�?
           }
         }
       }
@@ -9137,7 +9137,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "空のリザーバー"
+            "value" : "空のリザーバ�?
           }
         },
         "nb" : {
@@ -9281,7 +9281,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "デバイス接続時のエラー"
+            "value" : "デバイス接続時のエラ�?
           }
         },
         "nb" : {
@@ -9347,13 +9347,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lỗi khi kết nối với thiết bị"
+            "value" : "Lỗi khi kết nối với thiết b�?
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "连接设备时出错"
+            "value" : "连接设备时出�?
           }
         }
       }
@@ -9490,7 +9490,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lỗi khi bắt đầu quét thiết bị..."
+            "value" : "Lỗi khi bắt đầu quét thiết b�?.."
           }
         },
         "zh-Hans" : {
@@ -9634,13 +9634,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "LỖI: Không ghép nối được thiết bị"
+            "value" : "LỖI: Không ghép nối được thiết b�?
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "错误：配对设备失败"
+            "value" : "错误：配对设备失�?
           }
         }
       }
@@ -9778,13 +9778,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Không thể điều chỉnh liều basal"
+            "value" : "Không th�?điều chỉnh liều basal"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "调整基础率失败"
+            "value" : "调整基础率失�?
           }
         }
       }
@@ -9856,7 +9856,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプ時間の調整に失敗"
+            "value" : "ポンプ時間の調整に失�?
           }
         },
         "nb" : {
@@ -9928,7 +9928,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未能调整泵时间"
+            "value" : "未能调整泵时�?
           }
         }
       }
@@ -10000,7 +10000,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "サスペンションの調整に失敗"
+            "value" : "サスペンションの調整に失�?
           }
         },
         "nb" : {
@@ -10066,7 +10066,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Không thể điều chỉnh bởi hệ thống treo"
+            "value" : "Không th�?điều chỉnh bởi h�?thống treo"
           }
         },
         "zh-Hans" : {
@@ -10210,13 +10210,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Không thể điều chỉnh liều temp basal"
+            "value" : "Không th�?điều chỉnh liều temp basal"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "调整临时基础率失败"
+            "value" : "调整临时基础率失�?
           }
         }
       }
@@ -10360,7 +10360,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "生成 Dana 基础率程序失败"
+            "value" : "生成 Dana 基础率程序失�?
           }
         }
       }
@@ -10432,7 +10432,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "接続に失敗しました"
+            "value" : "接続に失敗しまし�?
           }
         },
         "nb" : {
@@ -10498,7 +10498,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Không thể kết nối"
+            "value" : "Không th�?kết nối"
           }
         },
         "zh-Hans" : {
@@ -10792,7 +10792,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "排空套管失败，请稍后再试。"
+            "value" : "排空套管失败，请稍后再试�?
           }
         }
       }
@@ -10936,7 +10936,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "排空管路失败，请稍后再试。"
+            "value" : "排空管路失败，请稍后再试�?
           }
         }
       }
@@ -11074,7 +11074,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Không thể thiết lập reservoir. Đồng bộ lại dữ liệu bơm và vui lòng thử lại"
+            "value" : "Không th�?thiết lập reservoir. Đồng b�?lại d�?liệu bơm và vui lòng th�?lại"
           }
         },
         "zh-Hans" : {
@@ -11872,7 +11872,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "インスリン年齢"
+            "value" : "インスリン年�?
           }
         },
         "nb" : {
@@ -11944,7 +11944,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "胰岛素年龄"
+            "value" : "胰岛素年�?
           }
         }
       }
@@ -12088,7 +12088,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "胰岛素推注"
+            "value" : "胰岛素推�?
           }
         }
       }
@@ -12160,7 +12160,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "インスリン残量"
+            "value" : "インスリン残�?
           }
         },
         "nb" : {
@@ -12304,7 +12304,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "インスリン中断"
+            "value" : "インスリン中�?
           }
         },
         "nb" : {
@@ -12376,7 +12376,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "胰岛素停用"
+            "value" : "胰岛素停�?
           }
         }
       }
@@ -12532,7 +12532,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "胰岛素类型"
+            "value" : "胰岛素类�?
           }
         }
       }
@@ -12670,13 +12670,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lần đồng bộ gần đây nhất"
+            "value" : "Lần đồng b�?gần đây nhất"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "最后一次同步"
+            "value" : "最后一次同�?
           }
         }
       }
@@ -12820,7 +12820,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "液晶显示屏开机时间"
+            "value" : "液晶显示屏开机时�?
           }
         }
       }
@@ -12964,7 +12964,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "加载中"
+            "value" : "加载�?
           }
         }
       }
@@ -13108,7 +13108,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "加载中"
+            "value" : "加载�?
           }
         }
       }
@@ -13180,7 +13180,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプ電池残量低下"
+            "value" : "ポンプ電池残量低�?
           }
         },
         "nb" : {
@@ -13252,7 +13252,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "泵电池电量不足"
+            "value" : "泵电池电量不�?
           }
         }
       }
@@ -13324,7 +13324,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "リザーバー残量警告"
+            "value" : "リザーバー残量警�?
           }
         },
         "nb" : {
@@ -13396,7 +13396,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "低药量提醒"
+            "value" : "低药量提�?
           }
         }
       }
@@ -13468,7 +13468,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプ時間を手動で同期"
+            "value" : "ポンプ時間を手動で同�?
           }
         },
         "nb" : {
@@ -13534,13 +13534,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Đồng bộ thời gian bơm thủ công"
+            "value" : "Đồng b�?thời gian bơm th�?công"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "手动同步泵时间"
+            "value" : "手动同步泵时�?
           }
         }
       }
@@ -13684,7 +13684,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "错过血糖检查"
+            "value" : "错过血糖检�?
           }
         }
       }
@@ -13756,7 +13756,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "夜間ポンプ時刻同期"
+            "value" : "夜間ポンプ時刻同�?
           }
         },
         "nb" : {
@@ -13828,7 +13828,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "夜间同步泵时间"
+            "value" : "夜间同步泵时�?
           }
         }
       }
@@ -13900,7 +13900,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "インスリンなし"
+            "value" : "インスリンな�?
           }
         },
         "nb" : {
@@ -14044,7 +14044,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "インスリンの種類がありません。ダナメニューで設定してください。"
+            "value" : "インスリンの種類がありません。ダナメニューで設定してください�?
           }
         },
         "nb" : {
@@ -14116,7 +14116,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有可用的胰岛素类型。请在 Dana 菜单中进行配置"
+            "value" : "没有可用的胰岛素类型。请�?Dana 菜单中进行配�?
           }
         }
       }
@@ -14188,7 +14188,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "いいえ、切断するだけです"
+            "value" : "いいえ、切断するだけで�?
           }
         },
         "nb" : {
@@ -14254,7 +14254,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Không, chỉ cần ngắt kết nối"
+            "value" : "Không, ch�?cần ngắt kết nối"
           }
         },
         "zh-Hans" : {
@@ -14398,7 +14398,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Không, giữ nguyên như vậy"
+            "value" : "Không, gi�?nguyên như vậy"
           }
         },
         "zh-Hans" : {
@@ -14542,13 +14542,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Không, Giữ nguyên"
+            "value" : "Không, Gi�?nguyên"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不，保持泵原样"
+            "value" : "不，保持泵原�?
           }
         }
       }
@@ -14620,7 +14620,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "注：Danaポンプには、Danaポンプのビープ音を無音にする特別な設定があります。これを有効にするには、Danaの販売代理店にお問い合わせください。"
+            "value" : "注：Danaポンプには、Danaポンプのビープ音を無音にする特別な設定があります。これを有効にするには、Danaの販売代理店にお問い合わせください�?
           }
         },
         "nb" : {
@@ -14686,13 +14686,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lưu ý: Máy bơm Dana của bạn có một cài đặt đặc biệt cho phép bạn tắt tiếng bíp của máy bơm Dana. Để bật chức năng này, vui lòng liên hệ với nhà phân phối Dana của bạn"
+            "value" : "Lưu ý: Máy bơm Dana của bạn có một cài đặt đặc biệt cho phép bạn tắt tiếng bíp của máy bơm Dana. Đ�?bật chức năng này, vui lòng liên h�?với nhà phân phối Dana của bạn"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "注：您的 Dana 泵有一个特殊设置，允许您将德纳泵的蜂鸣声静音。要启用此功能，请联系您的 Dana 经销商。"
+            "value" : "注：您的 Dana 泵有一个特殊设置，允许您将德纳泵的蜂鸣声静音。要启用此功能，请联系您�?Dana 经销商�?
           }
         }
       }
@@ -15406,7 +15406,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chỉ hỗ trợ liều Bolus tự động"
+            "value" : "Ch�?h�?tr�?liều Bolus t�?động"
           }
         },
         "zh-Hans" : {
@@ -15418,7 +15418,7 @@
       }
     },
     "Pairing" : {
-      "comment" : "Title for DanaKitScanView",
+      "comment" : "Title for M640GKitScanView",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -15483,7 +15483,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ペアリング"
+            "value" : "ペアリン�?
           }
         },
         "nb" : {
@@ -15915,7 +15915,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ピンコード必須"
+            "value" : "ピンコード必�?
           }
         },
         "nb" : {
@@ -15987,7 +15987,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "需要 Pin 码"
+            "value" : "需�?Pin �?
           }
         }
       }
@@ -16059,7 +16059,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "設定メニューで投与戦略の変更を検討してください。"
+            "value" : "設定メニューで投与戦略の変更を検討してください�?
           }
         },
         "nb" : {
@@ -16131,7 +16131,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请考虑在设置菜单中更改您的给药策略。"
+            "value" : "请考虑在设置菜单中更改您的给药策略�?
           }
         }
       }
@@ -16347,7 +16347,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプ電池 0"
+            "value" : "ポンプ電�?0"
           }
         },
         "nb" : {
@@ -16419,7 +16419,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "泵电量 0%%"
+            "value" : "泵电�?0%%"
           }
         }
       }
@@ -16491,7 +16491,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプのバッテリーが空です。すぐに交換してください！"
+            "value" : "ポンプのバッテリーが空です。すぐに交換してください�?
           }
         },
         "nb" : {
@@ -16701,13 +16701,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pin máy bơm cần được thay thế sớm"
+            "value" : "Pin máy bơm cần được thay th�?sớm"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "泵电池需要尽快更换"
+            "value" : "泵电池需要尽快更�?
           }
         }
       }
@@ -16851,13 +16851,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "泵故障"
+            "value" : "泵故�?
           }
         }
       }
     },
     "Pump information" : {
-      "comment" : "The title of the pump information section in DanaKit settings",
+      "comment" : "The title of the pump information section in M640GKit settings",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
@@ -16923,7 +16923,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプ情報"
+            "value" : "ポンプ情�?
           }
         },
         "nb" : {
@@ -16995,7 +16995,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "泵信息"
+            "value" : "泵信�?
           }
         }
       }
@@ -17283,7 +17283,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "泵仍处于断开状态"
+            "value" : "泵仍处于断开状�?
           }
         }
       }
@@ -17427,7 +17427,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "泵名称"
+            "value" : "泵名�?
           }
         }
       }
@@ -17499,7 +17499,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプ停止"
+            "value" : "ポンプ停�?
           }
         },
         "nb" : {
@@ -17571,13 +17571,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "泵关闭"
+            "value" : "泵关�?
           }
         }
       }
     },
     "Pump time" : {
-      "comment" : "Text for pump time\nThe title of the pump time section in DanaKit settings",
+      "comment" : "Text for pump time\nThe title of the pump time section in M640GKit settings",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
@@ -17643,7 +17643,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプ時間"
+            "value" : "ポンプ時�?
           }
         },
         "nb" : {
@@ -17715,7 +17715,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "泵时间"
+            "value" : "泵时�?
           }
         }
       }
@@ -17853,7 +17853,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bật lại tính năng đồng bộ bolus không?"
+            "value" : "Bật lại tính năng đồng b�?bolus không?"
           }
         },
         "zh-Hans" : {
@@ -17931,7 +17931,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "無効な16進文字列を受信しました。再試行してください。"
+            "value" : "無効�?6進文字列を受信しました。再試行してください�?
           }
         },
         "nb" : {
@@ -17997,13 +17997,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chuỗi hex không hợp lệ. Hãy thử lại"
+            "value" : "Chuỗi hex không hợp l�? Hãy th�?lại"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "收到无效十六进制字符串。重试"
+            "value" : "收到无效十六进制字符串。重�?
           }
         }
       }
@@ -18075,7 +18075,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "無効なピンコード長を受信しました。再試行してください。"
+            "value" : "無効なピンコード長を受信しました。再試行してください�?
           }
         },
         "nb" : {
@@ -18141,19 +18141,19 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Độ dài mã pin không hợp lệ. Hãy thử lại"
+            "value" : "Đ�?dài mã pin không hợp l�? Hãy th�?lại"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "收到无效的密码长度。再试一次"
+            "value" : "收到无效的密码长度。再试一�?
           }
         }
       }
     },
     "Reconnect to pump" : {
-      "comment" : "DanaKit reconnect",
+      "comment" : "M640GKit reconnect",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
@@ -18297,7 +18297,7 @@
       }
     },
     "Reconnect tp pump" : {
-      "comment" : "DanaKit connect",
+      "comment" : "M640GKit connect",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
@@ -18363,7 +18363,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプを再接続する"
+            "value" : "ポンプを再接続す�?
           }
         },
         "nb" : {
@@ -18441,7 +18441,7 @@
       }
     },
     "Reconnecting..." : {
-      "comment" : "DanaKit reconnecting",
+      "comment" : "M640GKit reconnecting",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
@@ -18507,7 +18507,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "再接続..."
+            "value" : "再接�?.."
           }
         },
         "nb" : {
@@ -18651,7 +18651,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "補充量"
+            "value" : "補充�?
           }
         },
         "nb" : {
@@ -18717,13 +18717,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Số lượng nạp lại"
+            "value" : "S�?lượng nạp lại"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "加注量"
+            "value" : "加注�?
           }
         }
       }
@@ -18795,7 +18795,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "インスリン残量"
+            "value" : "インスリン残�?
           }
         },
         "nb" : {
@@ -18867,7 +18867,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "胰岛素余量"
+            "value" : "胰岛素余�?
           }
         }
       }
@@ -19011,7 +19011,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "移除泵"
+            "value" : "移除�?
           }
         }
       }
@@ -19227,7 +19227,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "リザーバーとカニューレ"
+            "value" : "リザーバーとカニュー�?
           }
         },
         "nb" : {
@@ -19299,7 +19299,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "药筒和套管"
+            "value" : "药筒和套�?
           }
         }
       }
@@ -19371,7 +19371,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "リザーバーが空です。すぐに交換してください！"
+            "value" : "リザーバーが空です。すぐに交換してください�?
           }
         },
         "nb" : {
@@ -19437,13 +19437,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bình chứa đã cạn. Hãy thay thế ngay!"
+            "value" : "Bình chứa đã cạn. Hãy thay th�?ngay!"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "药筒已空。请立即更换！"
+            "value" : "药筒已空。请立即更换�?
           }
         }
       }
@@ -19587,7 +19587,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "更换药筒和套管"
+            "value" : "更换药筒和套�?
           }
         }
       }
@@ -19659,7 +19659,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "履歴書"
+            "value" : "履歴�?
           }
         },
         "nb" : {
@@ -19947,7 +19947,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "セーブ"
+            "value" : "セー�?
           }
         },
         "nb" : {
@@ -20163,7 +20163,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "扫描中"
+            "value" : "扫描�?
           }
         }
       }
@@ -20235,7 +20235,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "予定ベース"
+            "value" : "予定ベー�?
           }
         },
         "nb" : {
@@ -20307,7 +20307,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "预设基础率"
+            "value" : "预设基础�?
           }
         }
       }
@@ -20379,7 +20379,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "スクロール機能"
+            "value" : "スクロール機�?
           }
         },
         "nb" : {
@@ -20523,7 +20523,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "秒"
+            "value" : "�?
           }
         },
         "nb" : {
@@ -20739,7 +20739,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择胰岛素类型"
+            "value" : "选择胰岛素类�?
           }
         }
       }
@@ -20822,7 +20822,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このポンプで使用するインスリンの種類を選択してください。"
+            "value" : "このポンプで使用するインスリンの種類を選択してください�?
           }
         },
         "nb" : {
@@ -20888,7 +20888,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chọn loại insulin mà bạn sẽ sử dụng trong máy bơm này"
+            "value" : "Chọn loại insulin mà bạn s�?s�?dụng trong máy bơm này"
           }
         },
         "zh-Hans" : {
@@ -21032,13 +21032,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chọn loại insulin bạn sẽ sử dụng trong máy bơm này."
+            "value" : "Chọn loại insulin bạn s�?s�?dụng trong máy bơm này."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择您将在此泵中使用的胰岛素类型。"
+            "value" : "选择您将在此泵中使用的胰岛素类型�?
           }
         }
       }
@@ -21254,7 +21254,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプが使用する基礎プロフィールを設定する。ポンプに内蔵されているプロファイルを、 %@のプロファイルで上書きすることに注意してください。"
+            "value" : "ポンプが使用する基礎プロフィールを設定する。ポンプに内蔵されているプロファイルを�?%@のプロファイルで上書きすることに注意してください�?
           }
         },
         "nb" : {
@@ -21320,13 +21320,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Đặt cấu hình cơ bản mà máy bơm nên sử dụng. Lưu ý rằng nó sẽ ghi đè lên cấu hình có trong máy bơm, với cấu hình trong %@"
+            "value" : "Đặt cấu hình cơ bản mà máy bơm nên s�?dụng. Lưu ý rằng nó s�?ghi đè lên cấu hình có trong máy bơm, với cấu hình trong %@"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "设置泵应使用的基础配置文件。注意，它将用 %@中的配置文件覆盖泵中的配置文件。"
+            "value" : "设置泵应使用的基础配置文件。注意，它将�?%@中的配置文件覆盖泵中的配置文件�?
           }
         }
       }
@@ -21398,7 +21398,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "基礎体温の設定は現在サポートされていません。"
+            "value" : "基礎体温の設定は現在サポートされていません�?
           }
         },
         "nb" : {
@@ -21464,13 +21464,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cài đặt liều temp basal không được hỗ trợ tại thời điểm này"
+            "value" : "Cài đặt liều temp basal không được h�?tr�?tại thời điểm này"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "目前不支持设置临时基础率"
+            "value" : "目前不支持设置临时基础�?
           }
         }
       }
@@ -21686,7 +21686,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DanaRS v3のセットアップ"
+            "value" : "DanaRS v3のセットアッ�?
           }
         },
         "nb" : {
@@ -21908,7 +21908,7 @@
       }
     },
     "Share Dana pump logs" : {
-      "comment" : "DanaKit share logs",
+      "comment" : "M640GKit share logs",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
@@ -21974,7 +21974,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ダナ・ポンプの記録を共有する"
+            "value" : "ダナ・ポンプの記録を共有す�?
           }
         },
         "nb" : {
@@ -22040,13 +22040,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chia sẻ nhật ký bơm Dana"
+            "value" : "Chia s�?nhật ký bơm Dana"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "分享 Dana 泵日志"
+            "value" : "分享 Dana 泵日�?
           }
         }
       }
@@ -22118,7 +22118,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "時刻は12時間表示か24時間表示か"
+            "value" : "時刻�?2時間表示�?4時間表示�?
           }
         },
         "nb" : {
@@ -22184,13 +22184,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Thời gian được hiển thị 12h hoặc 24h"
+            "value" : "Thời gian được hiển th�?12h hoặc 24h"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "时间应该以 12 小时还是 24 小时显示"
+            "value" : "时间应该�?12 小时还是 24 小时显示"
           }
         }
       }
@@ -22550,7 +22550,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ステータス"
+            "value" : "ステータ�?
           }
         },
         "nb" : {
@@ -22622,7 +22622,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "状态"
+            "value" : "状�?
           }
         }
       }
@@ -22766,7 +22766,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "步骤 1：排空套管"
+            "value" : "步骤 1：排空套�?
           }
         }
       }
@@ -22910,7 +22910,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "步骤 1：设置药筒药量"
+            "value" : "步骤 1：设置药筒药�?
           }
         }
       }
@@ -23198,7 +23198,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "停止临时基础率"
+            "value" : "停止临时基础�?
           }
         }
       }
@@ -23270,7 +23270,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "サスペンド"
+            "value" : "サスペン�?
           }
         },
         "nb" : {
@@ -23414,7 +23414,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "配送の一時停止"
+            "value" : "配送の一時停�?
           }
         },
         "nb" : {
@@ -23492,7 +23492,7 @@
       }
     },
     "Sync pump data" : {
-      "comment" : "DanaKit sync pump",
+      "comment" : "M640GKit sync pump",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
@@ -23558,7 +23558,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプデータの同期"
+            "value" : "ポンプデータの同�?
           }
         },
         "nb" : {
@@ -23624,13 +23624,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Đồng bộ dữ liệu bơm"
+            "value" : "Đồng b�?d�?liệu bơm"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同步泵数据"
+            "value" : "同步泵数�?
           }
         }
       }
@@ -23774,7 +23774,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "临时基础率"
+            "value" : "临时基础�?
           }
         }
       }
@@ -23846,7 +23846,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dana-Iインスリンポンプは、メーカーのSooilが2020年に初めて発売したもので、シリーズの最新作である。"
+            "value" : "Dana-Iインスリンポンプは、メーカーのSooil�?020年に初めて発売したもので、シリーズの最新作である�?
           }
         },
         "nb" : {
@@ -23918,7 +23918,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dana-I 胰岛素泵由制造商 Sooil 于 2020 年首次推出，是该系列的最新产品。"
+            "value" : "Dana-I 胰岛素泵由制造商 Sooil �?2020 年首次推出，是该系列的最新产品�?
           }
         }
       }
@@ -23990,7 +23990,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DanaRS インスリンポンプは 2002 年に初めて発売された。注：ファームウェアバージョン3のDanaRSポンプのみがサポートされています。"
+            "value" : "DanaRS インスリンポンプ�?2002 年に初めて発売された。注：ファームウェアバージョ�?のDanaRSポンプのみがサポートされています�?
           }
         },
         "nb" : {
@@ -24056,13 +24056,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Máy bơm insulin DanaRS được ra mắt lần đầu vào năm 2002. LƯU Ý: Chỉ các máy bơm DanaRS có phiên bản phần mềm 3 mới được hỗ trợ."
+            "value" : "Máy bơm insulin DanaRS được ra mắt lần đầu vào năm 2002. LƯU Ý: Ch�?các máy bơm DanaRS có phiên bản phần mềm 3 mới được h�?tr�?"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DanaRS 胰岛素泵于 2002 年首次发布。注意：仅支持固件版本为 3 的 DanaRS 泵"
+            "value" : "DanaRS 胰岛素泵�?2002 年首次发布。注意：仅支持固件版本为 3 �?DanaRS �?
           }
         }
       }
@@ -24134,7 +24134,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "インスリン投与が中断されました。処置失敗"
+            "value" : "インスリン投与が中断されました。処置失�?
           }
         },
         "nb" : {
@@ -24200,13 +24200,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Việc cung cấp insulin đã bị tạm dừng. Hành động không thành công"
+            "value" : "Việc cung cấp insulin đã b�?tạm dừng. Hành động không thành công"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "胰岛素输送已暂停。行动失败"
+            "value" : "胰岛素输送已暂停。行动失�?
           }
         }
       }
@@ -24278,7 +24278,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ボーラスの上限値に達しています。量を減らすか、上限を増やしてください。"
+            "value" : "ボーラスの上限値に達しています。量を減らすか、上限を増やしてください�?
           }
         },
         "nb" : {
@@ -24344,13 +24344,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Đã đạt đến giới hạn bolus tối đa. Vui lòng thử lượng thấp hơn hoặc tăng giới hạn"
+            "value" : "Đã đạt đến giới hạn bolus tối đa. Vui lòng th�?lượng thấp hơn hoặc tăng giới hạn"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已达到最大剂量上限。请尝试更低的大剂量或提高上限"
+            "value" : "已达到最大剂量上限。请尝试更低的大剂量或提高上�?
           }
         }
       }
@@ -24422,7 +24422,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "1日のインスリン量が上限に達しています。もう少し量を減らすか、上限を増やしてください。"
+            "value" : "1日のインスリン量が上限に達しています。もう少し量を減らすか、上限を増やしてください�?
           }
         },
         "nb" : {
@@ -24488,13 +24488,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Đã đạt đến giới hạn insulin tối đa hàng ngày. Vui lòng thử lượng thấp hơn hoặc tăng giới hạn"
+            "value" : "Đã đạt đến giới hạn insulin tối đa hàng ngày. Vui lòng th�?lượng thấp hơn hoặc tăng giới hạn"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已达到每日胰岛素用量上限。请尝试降低用量或增加上限"
+            "value" : "已达到每日胰岛素用量上限。请尝试降低用量或增加上�?
           }
         }
       }
@@ -24566,7 +24566,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプがシャフトの問題を検出しました。リザーバを取り外し、すべてを確認してから再度お試しください。"
+            "value" : "ポンプがシャフトの問題を検出しました。リザーバを取り外し、すべてを確認してから再度お試しください�?
           }
         },
         "nb" : {
@@ -24632,13 +24632,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Máy bơm đã phát hiện ra sự cố với chaft của nó. Vui lòng tháo bình chứa, kiểm tra mọi thứ và thử lại"
+            "value" : "Máy bơm đã phát hiện ra s�?c�?với chaft của nó. Vui lòng tháo bình chứa, kiểm tra mọi th�?và th�?lại"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "泵检测到其轴有问题。请卸下储液器，检查一切后再试一次"
+            "value" : "泵检测到其轴有问题。请卸下储液器，检查一切后再试一�?
           }
         }
       }
@@ -24776,7 +24776,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bơm sẽ nhắc bạn khi lượng insulin trong bơm đạt đến mức này"
+            "value" : "Bơm s�?nhắc bạn khi lượng insulin trong bơm đạt đến mức này"
           }
         },
         "zh-Hans" : {
@@ -24998,7 +24998,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ポンプの時刻は現在時刻とは異なります。ポンプの時刻はスケジュールされた治療設定を制御します。ポンプ時刻の行までスクロールして、時差を確認し、ポンプを設定してください。"
+            "value" : "ポンプの時刻は現在時刻とは異なります。ポンプの時刻はスケジュールされた治療設定を制御します。ポンプ時刻の行までスクロールして、時差を確認し、ポンプを設定してください�?
           }
         },
         "nb" : {
@@ -25064,13 +25064,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Thời gian trên máy bơm của bạn khác với thời gian hiện tại. Thời gian của máy bơm sẽ kiểm soát cài đặt trị liệu theo lịch trình của bạn. Cuộn xuống đến Pump Time để xem lại chênh lệch thời gian và cấu hình bơm của bạn."
+            "value" : "Thời gian trên máy bơm của bạn khác với thời gian hiện tại. Thời gian của máy bơm s�?kiểm soát cài đặt tr�?liệu theo lịch trình của bạn. Cuộn xuống đến Pump Time đ�?xem lại chênh lệch thời gian và cấu hình bơm của bạn."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "泵上的时间与当前时间不同。泵上的时间控制着您的计划治疗设置。向下滚动到泵时间行，查看时差并配置您的泵。"
+            "value" : "泵上的时间与当前时间不同。泵上的时间控制着您的计划治疗设置。向下滚动到泵时间行，查看时差并配置您的泵�?
           }
         }
       }
@@ -25142,7 +25142,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "あまりにも長い間、ポンプとの相互作用がありません。ポンプのこの機能を無効にするか、ポンプと対話するかしてください。"
+            "value" : "あまりにも長い間、ポンプとの相互作用がありません。ポンプのこの機能を無効にするか、ポンプと対話するかしてください�?
           }
         },
         "nb" : {
@@ -25208,13 +25208,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Đã không có bất kỳ tương tác nào với máy bơm trong thời gian quá dài. Hãy vô hiệu hóa chức năng này trong máy bơm hoặc tương tác với máy bơm"
+            "value" : "Đã không có bất k�?tương tác nào với máy bơm trong thời gian quá dài. Hãy vô hiệu hóa chức năng này trong máy bơm hoặc tương tác với máy bơm"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "长时间未与胰岛素泵进行交互。请在胰岛素泵中禁用此功能，或进行一次操作以恢复交互。"
+            "value" : "长时间未与胰岛素泵进行交互。请在胰岛素泵中禁用此功能，或进行一次操作以恢复交互�?
           }
         }
       }
@@ -25352,13 +25352,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Phương pháp nạp lại này chỉ dành cho trường hợp máy bơm không thể nạp lại bình chứa hoặc mồi ống thông"
+            "value" : "Phương pháp nạp lại này ch�?dành cho trường hợp máy bơm không th�?nạp lại bình chứa hoặc mồi ống thông"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这种加注方法仅适用于泵无法提供给储液器加注或给插管填料的情况。"
+            "value" : "这种加注方法仅适用于泵无法提供给储液器加注或给插管填料的情况�?
           }
         }
       }
@@ -25430,7 +25430,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "検出された時間変化"
+            "value" : "検出された時間変�?
           }
         },
         "nb" : {
@@ -25574,7 +25574,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ブルートゥース・モデル"
+            "value" : "ブルートゥース・モデ�?
           }
         },
         "nb" : {
@@ -25640,7 +25640,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chuyển đổi chế độ Bluetooth"
+            "value" : "Chuyển đổi ch�?đ�?Bluetooth"
           }
         },
         "zh-Hans" : {
@@ -25784,7 +25784,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chuyển đổi chế độ im lặng không?"
+            "value" : "Chuyển đổi ch�?đ�?im lặng không?"
           }
         },
         "zh-Hans" : {
@@ -25934,7 +25934,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "输注管补药剂量"
+            "value" : "输注管补药剂�?
           }
         }
       }
@@ -26006,7 +26006,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "詰め替えタイプ"
+            "value" : "詰め替えタイ�?
           }
         },
         "nb" : {
@@ -26294,7 +26294,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "U/時"
+            "value" : "U/�?
           }
         },
         "nb" : {
@@ -26726,7 +26726,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ユーザーオプション"
+            "value" : "ユーザーオプショ�?
           }
         },
         "nb" : {
@@ -26936,7 +26936,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chế độ rung"
+            "value" : "Ch�?đ�?rung"
           }
         },
         "zh-Hans" : {
@@ -27080,7 +27080,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CẢNH BÁO: Vui lòng không sử dụng tính năng này cho đến khi bạn đã đọc tài liệu hướng dẫn"
+            "value" : "CẢNH BÁO: Vui lòng không s�?dụng tính năng này cho đến khi bạn đã đọc tài liệu hướng dẫn"
           }
         },
         "zh-Hans" : {
@@ -27224,7 +27224,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CẢNH BÁO: SỬ DỤNG THẬN TRỌNG!"
+            "value" : "CẢNH BÁO: S�?DỤNG THẬN TRỌNG!"
           }
         },
         "zh-Hans" : {
@@ -27296,7 +27296,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ようこそ！"
+            "value" : "ようこそ�?
           }
         },
         "nb" : {
@@ -27572,7 +27572,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "はい、1時間"
+            "value" : "はい�?時間"
           }
         },
         "nb" : {
@@ -27638,7 +27638,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Có, 1 giờ"
+            "value" : "Có, 1 gi�?
           }
         },
         "zh-Hans" : {
@@ -27716,7 +27716,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "はい、5分"
+            "value" : "はい�?�?
           }
         },
         "nb" : {
@@ -27860,7 +27860,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "はい、15分"
+            "value" : "はい�?5�?
           }
         },
         "nb" : {
@@ -28004,7 +28004,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "はい、30分"
+            "value" : "はい�?0�?
           }
         },
         "nb" : {
@@ -28214,13 +28214,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Có, tắt đồng bộ bolus"
+            "value" : "Có, tắt đồng b�?bolus"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "是的，禁用大剂量同步。"
+            "value" : "是的，禁用大剂量同步�?
           }
         }
       }
@@ -28292,7 +28292,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "はい、サイレントトーンを無効にする"
+            "value" : "はい、サイレントトーンを無効にす�?
           }
         },
         "nb" : {
@@ -28364,7 +28364,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "是，禁用无声提示音"
+            "value" : "是，禁用无声提示�?
           }
         }
       }
@@ -28436,7 +28436,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "はい、サイレントトーンを有効にする"
+            "value" : "はい、サイレントトーンを有効にす�?
           }
         },
         "nb" : {
@@ -28508,7 +28508,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "是，启用无声提示音"
+            "value" : "是，启用无声提示�?
           }
         }
       }
@@ -28580,7 +28580,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "はい、ボーラス同期を再度有効にしてください"
+            "value" : "はい、ボーラス同期を再度有効にしてくださ�?
           }
         },
         "nb" : {
@@ -28646,7 +28646,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Có, bật lại đồng bộ bolus"
+            "value" : "Có, bật lại đồng b�?bolus"
           }
         },
         "zh-Hans" : {
@@ -28724,7 +28724,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "はい、連続モードに切り替える"
+            "value" : "はい、連続モードに切り替え�?
           }
         },
         "nb" : {
@@ -28790,13 +28790,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Có, chuyển sang chế độ liên tục"
+            "value" : "Có, chuyển sang ch�?đ�?liên tục"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "是，切换到连续模式"
+            "value" : "是，切换到连续模�?
           }
         }
       }
@@ -28934,13 +28934,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Có, chuyển sang chế độ tương tác"
+            "value" : "Có, chuyển sang ch�?đ�?tương tác"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "是，切换到交互模式"
+            "value" : "是，切换到交互模�?
           }
         }
       }
@@ -29078,13 +29078,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Có, đồng bộ với thời gian hiện tại"
+            "value" : "Có, đồng b�?với thời gian hiện tại"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "是，与当前时间同步"
+            "value" : "是，与当前时间同�?
           }
         }
       }
@@ -29300,7 +29300,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "1日の基礎摂取量の上限に達しました。制限を増やすには、Danaの販売代理店にご連絡ください。"
+            "value" : "1日の基礎摂取量の上限に達しました。制限を増やすには、Danaの販売代理店にご連絡ください�?
           }
         },
         "nb" : {
@@ -29366,7 +29366,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Đã đạt đến giới hạn bolus tối đa. Vui lòng thử lượng thấp hơn hoặc tăng giới hạn"
+            "value" : "Đã đạt đến giới hạn bolus tối đa. Vui lòng th�?lượng thấp hơn hoặc tăng giới hạn"
           }
         },
         "zh-Hans" : {
@@ -29444,7 +29444,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "インスリンの1日あたりの摂取量が上限に達しました。限度額を増やすには、ダナ販売店にご連絡ください。"
+            "value" : "インスリンの1日あたりの摂取量が上限に達しました。限度額を増やすには、ダナ販売店にご連絡ください�?
           }
         },
         "nb" : {
@@ -29510,7 +29510,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Đã đạt giới hạn insulin hàng ngày của bạn. Vui lòng liên hệ với nhà phân phối Dana của bạn để tăng giới hạn"
+            "value" : "Đã đạt giới hạn insulin hàng ngày của bạn. Vui lòng liên h�?với nhà phân phối Dana của bạn đ�?tăng giới hạn"
           }
         },
         "zh-Hans" : {
@@ -29654,13 +29654,13 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bơm của bạn đã bị ngắt kết nối hơn 5 phút!"
+            "value" : "Bơm của bạn đã b�?ngắt kết nối hơn 5 phút!"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "您的泵断开连接的时间已超过 5 分钟！"
+            "value" : "您的泵断开连接的时间已超过 5 分钟�?
           }
         }
       }
@@ -29798,7 +29798,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Máy bơm của bạn vẫn bị ngắt kết nối sau thời gian đã đặt!"
+            "value" : "Máy bơm của bạn vẫn b�?ngắt kết nối sau thời gian đã đặt!"
           }
         },
         "zh-Hans" : {
