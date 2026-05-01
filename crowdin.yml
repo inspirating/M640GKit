@@ -1,7 +1,0 @@
-files:
-  - source: /M640GKit/Resources/Localizable.xcstrings
-    translation: /M640GKit/Resources/Localizable.xcstrings
-    multilingual: 1
-  - source: /M640GKitUI/Resources/Localizable.xcstrings
-    translation: /M640GKitUI/Resources/Localizable.xcstrings
-    multilingual: 1
