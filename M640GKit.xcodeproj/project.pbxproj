@@ -659,6 +659,7 @@
 			files = (
 				C1E34B6829C7AD62009A50A5 /* LoopKit.framework in Frameworks */,
 				C1E34B7D29C7B075009A50A5 /* RileyLinkKit.framework in Frameworks */,
+				C1E34BA229C7B652009A50A5 /* RileyLinkBLEKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
