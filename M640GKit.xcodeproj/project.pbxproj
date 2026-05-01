@@ -253,7 +253,6 @@
 		C1E34B2429C7ABF3009A50A5 /* Image.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E34B0A29C7ABF2009A50A5 /* Image.swift */; };
 		C1E34B2529C7ABF3009A50A5 /* M640GPumpIDSetupViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E34B0C29C7ABF2009A50A5 /* M640GPumpIDSetupViewController.swift */; };
 		C1E34B2629C7ABF3009A50A5 /* M640GPumpManagerSetupViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E34B0D29C7ABF2009A50A5 /* M640GPumpManagerSetupViewController.swift */; };
-		C1E34B2729C7ABF3009A50A5 /* M640GPumpClockSetupViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E34B0E29C7ABF2009A50A5 /* M640GPumpClockSetupViewController.swift */; };
 		C1E34B2829C7ABF3009A50A5 /* M640GPumpSetupCompleteViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E34B0F29C7ABF2009A50A5 /* M640GPumpSetupCompleteViewController.swift */; };
 		C1E34B2929C7ABF3009A50A5 /* M640GPumpSentrySetupViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E34B1029C7ABF2009A50A5 /* M640GPumpSentrySetupViewController.swift */; };
 		C1E34B2A29C7ABF3009A50A5 /* M640GPumpManager+UI.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E34B1129C7ABF2009A50A5 /* M640GPumpManager+UI.swift */; };
@@ -601,7 +600,6 @@
 		C1E34B0A29C7ABF2009A50A5 /* Image.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Image.swift; sourceTree = "<group>"; };
 		C1E34B0C29C7ABF2009A50A5 /* M640GPumpIDSetupViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = M640GPumpIDSetupViewController.swift; sourceTree = "<group>"; };
 		C1E34B0D29C7ABF2009A50A5 /* M640GPumpManagerSetupViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = M640GPumpManagerSetupViewController.swift; sourceTree = "<group>"; };
-		C1E34B0E29C7ABF2009A50A5 /* M640GPumpClockSetupViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = M640GPumpClockSetupViewController.swift; sourceTree = "<group>"; };
 		C1E34B0F29C7ABF2009A50A5 /* M640GPumpSetupCompleteViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = M640GPumpSetupCompleteViewController.swift; sourceTree = "<group>"; };
 		C1E34B1029C7ABF2009A50A5 /* M640GPumpSentrySetupViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = M640GPumpSentrySetupViewController.swift; sourceTree = "<group>"; };
 		C1E34B1129C7ABF2009A50A5 /* M640GPumpManager+UI.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "M640GPumpManager+UI.swift"; sourceTree = "<group>"; };
@@ -659,6 +657,7 @@
 			files = (
 				C1E34B6829C7AD62009A50A5 /* LoopKit.framework in Frameworks */,
 				C1E34B7D29C7B075009A50A5 /* RileyLinkKit.framework in Frameworks */,
+				C1E34BA229C7B652009A50A5 /* RileyLinkBLEKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1135,7 +1134,6 @@
 			children = (
 				C1E34B0C29C7ABF2009A50A5 /* M640GPumpIDSetupViewController.swift */,
 				C1E34B0D29C7ABF2009A50A5 /* M640GPumpManagerSetupViewController.swift */,
-				C1E34B0E29C7ABF2009A50A5 /* M640GPumpClockSetupViewController.swift */,
 				C1E34B0F29C7ABF2009A50A5 /* M640GPumpSetupCompleteViewController.swift */,
 				C1E34B1029C7ABF2009A50A5 /* M640GPumpSentrySetupViewController.swift */,
 			);
