@@ -16,7 +16,7 @@ struct M640GKitSettingsView: View {
 
     var removePumpManagerActionSheet: ActionSheet {
         ActionSheet(
-            title: Text(LocalizedString("Remove Pump", comment: "Title for Dana-i/RS PumpManager deletion action sheet.")),
+            title: Text(LocalizedString("Remove Pump", comment: "Title for -i/RS PumpManager deletion action sheet.")),
             message: Text(LocalizedString(
                 "Are you sure you want to stop using Dana-i/RS?",
                 comment: "Message for Dana-i/RS PumpManager deletion action sheet"
