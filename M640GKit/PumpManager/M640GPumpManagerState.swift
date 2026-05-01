@@ -6,8 +6,8 @@
 //
 
 import LoopKit
-//import RileyLinkKit
-//import RileyLinkBLEKit
+import RileyLinkKit
+import RileyLinkBLEKit
 
 public struct ReconciledDoseMapping: Equatable {
     let startTime: Date
