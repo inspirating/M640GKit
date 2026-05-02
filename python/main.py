@@ -32,7 +32,9 @@ from encryption import crc8_calculate, Crypto
 from enums import (
     BLEState, PatchState, BasalType, AlarmSettings, CommandType,
     MASK_SUSPEND, MASK_NORMAL_BOLUS, MASK_BASAL, MASK_RESERVOIR,
-    MASK_BATTERY, MASK_AGE, AlertType
+    MASK_BATTERY, MASK_AGE, MASK_ALARM, MASK_UNUSED_CGM,
+    MASK_UNUSED_COMMAND_CONFIRM, MASK_UNUSED_AUTO_STATUS, MASK_UNUSED_LEGACY,
+    MASK_MAGNETO_PLACE, AlertType
 )
 from packets import (
     AuthorizePacket, SynchronizePacket, SubscribePacket,
@@ -144,6 +146,8 @@ class M640GPumpSimulator:
         self.client_info = {}
 
         self.session_token = self._generate_session_token()
+        self.pump_timezone = 0
+        self.time_sync_pending = False
 
         self.gatt_server = GATTServer(self.ble)
         self.gatt_server.on_write_request = self._on_write_request
@@ -211,6 +215,7 @@ class M640GPumpSimulator:
         self._update_bolus_delivery()
         self._update_temp_basal()
         self._update_prime_progress()
+        self._check_state_notifications()
 
         if random.randint(0, 1000) == 0:
             self.battery_voltage = max(2.8, self.battery_voltage - 0.01)
@@ -218,6 +223,51 @@ class M640GPumpSimulator:
 
         if self.is_subscribed and self.is_connected:
             self._send_periodic_notification()
+
+    def _check_state_notifications(self):
+        if not hasattr(self, 'last_notified_state'):
+            self.last_notified_state = None
+
+        if self.patch_state == self.last_notified_state:
+            return
+
+        should_notify = False
+
+        if self.patch_state == PatchState.SUSPENDED:
+            if self.total_elapsed_time % 7200 == 0:
+                Logger.info("通知: 每日最大暂停")
+                should_notify = True
+            if self.total_elapsed_time % 3600 == 0:
+                Logger.info("通知: 每小时最大暂停")
+                should_notify = True
+        elif self.patch_state == PatchState.OCCLUSION:
+            Logger.info("通知: 堵管报警")
+            should_notify = True
+        elif self.patch_state == PatchState.PATCH_FAULT:
+            Logger.info("通知: Patch 故障")
+            should_notify = True
+        elif self.patch_state == PatchState.RESERVOIR_EMPTY:
+            Logger.info("通知: 储药器空")
+            should_notify = True
+
+        if should_notify:
+            self.last_notified_state = self.patch_state
+            self._send_state_notification()
+
+    def _send_state_notification(self):
+        sync_data = self._build_synchronize_data()
+        packet = SynchronizePacket()
+        packet.total_data = sync_data
+        packet.data_size = len(sync_data)
+        packet.response_code = 0
+
+        encoded = packet.encode(self._sequence_number)
+        self._sequence_number = (self._sequence_number + 1) % 254
+
+        for pkg in encoded:
+            self.gatt_server.send_notification(pkg)
+
+        Logger.info(f"状态通知已发送: Patch 状态={self.patch_state}")
 
     def _update_prime_progress(self):
         if self.patch_state == PatchState.PRIMING:
@@ -290,7 +340,9 @@ class M640GPumpSimulator:
 
         field_mask = (
             MASK_SUSPEND | MASK_NORMAL_BOLUS | MASK_BASAL |
-            MASK_RESERVOIR | MASK_BATTERY | MASK_AGE | MASK_SETUP
+            MASK_RESERVOIR | MASK_BATTERY | MASK_AGE | MASK_SETUP |
+            MASK_ALARM | MASK_UNUSED_CGM | MASK_UNUSED_COMMAND_CONFIRM |
+            MASK_UNUSED_AUTO_STATUS | MASK_UNUSED_LEGACY | MASK_MAGNETO_PLACE
         )
         data.extend(field_mask.to_bytes(2, 'little'))
 
@@ -327,13 +379,30 @@ class M640GPumpSimulator:
         reservoir_raw = int(self.reservoir / 0.05)
         data.extend(reservoir_raw.to_bytes(2, 'little'))
 
-        battery_raw = int(self.battery_voltage * 1000)
-        data.extend(battery_raw.to_bytes(3, 'little'))
+        voltage_a_raw = int(self.battery_voltage * 512)
+        voltage_b_raw = int(self.battery_voltage * 512)
+        battery_value = (voltage_b_raw << 12) | voltage_a_raw
+        data.extend(battery_value.to_bytes(3, 'little'))
 
         data.extend(self.total_elapsed_time.to_bytes(4, 'little'))
 
         prime_progress = getattr(self, 'prime_progress', 0) if self.patch_state == PatchState.PRIMING else 0
         data.append(prime_progress)
+
+        active_alarms_flags = 0
+        data.extend(active_alarms_flags.to_bytes(2, 'little'))
+        data.extend((0).to_bytes(2, 'little'))
+
+        data.extend((0).to_bytes(4, 'little'))
+
+        data.extend((0).to_bytes(2, 'little'))
+
+        data.extend((0).to_bytes(2, 'little'))
+
+        data.extend((0).to_bytes(2, 'little'))
+
+        magneto_value = int(1.0 / 0.01)
+        data.extend(magneto_value.to_bytes(2, 'little'))
 
         return bytes(data)
 
@@ -458,6 +527,7 @@ class M640GPumpSimulator:
             time_bytes = data[7:11]
             new_time = int.from_bytes(time_bytes, 'little')
             Logger.info(f"  设置时间戳: {new_time}")
+            self.time_sync_pending = True
         response = self._build_response_packet(CommandType.SET_TIME, seq_num, b'')
         self.gatt_server.send_notification(response)
 
@@ -596,8 +666,18 @@ class M640GPumpSimulator:
         if len(data) >= 8:
             tz_offset = int.from_bytes(data[6:8], 'little', signed=True)
             Logger.info(f"  时区偏移: {tz_offset} 分钟")
+            self.pump_timezone = tz_offset
         response = self._build_response_packet(CommandType.SET_TIME_ZONE, seq_num, b'')
         self.gatt_server.send_notification(response)
+
+        if hasattr(self, 'time_sync_pending') and self.time_sync_pending:
+            self.time_sync_pending = False
+            Logger.info("时间同步流程完成, 发送验证时间")
+            current_time = m640gkit_seconds()
+            response_data = bytearray()
+            response_data.extend(current_time.to_bytes(4, 'little'))
+            response = self._build_response_packet(CommandType.GET_TIME, seq_num + 1, response_data)
+            self.gatt_server.send_notification(response)
 
     def _handle_prime_request(self, data: bytes, seq_num: int):
         Logger.info("收到预充请求")

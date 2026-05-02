@@ -265,6 +265,10 @@ MASK_STORAGE = 0x0100             # 存储数据
 MASK_ALARM = 0x0200               # 警报状态
 MASK_AGE = 0x0400                 # Patch 使用时长
 MASK_MAGNETO_PLACE = 0x0800       # 磁铁位置
+MASK_UNUSED_CGM = 0x1000          # 未使用 CGM 字段
+MASK_UNUSED_COMMAND_CONFIRM = 0x2000  # 未使用命令确认字段
+MASK_UNUSED_AUTO_STATUS = 0x4000  # 未使用自动状态字段
+MASK_UNUSED_LEGACY = 0x8000       # 未使用遗留字段
 
 
 # =============================================================================
