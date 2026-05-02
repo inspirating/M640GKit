@@ -132,10 +132,14 @@ class ActivatePacket(BasePacket):
         return bytes(base)
 
     def parse_response(self) -> dict:
-        """解析激活响应"""
         return {
             'patch_id': self.total_data[6:10],
-            'time': int.from_bytes(self.total_data[10:14], 'little')
+            'time': int.from_bytes(self.total_data[10:14], 'little'),
+            'basal_type': self.total_data[14] if len(self.total_data) > 14 else 0,
+            'basal_value': int.from_bytes(self.total_data[15:17], 'little') if len(self.total_data) > 16 else 0,
+            'basal_sequence': int.from_bytes(self.total_data[17:19], 'little') if len(self.total_data) > 18 else 0,
+            'basal_patch_id': int.from_bytes(self.total_data[19:21], 'little') if len(self.total_data) > 20 else 0,
+            'basal_start_time': int.from_bytes(self.total_data[21:25], 'little') if len(self.total_data) > 24 else 0,
         }
 
 

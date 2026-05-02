@@ -31,10 +31,11 @@ import utime
 from encryption import crc8_calculate, Crypto
 from enums import (
     BLEState, PatchState, BasalType, AlarmSettings, CommandType,
-    MASK_SUSPEND, MASK_NORMAL_BOLUS, MASK_BASAL, MASK_RESERVOIR,
-    MASK_BATTERY, MASK_AGE, MASK_ALARM, MASK_UNUSED_CGM,
-    MASK_UNUSED_COMMAND_CONFIRM, MASK_UNUSED_AUTO_STATUS, MASK_UNUSED_LEGACY,
-    MASK_MAGNETO_PLACE, AlertType
+    MASK_SUSPEND, MASK_NORMAL_BOLUS, MASK_EXTENDED_BOLUS, MASK_BASAL,
+    MASK_SETUP, MASK_RESERVOIR, MASK_START_TIME, MASK_BATTERY,
+    MASK_STORAGE, MASK_ALARM, MASK_AGE, MASK_MAGNETO_PLACE,
+    MASK_UNUSED_CGM, MASK_UNUSED_COMMAND_CONFIRM,
+    MASK_UNUSED_AUTO_STATUS, MASK_UNUSED_LEGACY, AlertType
 )
 from packets import (
     AuthorizePacket, SynchronizePacket, SubscribePacket,
@@ -271,7 +272,7 @@ class M640GPumpSimulator:
         packet.data_size = len(sync_data)
         packet.response_code = 0
 
-        encoded = packet.encode(self._sequence_number)
+        encoded = packet.encode_notification(self._sequence_number)
         self._sequence_number = (self._sequence_number + 1) % 254
 
         for pkg in encoded:
@@ -372,7 +373,7 @@ class M640GPumpSimulator:
         packet.data_size = len(sync_data)
         packet.response_code = 0
 
-        encoded = packet.encode(self._sequence_number)
+        encoded = packet.encode_notification(self._sequence_number)
         self._sequence_number = (self._sequence_number + 1) % 254
 
         for pkg in encoded:
@@ -380,81 +381,97 @@ class M640GPumpSimulator:
 
     def _build_synchronize_data(self) -> bytes:
         data = bytearray()
-        data.append(0)
-        data.append(0)
-
-        patch_id = random.randint(1, 65535)
-        data.extend(patch_id.to_bytes(2, 'little'))
-
-        data.append(0)
-        data.append(0)
         data.append(self.patch_state)
 
         field_mask = (
-            MASK_SUSPEND | MASK_NORMAL_BOLUS | MASK_BASAL |
-            MASK_RESERVOIR | MASK_BATTERY | MASK_AGE | MASK_SETUP |
-            MASK_ALARM | MASK_UNUSED_CGM | MASK_UNUSED_COMMAND_CONFIRM |
-            MASK_UNUSED_AUTO_STATUS | MASK_UNUSED_LEGACY | MASK_MAGNETO_PLACE
+            MASK_SUSPEND | MASK_NORMAL_BOLUS | MASK_EXTENDED_BOLUS | MASK_BASAL |
+            MASK_SETUP | MASK_RESERVOIR | MASK_START_TIME | MASK_BATTERY |
+            MASK_STORAGE | MASK_ALARM | MASK_AGE | MASK_MAGNETO_PLACE |
+            MASK_UNUSED_CGM | MASK_UNUSED_COMMAND_CONFIRM |
+            MASK_UNUSED_AUTO_STATUS | MASK_UNUSED_LEGACY
         )
         data.extend(field_mask.to_bytes(2, 'little'))
 
-        if self.patch_state == PatchState.SUSPENDED:
+        if field_mask & MASK_SUSPEND:
             suspend_seconds = self.total_elapsed_time
             data.extend(suspend_seconds.to_bytes(4, 'little'))
 
-        if self.current_bolus:
-            bolus_type = self.current_bolus['type']
-            completed = 0x80 if self.bolus_delivery_progress >= 100 else 0
-            data.append(bolus_type | completed)
-            delivered = int(self.current_bolus['amount'] * (self.bolus_delivery_progress / 100) / 0.05)
-            data.extend(delivered.to_bytes(2, 'little'))
-        else:
-            data.append(0)
+        if field_mask & MASK_NORMAL_BOLUS:
+            if self.current_bolus:
+                bolus_type = self.current_bolus['type']
+                completed = 0x80 if self.bolus_delivery_progress >= 100 else 0
+                data.append(bolus_type | completed)
+                delivered = int(self.current_bolus['amount'] * (self.bolus_delivery_progress / 100) / 0.05)
+                data.extend(delivered.to_bytes(2, 'little'))
+            else:
+                data.append(0)
+                data.extend((0).to_bytes(2, 'little'))
+
+        if field_mask & MASK_EXTENDED_BOLUS:
+            data.extend((0).to_bytes(3, 'little'))
+
+        if field_mask & MASK_BASAL:
+            basal_type = BasalType.ABSOLUTE_TEMP if self.temp_basal else BasalType.STANDARD
+            data.append(basal_type)
+            data.extend((0).to_bytes(2, 'little'))
+            patch_id = random.randint(1, 65535)
+            data.extend(patch_id.to_bytes(2, 'little'))
+            start_time_seconds = int(self.patch_start_time - (365 * 24 * 3600 * 20))
+            data.extend(start_time_seconds.to_bytes(4, 'little'))
+            if self.temp_basal:
+                rate = int(self.temp_basal['rate'] / 0.05)
+                delivery = rate
+            else:
+                rate = int(0.6 / 0.05)
+                delivery = 0
+            rate_value = (delivery << 12) | rate
+            data.extend(rate_value.to_bytes(3, 'little'))
+
+        if field_mask & MASK_SETUP:
+            prime_progress = getattr(self, 'prime_progress', 0) if self.patch_state == PatchState.PRIMING else 0
+            data.append(prime_progress)
+
+        if field_mask & MASK_RESERVOIR:
+            reservoir_raw = int(self.reservoir / 0.05)
+            data.extend(reservoir_raw.to_bytes(2, 'little'))
+
+        if field_mask & MASK_START_TIME:
+            start_time_seconds = int(self.patch_start_time - (365 * 24 * 3600 * 20))
+            data.extend(start_time_seconds.to_bytes(4, 'little'))
+
+        if field_mask & MASK_BATTERY:
+            voltage_a_raw = int(self.battery_voltage * 512)
+            voltage_b_raw = int(self.battery_voltage * 512)
+            battery_value = (voltage_b_raw << 12) | voltage_a_raw
+            data.extend(battery_value.to_bytes(3, 'little'))
+
+        if field_mask & MASK_STORAGE:
+            data.extend((0).to_bytes(2, 'little'))
             data.extend((0).to_bytes(2, 'little'))
 
-        basal_type = BasalType.ABSOLUTE_TEMP if self.temp_basal else BasalType.STANDARD
-        data.append(basal_type)
-        data.extend((0).to_bytes(2, 'little'))
-        data.extend(patch_id.to_bytes(2, 'little'))
-        start_time_seconds = int(self.patch_start_time - (365 * 24 * 3600 * 20))
-        data.extend(start_time_seconds.to_bytes(4, 'little'))
+        if field_mask & MASK_ALARM:
+            active_alarms_flags = 0
+            data.extend(active_alarms_flags.to_bytes(2, 'little'))
+            data.extend((0).to_bytes(2, 'little'))
 
-        if self.temp_basal:
-            rate = int(self.temp_basal['rate'] / 0.05)
-            delivery = rate
-        else:
-            rate = int(0.6 / 0.05)
-            delivery = 0
-        rate_value = (delivery << 12) | rate
-        data.extend(rate_value.to_bytes(3, 'little'))
+        if field_mask & MASK_AGE:
+            data.extend(self.total_elapsed_time.to_bytes(4, 'little'))
 
-        reservoir_raw = int(self.reservoir / 0.05)
-        data.extend(reservoir_raw.to_bytes(2, 'little'))
+        if field_mask & MASK_MAGNETO_PLACE:
+            magneto_value = int(1.0 / 0.01)
+            data.extend(magneto_value.to_bytes(2, 'little'))
 
-        voltage_a_raw = int(self.battery_voltage * 512)
-        voltage_b_raw = int(self.battery_voltage * 512)
-        battery_value = (voltage_b_raw << 12) | voltage_a_raw
-        data.extend(battery_value.to_bytes(3, 'little'))
+        if field_mask & MASK_UNUSED_CGM:
+            data.extend((0).to_bytes(5, 'little'))
 
-        data.extend(self.total_elapsed_time.to_bytes(4, 'little'))
+        if field_mask & MASK_UNUSED_COMMAND_CONFIRM:
+            data.extend((0).to_bytes(2, 'little'))
 
-        prime_progress = getattr(self, 'prime_progress', 0) if self.patch_state == PatchState.PRIMING else 0
-        data.append(prime_progress)
+        if field_mask & MASK_UNUSED_AUTO_STATUS:
+            data.extend((0).to_bytes(2, 'little'))
 
-        active_alarms_flags = 0
-        data.extend(active_alarms_flags.to_bytes(2, 'little'))
-        data.extend((0).to_bytes(2, 'little'))
-
-        data.extend((0).to_bytes(4, 'little'))
-
-        data.extend((0).to_bytes(2, 'little'))
-
-        data.extend((0).to_bytes(2, 'little'))
-
-        data.extend((0).to_bytes(2, 'little'))
-
-        magneto_value = int(1.0 / 0.01)
-        data.extend(magneto_value.to_bytes(2, 'little'))
+        if field_mask & MASK_UNUSED_LEGACY:
+            data.extend((0).to_bytes(2, 'little'))
 
         return bytes(data)
 
@@ -637,7 +654,7 @@ class M640GPumpSimulator:
     def _handle_subscribe_request(self, data: bytes, seq_num: int):
         Logger.info("收到订阅请求")
         self.is_subscribed = True
-        response = self._build_response_packet(CommandType.SUBSCRIBE, seq_num, b'\x01')
+        response = self._build_response_packet(CommandType.SUBSCRIBE, seq_num, b'')
         self.gatt_server.send_notification(response)
 
     def _handle_get_time_request(self, data: bytes, seq_num: int):
@@ -709,15 +726,36 @@ class M640GPumpSimulator:
             self.temp_basal = {'type': basal_type, 'rate': rate, 'start_time': utime.time()}
             self.temp_basal_remaining = duration
 
-        response = self._build_response_packet(CommandType.SET_TEMP_BASAL, seq_num, b'')
+        response_data = bytearray()
+        response_data.append(BasalType.ABSOLUTE_TEMP if self.temp_basal else BasalType.STANDARD)
+        basal_value = int((self.temp_basal['rate'] if self.temp_basal else 0.6) / 0.05)
+        response_data.extend(basal_value.to_bytes(2, 'little'))
+        response_data.extend((0).to_bytes(2, 'little'))
+        patch_id = random.randint(1, 65535)
+        response_data.extend(patch_id.to_bytes(2, 'little'))
+        start_time_seconds = int(self.patch_start_time - (365 * 24 * 3600 * 20))
+        response_data.extend(start_time_seconds.to_bytes(4, 'little'))
+
+        response = self._build_response_packet(CommandType.SET_TEMP_BASAL, seq_num, response_data)
         self.gatt_server.send_notification(response)
 
     def _handle_cancel_temp_basal_request(self, data: bytes, seq_num: int):
         Logger.info("收到取消临时基础率请求")
         self.temp_basal = None
         self.temp_basal_remaining = 0
+
+        response_data = bytearray()
+        response_data.append(BasalType.STANDARD)
+        basal_value = int(0.6 / 0.05)
+        response_data.extend(basal_value.to_bytes(2, 'little'))
+        response_data.extend((0).to_bytes(2, 'little'))
+        patch_id = random.randint(1, 65535)
+        response_data.extend(patch_id.to_bytes(2, 'little'))
+        start_time_seconds = int(self.patch_start_time - (365 * 24 * 3600 * 20))
+        response_data.extend(start_time_seconds.to_bytes(4, 'little'))
+
         Logger.info("  临时基础率已取消")
-        response = self._build_response_packet(CommandType.CANCEL_TEMP_BASAL, seq_num, b'')
+        response = self._build_response_packet(CommandType.CANCEL_TEMP_BASAL, seq_num, response_data)
         self.gatt_server.send_notification(response)
 
     def _handle_suspend_request(self, data: bytes, seq_num: int):
@@ -747,7 +785,18 @@ class M640GPumpSimulator:
 
     def _handle_set_basal_profile_request(self, data: bytes, seq_num: int):
         Logger.info("收到设置基础率配置文件请求")
-        response = self._build_response_packet(CommandType.SET_BASAL_PROFILE, seq_num, b'')
+
+        response_data = bytearray()
+        response_data.append(BasalType.STANDARD)
+        basal_value = int(0.6 / 0.05)
+        response_data.extend(basal_value.to_bytes(2, 'little'))
+        response_data.extend((0).to_bytes(2, 'little'))
+        patch_id = random.randint(1, 65535)
+        response_data.extend(patch_id.to_bytes(2, 'little'))
+        start_time_seconds = int(self.patch_start_time - (365 * 24 * 3600 * 20))
+        response_data.extend(start_time_seconds.to_bytes(4, 'little'))
+
+        response = self._build_response_packet(CommandType.SET_BASAL_PROFILE, seq_num, response_data)
         self.gatt_server.send_notification(response)
 
     def _handle_clear_alarm_request(self, data: bytes, seq_num: int):
@@ -763,16 +812,34 @@ class M640GPumpSimulator:
         self.reservoir = MAX_RESERVOIR
         self.patch_start_time = utime.time()
         self.total_elapsed_time = 0
+
+        response_data = bytearray()
+        patch_id = random.randint(1, 65535)
+        response_data.extend(patch_id.to_bytes(4, 'little'))
+        start_time_seconds = int(self.patch_start_time - (365 * 24 * 3600 * 20))
+        response_data.extend(start_time_seconds.to_bytes(4, 'little'))
+        response_data.append(BasalType.STANDARD)
+        basal_value = int(0.6 / 0.05)
+        response_data.extend(basal_value.to_bytes(2, 'little'))
+        response_data.extend((0).to_bytes(2, 'little'))
+        response_data.extend(patch_id.to_bytes(2, 'little'))
+        response_data.extend(start_time_seconds.to_bytes(4, 'little'))
+
         Logger.info("  Patch 已激活")
-        response = self._build_response_packet(CommandType.ACTIVATE, seq_num, b'')
+        response = self._build_response_packet(CommandType.ACTIVATE, seq_num, response_data)
         self.gatt_server.send_notification(response)
 
     def _handle_stop_patch_request(self, data: bytes, seq_num: int):
         Logger.info("收到停止 Patch 请求")
         self.patch_state = PatchState.STOPPED
         self.simulator_state = PumpSimulatorState.EJECTING
+
+        response_data = bytearray()
+        response_data.extend((0).to_bytes(2, 'little'))
+        response_data.extend((0).to_bytes(2, 'little'))
+
         Logger.info("  Patch 已停止")
-        response = self._build_response_packet(CommandType.STOP_PATCH, seq_num, b'')
+        response = self._build_response_packet(CommandType.STOP_PATCH, seq_num, response_data)
         self.gatt_server.send_notification(response)
 
     def _handle_set_patch_request(self, data: bytes, seq_num: int):
@@ -796,15 +863,6 @@ class M640GPumpSimulator:
             self.pump_timezone = tz_offset
         response = self._build_response_packet(CommandType.SET_TIME_ZONE, seq_num, b'')
         self.gatt_server.send_notification(response)
-
-        if hasattr(self, 'time_sync_pending') and self.time_sync_pending:
-            self.time_sync_pending = False
-            Logger.info("时间同步流程完成, 发送验证时间")
-            current_time = m640gkit_seconds()
-            response_data = bytearray()
-            response_data.extend(current_time.to_bytes(4, 'little'))
-            response = self._build_response_packet(CommandType.GET_TIME, seq_num + 1, response_data)
-            self.gatt_server.send_notification(response)
 
     def _handle_prime_request(self, data: bytes, seq_num: int):
         Logger.info("收到预充请求")

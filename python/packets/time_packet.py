@@ -115,8 +115,19 @@ class SetTimeZonePacket(BasePacket):
         self.time_zone = time_zone
 
     def get_request_bytes(self) -> bytes:
-        """获取请求数据"""
-        return self.time_zone.to_bytes(4, 'little')
+        offset = self.time_zone
+        if offset > 12 * 60:
+            offset -= 24 * 60
+        if offset < 0:
+            offset += 65536
+
+        base = bytearray([
+            offset & 0xFF,
+            (offset >> 8) & 0xFF
+        ])
+        seconds = m640gkit_seconds()
+        base += seconds.to_bytes(4, 'little')
+        return bytes(base)
 
 
 class ClearAlertPacket(BasePacket):

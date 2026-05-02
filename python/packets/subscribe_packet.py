@@ -24,5 +24,4 @@ class SubscribePacket(BasePacket):
     command_type = CommandType.SUBSCRIBE
 
     def get_request_bytes(self) -> bytes:
-        """订阅包无请求数据"""
-        return b''
+        return bytes([0xFF, 0x0F])

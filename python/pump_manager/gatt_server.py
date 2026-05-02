@@ -18,6 +18,8 @@ GATT 服务器
 
 import ubluetooth
 from enums import SERVICE_UUID, READ_UUID, WRITE_UUID
+from encryption import crc8_calculate
+import time
 
 
 class GATTServer:
@@ -174,7 +176,6 @@ class GATTServer:
                 expected_crc = crc8_calculate(data[:-2])
                 actual_data = list(data)
                 if len(actual_data) >= 2 and actual_data[-2] != expected_crc:
-                    Logger.debug(f"CRC 补零: 期望 {expected:#04x}, 实际 {actual_data[-2]:#04x}")
                     actual_data[-1] = 0x00
                     data = bytes(actual_data)
 
@@ -182,7 +183,7 @@ class GATTServer:
             self.ble.gatt_server_notify(self._read_handle, data, True)
             return True
         except Exception as e:
-            Logger.error(f"发送通知失败: {e}")
+            print(f"发送通知失败: {e}")
             return False
 
     def send_notification_with_crc_hack(self, data: bytes) -> bool:

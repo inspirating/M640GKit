@@ -134,6 +134,48 @@ class BasePacket:
         """检查是否有足够的数据 (子类的 mimimum_data_size)"""
         return len(self.total_data) >= getattr(self, 'minimum_data_size', 0)
 
+    def encode_notification(self, sequence_number: int) -> list:
+        """
+        编码通知数据包 (使用 total_data 而非 get_request_bytes)
+
+        参数:
+            sequence_number: 序列号
+
+        返回:
+            数据包列表 (可能分包)
+        """
+        content = self.total_data
+
+        header = bytearray([
+            len(content) + 5,
+            self.command_type,
+            sequence_number,
+            0
+        ])
+
+        tmp = bytes(header) + content
+        total_command = tmp + bytes([crc8_calculate(tmp)])
+
+        if len(total_command) - len(header) <= 15:
+            output = total_command + bytes([0])
+            return [output]
+
+        packages = []
+        pkg_index = 1
+        remaining = total_command[4:]
+
+        while len(remaining) > 15:
+            header[3] = pkg_index
+            tmp2 = bytes(header) + remaining[:15]
+            packages.append(tmp2 + bytes([crc8_calculate(tmp2)]))
+            remaining = remaining[15:]
+            pkg_index += 1
+
+        header[3] = pkg_index
+        tmp3 = bytes(header) + remaining
+        packages.append(tmp3 + bytes([crc8_calculate(tmp3)]))
+        return packages
+
     def get_request_bytes(self) -> bytes:
         """
         获取请求数据部分
