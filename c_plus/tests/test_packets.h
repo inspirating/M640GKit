@@ -122,7 +122,7 @@ public:
         auto setEncoded = setPacket.encode(2);
         Serial.printf("  设置时间包数量: %d\n", setEncoded.size());
 
-        SetTimeZonePacket tzPacket(480);
+        SetTimeZonePacket tzPacket(480, 123456);
         auto tzEncoded = tzPacket.encode(3);
         Serial.printf("  设置时区包数量: %d\n", tzEncoded.size());
 

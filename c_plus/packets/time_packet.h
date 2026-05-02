@@ -78,8 +78,10 @@ public:
 class SetTimeZonePacket : public BasePacket {
 public:
     int16_t timezoneOffset;
+    uint32_t dateSeconds;
 
-    SetTimeZonePacket(int16_t offset = 0) : timezoneOffset(offset) {
+    SetTimeZonePacket(int16_t offset = 0, uint32_t seconds = 0)
+        : timezoneOffset(offset), dateSeconds(seconds) {
         commandType = static_cast<uint8_t>(CommandType::SET_TIME_ZONE);
     }
 
@@ -87,18 +89,27 @@ public:
         std::vector<uint8_t> data;
         data.push_back(timezoneOffset & 0xFF);
         data.push_back((timezoneOffset >> 8) & 0xFF);
+        data.push_back(dateSeconds & 0xFF);
+        data.push_back((dateSeconds >> 8) & 0xFF);
+        data.push_back((dateSeconds >> 16) & 0xFF);
+        data.push_back((dateSeconds >> 24) & 0xFF);
         return data;
     }
 };
 
 class ClearAlertPacket : public BasePacket {
 public:
+    uint16_t alertType = 4;
+
     ClearAlertPacket() {
         commandType = static_cast<uint8_t>(CommandType::CLEAR_ALARM);
     }
 
     std::vector<uint8_t> getRequestBytes() const override {
-        return {};
+        return {
+            static_cast<uint8_t>(alertType & 0xFF),
+            static_cast<uint8_t>((alertType >> 8) & 0xFF)
+        };
     }
 };
 

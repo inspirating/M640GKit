@@ -17,6 +17,7 @@ namespace M640GKit {
 
 class SetBasalProfilePacket : public BasePacket {
 public:
+    uint8_t basalType = 1;
     std::vector<uint8_t> profileData;
 
     SetBasalProfilePacket() {
@@ -24,7 +25,10 @@ public:
     }
 
     std::vector<uint8_t> getRequestBytes() const override {
-        return profileData;
+        std::vector<uint8_t> data;
+        data.push_back(basalType);
+        data.insert(data.end(), profileData.begin(), profileData.end());
+        return data;
     }
 };
 

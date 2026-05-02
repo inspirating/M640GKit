@@ -139,6 +139,8 @@ public:
         // 初始化 GATT Server
         gattServer.onWriteRequest = handleWriteRequestStatic;
         gattServer.onSubscribe = handleSubscribeStatic;
+        gattServer.onConnect = handleConnectStatic;
+        gattServer.onDisconnect = handleDisconnectStatic;
         gattServer.start();
 
         simulatorState = SimulatorState::READY;
@@ -225,6 +227,7 @@ private:
     uint8_t expectedPacketLen;
     uint8_t currentCmdType;
     uint8_t currentSeqNum;
+    uint8_t currentPkgIndex;
 
     void generateSessionToken() {
         for (int i = 0; i < 4; i++) {
@@ -335,19 +338,7 @@ private:
 
     void sendStateNotification() {
         std::vector<uint8_t> syncData = buildSynchronizeData();
-        SynchronizePacket packet;
-        packet.totalData = syncData;
-        packet.dataSize = syncData.size();
-        packet.responseCode = 0;
-
-        auto encoded = packet.encodeNotification(sequenceNumber);
-        sequenceNumber = (sequenceNumber + 1) % 254;
-
-        for (const auto& pkg : encoded) {
-            gattServer.sendNotification(pkg.data(), pkg.size());
-        }
-
-        Logger::info("状态通知已发送");
+        gattServer.sendNotification(syncData.data(), syncData.size(), false);
     }
 
     void sendPingHeartbeat() {
@@ -358,7 +349,7 @@ private:
             lastPingTime = currentTime;
             pingCounter++;
 
-            uint8_t pingData[8] = {0x02, 0x00, sequenceNumber, 0, 0, 0, 0, 0};
+            uint8_t pingData[8] = {0x07, 0x00, sequenceNumber, 0, 0, 0, 0, 0};
             uint8_t crc = crc8Calculate(pingData, 6);
             pingData[6] = crc;
             pingData[7] = 0;
@@ -368,14 +359,13 @@ private:
     }
 
     void checkConnectionTimeout() {
-        if (!isConnected) return;
+        if (!isConnected || isSubscribed) return;
 
         uint32_t currentTime = millis();
         if (currentTime - lastActivityTime > connectionTimeoutMs) {
-            Logger::warning("连接超时,断开客户端");
-            connectionTracker.onDisconnect("连接超时");
+            Logger::warning("未认证连接超时,清理状态");
+            connectionTracker.onDisconnect("认证超时");
             isConnected = false;
-            isSubscribed = false;
             authenticatedClients.clear();
         }
     }
@@ -388,17 +378,7 @@ private:
 
     void sendSynchronizeNotification() {
         std::vector<uint8_t> syncData = buildSynchronizeData();
-        SynchronizePacket packet;
-        packet.totalData = syncData;
-        packet.dataSize = syncData.size();
-        packet.responseCode = 0;
-
-        auto encoded = packet.encodeNotification(sequenceNumber);
-        sequenceNumber = (sequenceNumber + 1) % 254;
-
-        for (const auto& pkg : encoded) {
-            gattServer.sendNotification(pkg.data(), pkg.size());
-        }
+        gattServer.sendNotification(syncData.data(), syncData.size(), false);
     }
 
     std::vector<uint8_t> buildSynchronizeData() {
@@ -455,15 +435,14 @@ private:
             data.push_back((startTime >> 24) & 0xFF);
             uint16_t rate = tempBasal ? static_cast<uint16_t>(tempBasal->rate / 0.05) : static_cast<uint16_t>(0.6 / 0.05);
             uint16_t delivery = tempBasal ? rate : 0;
-            uint32_t rateValue = (delivery << 12) | rate;
-            data.push_back(rateValue & 0xFF);
-            data.push_back((rateValue >> 8) & 0xFF);
-            data.push_back((rateValue >> 16) & 0xFF);
+            uint32_t rateDelivery = (static_cast<uint32_t>(delivery) << 12) | (rate & 0x0FFF);
+            data.push_back(rateDelivery & 0xFF);
+            data.push_back((rateDelivery >> 8) & 0xFF);
+            data.push_back((rateDelivery >> 16) & 0xFF);
         }
 
         if (fieldMask & MASK_SETUP) {
-            static uint8_t primeProgress = 0;
-            data.push_back(patchState == PatchState::PRIMING ? primeProgress++ : 0);
+            data.push_back(patchState == PatchState::PRIMING ? 100 : 0);
         }
 
         if (fieldMask & MASK_RESERVOIR) {
@@ -482,10 +461,10 @@ private:
         if (fieldMask & MASK_BATTERY) {
             uint16_t voltageA = static_cast<uint16_t>(batteryVoltage * 512);
             uint16_t voltageB = static_cast<uint16_t>(batteryVoltage * 512);
-            uint32_t batteryValue = (voltageB << 12) | voltageA;
-            data.push_back(batteryValue & 0xFF);
-            data.push_back((batteryValue >> 8) & 0xFF);
-            data.push_back((batteryValue >> 16) & 0xFF);
+            uint32_t packed = (static_cast<uint32_t>(voltageB) << 12) | (voltageA & 0x0FFF);
+            data.push_back(packed & 0xFF);
+            data.push_back((packed >> 8) & 0xFF);
+            data.push_back((packed >> 16) & 0xFF);
         }
 
         if (fieldMask & MASK_STORAGE) {
@@ -553,12 +532,25 @@ private:
         }
     }
 
+    static void handleConnectStatic() {
+        extern M640GPumpSimulator* gSimulator;
+        if (gSimulator) {
+            gSimulator->handleBleConnect();
+        }
+    }
+
+    static void handleDisconnectStatic() {
+        extern M640GPumpSimulator* gSimulator;
+        if (gSimulator) {
+            gSimulator->handleBleDisconnect();
+        }
+    }
+
     void handleWriteRequest(const uint8_t* data, size_t len) {
         lastActivityTime = millis();
 
-        if (len < 6) {
+        if (len < 4) {
             Logger::warning("数据长度太短");
-            sendErrorResponse(0, 0x0100);
             return;
         }
 
@@ -566,36 +558,34 @@ private:
         uint8_t cmdType = data[1];
         uint8_t seqNum = data[2];
         uint8_t pkgIndex = data[3];
-        uint16_t responseCode = data[4] | (data[5] << 8);
 
-        if (responseCode == 16384) {
-            return;
-        }
+        if (cmdType == 0x00) return;
 
-        if (pkgIndex == 0) {
-            if (cmdType == 0x00) return;
-
-            packetBuffer.assign(data, data + len);
+        if (packetBuffer.empty()) {
+            packetBuffer.assign(data, data + len - 1);
             expectedPacketLen = packetLen;
             currentCmdType = cmdType;
             currentSeqNum = seqNum;
+            currentPkgIndex = pkgIndex;
 
-            if (len >= packetLen) {
-                processCompleteCommand(packetBuffer.data(), packetLen);
+            if (packetBuffer.size() >= expectedPacketLen) {
+                processCompleteCommand(packetBuffer.data(), expectedPacketLen);
                 packetBuffer.clear();
                 expectedPacketLen = 0;
+                currentCmdType = 0;
             }
         } else {
-            if (currentCmdType == 0 || seqNum != currentSeqNum + 1) {
-                Logger::error("序列号不匹配");
-                sendErrorResponse(currentCmdType, 0x0102);
+            if (cmdType != currentCmdType || pkgIndex != currentPkgIndex + 1) {
+                Logger::error("包索引不匹配");
+                sendErrorResponse(static_cast<CommandType>(currentCmdType), 0x0102);
                 packetBuffer.clear();
                 expectedPacketLen = 0;
+                currentCmdType = 0;
                 return;
             }
 
-            packetBuffer.insert(packetBuffer.end(), data, data + len);
-            currentSeqNum = seqNum;
+            packetBuffer.insert(packetBuffer.end(), data + 4, data + len - 1);
+            currentPkgIndex = pkgIndex;
 
             if (packetBuffer.size() >= expectedPacketLen) {
                 processCompleteCommand(packetBuffer.data(), expectedPacketLen);
@@ -615,6 +605,19 @@ private:
             connectionTracker.onDisconnect("客户端取消订阅");
             Logger::info("订阅状态变化: 已取消订阅");
         }
+    }
+
+    void handleBleConnect() {
+        Logger::info("BLE 客户端已连接");
+        lastActivityTime = millis();
+    }
+
+    void handleBleDisconnect() {
+        Logger::info("BLE 客户端已断开");
+        isConnected = false;
+        isSubscribed = false;
+        authenticatedClients.clear();
+        connectionTracker.onDisconnect("BLE 断开");
     }
 
     void processCompleteCommand(const uint8_t* data, uint8_t len) {
@@ -688,21 +691,37 @@ private:
             case CommandType::GET_RECORD:
                 handleGetRecordRequest(data, len, seqNum);
                 break;
+            case CommandType::SET_BOLUS_MOTOR:
+                handleSetBolusMotorRequest(data, len, seqNum);
+                break;
             default:
                 Logger::warning("未知命令类型");
-                sendErrorResponse(cmdType, 0x0101);
+                sendErrorResponse(static_cast<CommandType>(cmdType), 0x0101);
         }
     }
 
     void handleAuthRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
         Logger::info("收到认证请求");
 
-        uint8_t role = data[6];
-        uint8_t clientToken[4] = {data[7], data[8], data[9], data[10]};
-        uint8_t clientKey[4] = {data[11], data[12], data[13], data[14]};
+        if (len < 13) {
+            Logger::error("认证请求数据长度不足");
+            sendErrorResponse(CommandType::AUTH_REQ, 0x0101);
+            return;
+        }
 
+        uint8_t role = data[4];
+        uint8_t clientToken[4] = {data[5], data[6], data[7], data[8]};
+        uint8_t clientKey[4] = {data[9], data[10], data[11], data[12]};
+
+        uint8_t reversedSN[4] = {PUMP_SN[3], PUMP_SN[2], PUMP_SN[1], PUMP_SN[0]};
         uint8_t correctKey[4];
-        Crypto::genKey(PUMP_SN, correctKey);
+        Crypto::genKey(reversedSN, correctKey);
+
+        if (memcmp(clientKey, correctKey, 4) != 0) {
+            Logger::error("认证失败: 密钥不匹配");
+            sendErrorResponse(CommandType::AUTH_REQ, 0x0201);
+            return;
+        }
 
         Logger::info("认证成功");
 
@@ -746,47 +765,63 @@ private:
 
     void handleSetTimeRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
         Logger::info("收到设置时间请求");
-        if (len >= 11) {
-            uint32_t newTime = data[7] | (data[8] << 8) | (data[9] << 16) | (data[10] << 24);
-            timeSyncPending = true;
+        if (len >= 9) {
+            uint32_t newTime = data[5] | (data[6] << 8) | (data[7] << 16) | (data[8] << 24);
+            patchStartTime = newTime;
+            timeSyncPending = false;
+            Logger::info("时间已同步");
         }
         sendResponse(CommandType::SET_TIME, seqNum, nullptr, 0);
     }
 
     void handleSetTimeZoneRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
         Logger::info("收到设置时区请求");
-        if (len >= 8) {
-            int16_t tzOffset = data[6] | (data[7] << 8);
+        if (len >= 10) {
+            int16_t tzOffset = data[4] | (data[5] << 8);
             pumpTimezone = tzOffset;
+            uint32_t timeVal = data[6] | (data[7] << 8) | (data[8] << 16) | (data[9] << 24);
+            patchStartTime = timeVal;
+            Logger::info("时区和时间已更新");
         }
         sendResponse(CommandType::SET_TIME_ZONE, seqNum, nullptr, 0);
     }
 
     void handlePrimeRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
         Logger::info("收到预充请求");
-        if (patchState == PatchState::FILLED) {
+        if (patchState == PatchState::FILLED || patchState == PatchState::ACTIVE) {
             patchState = PatchState::PRIMING;
             Logger::info("预充已开始");
+        } else {
+            Logger::warning("当前状态不允许预充");
+            sendErrorResponse(CommandType::PRIME, 0x0400);
+            return;
         }
         sendResponse(CommandType::PRIME, seqNum, nullptr, 0);
     }
 
     void handleSetBolusRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
         Logger::info("收到设置大剂量请求");
-        if (len >= 10) {
-            uint8_t bolusType = data[6];
-            uint16_t amountRaw = data[7] | (data[8] << 8);
+
+        if (patchState != PatchState::ACTIVE && patchState != PatchState::ACTIVE_ALT) {
+            Logger::warning("泵未处于运行状态,无法执行大剂量");
+            sendErrorResponse(CommandType::SET_BOLUS, 0x0400);
+            return;
+        }
+
+        if (len >= 7) {
+            uint8_t bolusType = data[4];
+            uint16_t amountRaw = data[5] | (data[6] << 8);
             double amount = amountRaw * 0.05;
 
             if (currentBolus != nullptr) {
                 Logger::warning("已有大剂量在执行中");
-                sendErrorResponse(static_cast<uint8_t>(CommandType::SET_BOLUS), 0x0201);
+                sendErrorResponse(CommandType::SET_BOLUS, 0x0201);
                 return;
             }
 
             if (amount > reservoir) {
                 Logger::warning("储药器余量不足");
-                sendErrorResponse(static_cast<uint8_t>(CommandType::SET_BOLUS), 0x0202);
+                sendErrorResponse(CommandType::SET_BOLUS, 0x0202);
                 return;
             }
 
@@ -834,10 +869,17 @@ private:
 
     void handleSetTempBasalRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
         Logger::info("收到设置临时基础率请求");
-        if (len >= 12) {
-            uint8_t basalType = data[6];
-            uint16_t rateRaw = data[7] | (data[8] << 8);
-            uint16_t durationRaw = data[9] | (data[10] << 8);
+
+        if (patchState != PatchState::ACTIVE && patchState != PatchState::ACTIVE_ALT) {
+            Logger::warning("泵未处于运行状态,无法设置临时基础率");
+            sendErrorResponse(CommandType::SET_TEMP_BASAL, 0x0400);
+            return;
+        }
+
+        if (len >= 9) {
+            uint8_t basalType = data[4];
+            uint16_t rateRaw = data[5] | (data[6] << 8);
+            uint16_t durationRaw = data[7] | (data[8] << 8);
             double rate = rateRaw * 0.05;
 
             if (tempBasal) delete tempBasal;
@@ -845,7 +887,7 @@ private:
             tempBasalRemaining = durationRaw;
         }
 
-        uint8_t responseData[12];
+        uint8_t responseData[11];
         responseData[0] = tempBasal ? static_cast<uint8_t>(BasalType::ABSOLUTE_TEMP) : static_cast<uint8_t>(BasalType::STANDARD);
         uint16_t basalValue = tempBasal ? static_cast<uint16_t>(tempBasal->rate / 0.05) : static_cast<uint16_t>(0.6 / 0.05);
         responseData[1] = basalValue & 0xFF;
@@ -860,9 +902,8 @@ private:
         responseData[8] = (startTime >> 8) & 0xFF;
         responseData[9] = (startTime >> 16) & 0xFF;
         responseData[10] = (startTime >> 24) & 0xFF;
-        responseData[11] = 0;
 
-        sendResponse(CommandType::SET_TEMP_BASAL, seqNum, responseData, 12);
+        sendResponse(CommandType::SET_TEMP_BASAL, seqNum, responseData, 11);
     }
 
     void handleCancelTempBasalRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
@@ -873,7 +914,7 @@ private:
             tempBasalRemaining = 0;
         }
 
-        uint8_t responseData[12];
+        uint8_t responseData[11];
         responseData[0] = static_cast<uint8_t>(BasalType::STANDARD);
         uint16_t basalValue = static_cast<uint16_t>(0.6 / 0.05);
         responseData[1] = basalValue & 0xFF;
@@ -888,13 +929,19 @@ private:
         responseData[8] = (startTime >> 8) & 0xFF;
         responseData[9] = (startTime >> 16) & 0xFF;
         responseData[10] = (startTime >> 24) & 0xFF;
-        responseData[11] = 0;
 
-        sendResponse(CommandType::CANCEL_TEMP_BASAL, seqNum, responseData, 12);
+        sendResponse(CommandType::CANCEL_TEMP_BASAL, seqNum, responseData, 11);
     }
 
     void handleSuspendRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
         Logger::info("收到暂停泵请求");
+
+        if (patchState != PatchState::ACTIVE && patchState != PatchState::ACTIVE_ALT) {
+            Logger::warning("泵未处于运行状态,无法暂停");
+            sendErrorResponse(CommandType::SUSPEND_PUMP, 0x0400);
+            return;
+        }
+
         patchState = PatchState::SUSPENDED;
         simulatorState = SimulatorState::SUSPENDED;
 
@@ -917,6 +964,13 @@ private:
 
     void handleResumeRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
         Logger::info("收到恢复泵请求");
+
+        if (patchState != PatchState::SUSPENDED) {
+            Logger::warning("泵未处于暂停状态,无法恢复");
+            sendErrorResponse(CommandType::RESUME_PUMP, 0x0400);
+            return;
+        }
+
         patchState = PatchState::ACTIVE;
         simulatorState = SimulatorState::RUNNING;
         sendResponse(CommandType::RESUME_PUMP, seqNum, nullptr, 0);
@@ -924,7 +978,10 @@ private:
 
     void handleSetBasalProfileRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
         Logger::info("收到设置基础率配置文件请求");
-        uint8_t responseData[12];
+        if (len >= 5) {
+            uint8_t profileType = data[4];
+        }
+        uint8_t responseData[11];
         responseData[0] = static_cast<uint8_t>(BasalType::STANDARD);
         uint16_t basalValue = static_cast<uint16_t>(0.6 / 0.05);
         responseData[1] = basalValue & 0xFF;
@@ -939,24 +996,33 @@ private:
         responseData[8] = (startTime >> 8) & 0xFF;
         responseData[9] = (startTime >> 16) & 0xFF;
         responseData[10] = (startTime >> 24) & 0xFF;
-        responseData[11] = 0;
-        sendResponse(CommandType::SET_BASAL_PROFILE, seqNum, responseData, 12);
+        sendResponse(CommandType::SET_BASAL_PROFILE, seqNum, responseData, 11);
     }
 
     void handleClearAlarmRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
         Logger::info("收到清除警报请求");
+        if (len >= 6) {
+            uint16_t alertType = data[4] | (data[5] << 8);
+        }
         sendResponse(CommandType::CLEAR_ALARM, seqNum, nullptr, 0);
     }
 
     void handleActivateRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
         Logger::info("收到激活 Patch 请求");
+
+        if (patchState != PatchState::PRIMED) {
+            Logger::warning("Patch 未完成预充,无法激活");
+            sendErrorResponse(CommandType::ACTIVATE, 0x0400);
+            return;
+        }
+
         patchState = PatchState::ACTIVE;
         simulatorState = SimulatorState::RUNNING;
         reservoir = MAX_RESERVOIR;
         patchStartTime = millis() / 1000;
         totalElapsedTime = 0;
 
-        uint8_t responseData[16];
+        uint8_t responseData[19];
         uint32_t patchId = random(65535) + 1;
         responseData[0] = patchId & 0xFF;
         responseData[1] = (patchId >> 8) & 0xFF;
@@ -975,8 +1041,11 @@ private:
         responseData[12] = 0;
         responseData[13] = patchId & 0xFF;
         responseData[14] = (patchId >> 8) & 0xFF;
-        responseData[15] = 0;
-        sendResponse(CommandType::ACTIVATE, seqNum, responseData, 16);
+        responseData[15] = startTime & 0xFF;
+        responseData[16] = (startTime >> 8) & 0xFF;
+        responseData[17] = (startTime >> 16) & 0xFF;
+        responseData[18] = (startTime >> 24) & 0xFF;
+        sendResponse(CommandType::ACTIVATE, seqNum, responseData, 19);
     }
 
     void handleStopPatchRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
@@ -1004,32 +1073,55 @@ private:
         sendResponse(CommandType::GET_RECORD, seqNum, responseData, 4);
     }
 
+    void handleSetBolusMotorRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
+        Logger::info("收到设置大剂量电机请求");
+        if (len >= 7) {
+            uint16_t motorSteps = data[4] | (data[5] << 8);
+            uint8_t direction = data[6];
+        }
+        sendResponse(CommandType::SET_BOLUS_MOTOR, seqNum, nullptr, 0);
+    }
+
     void sendResponse(CommandType cmdType, uint8_t seqNum, const uint8_t* data, uint8_t dataLen) {
-        uint8_t header[6] = {
-            static_cast<uint8_t>(dataLen + 6),
+        uint8_t totalContentLen = 2 + dataLen;
+
+        uint8_t header[4] = {
+            static_cast<uint8_t>(totalContentLen + 5),
             static_cast<uint8_t>(cmdType),
             seqNum,
-            0,
-            0,
             0
         };
 
         uint8_t packet[256];
-        memcpy(packet, header, 6);
+        memcpy(packet, header, 4);
+        packet[4] = 0;
+        packet[5] = 0;
         if (dataLen > 0) {
             memcpy(packet + 6, data, dataLen);
         }
 
-        uint8_t crc = crc8Calculate(packet, dataLen + 6);
-        packet[dataLen + 6] = crc;
-        packet[dataLen + 7] = 0;
+        uint8_t crc = crc8Calculate(packet, totalContentLen + 4);
+        packet[totalContentLen + 4] = crc;
+        packet[totalContentLen + 5] = 0;
 
-        gattServer.sendNotification(packet, dataLen + 8);
+        gattServer.sendResponse(packet, totalContentLen + 6);
     }
 
-    void sendErrorResponse(uint8_t cmdType, uint16_t errorCode) {
-        uint8_t errorData[4] = {0, 0, static_cast<uint8_t>(errorCode & 0xFF), static_cast<uint8_t>((errorCode >> 8) & 0xFF)};
-        sendResponse(static_cast<CommandType>(cmdType), 0, errorData, 4);
+    void sendErrorResponse(CommandType cmdType, uint16_t errorCode) {
+        uint8_t header[4] = {
+            7,
+            static_cast<uint8_t>(cmdType),
+            0,
+            0
+        };
+        uint8_t packet[8];
+        memcpy(packet, header, 4);
+        packet[4] = static_cast<uint8_t>(errorCode & 0xFF);
+        packet[5] = static_cast<uint8_t>((errorCode >> 8) & 0xFF);
+        uint8_t crc = crc8Calculate(packet, 6);
+        packet[6] = crc;
+        packet[7] = 0;
+        gattServer.sendResponse(packet, 8);
     }
 };
 

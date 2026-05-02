@@ -30,18 +30,21 @@ public:
         data.push_back(bolusType);
         data.push_back(amountRaw & 0xFF);
         data.push_back((amountRaw >> 8) & 0xFF);
+        data.push_back(0);
         return data;
     }
 };
 
 class CancelBolusPacket : public BasePacket {
 public:
+    uint8_t bolusType = 1;
+
     CancelBolusPacket() {
         commandType = static_cast<uint8_t>(CommandType::CANCEL_BOLUS);
     }
 
     std::vector<uint8_t> getRequestBytes() const override {
-        return {};
+        return {bolusType};
     }
 };
 

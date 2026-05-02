@@ -21,7 +21,7 @@ public:
     }
 
     std::vector<uint8_t> getRequestBytes() const override {
-        return {};
+        return {0xFF, 0x0F};
     }
 };
 

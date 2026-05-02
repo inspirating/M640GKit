@@ -38,11 +38,16 @@ public:
     void onSubscribe(BLECharacteristic* pCharacteristic, uint16_t subValue) override;
 };
 
+typedef void (*DisconnectCallback)();
+typedef void (*ConnectCallback)();
+
 class GATTServer {
 public:
     bool isRunning = false;
     WriteRequestCallback onWriteRequest = nullptr;
     SubscribeCallback onSubscribe = nullptr;
+    DisconnectCallback onDisconnect = nullptr;
+    ConnectCallback onConnect = nullptr;
 
     GATTServer() : server(nullptr), service(nullptr), readCharacteristic(nullptr),
                    writeCharacteristic(nullptr), callbacks(this) {}
@@ -61,7 +66,7 @@ public:
         // 创建写入特征 (可写)
         writeCharacteristic = service->createCharacteristic(
             WRITE_UUID,
-            BLECharacteristic::PROPERTY_WRITE
+            BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY
         );
         writeCharacteristic->setCallbacks(&callbacks);
 
@@ -124,6 +129,14 @@ public:
         return sendNotification(data, len, true);
     }
 
+    bool sendResponse(const uint8_t* data, size_t len) {
+        if (writeCharacteristic == nullptr) return false;
+
+        writeCharacteristic->setValue(data, len);
+        writeCharacteristic->notify();
+        return true;
+    }
+
 private:
     BLEServer* server;
     BLEService* service;
@@ -136,10 +149,16 @@ private:
 
 inline void GATTServerCallbacks::onConnect(BLEServer* pServer) {
     Serial.println("[BLE] 客户端已连接");
+    if (server && server->onConnect) {
+        server->onConnect();
+    }
 }
 
 inline void GATTServerCallbacks::onDisconnect(BLEServer* pServer) {
     Serial.println("[BLE] 客户端已断开");
+    if (server && server->onDisconnect) {
+        server->onDisconnect();
+    }
     if (server) {
         server->startAdvertising();
     }

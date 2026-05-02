@@ -92,13 +92,20 @@ enum class PatchState : uint8_t {
     ACTIVE = 32,              // 运行中 (正常工作中)
     ACTIVE_ALT = 33,          // 运行中 (备用)
     LOW_BG_SUSPENDED = 64,    // 低血糖自动暂停
+    LOW_BG_SUSPENDED2 = 65,   // 低血糖自动暂停2
     AUTO_SUSPENDED = 66,      // 自动暂停
+    HOURLY_MAX_SUSPENDED = 67, // 每小时最大暂停
+    DAILY_MAX_SUSPENDED = 68,  // 每日最大暂停
     SUSPENDED = 69,           // 手动暂停
     PAUSED = 70,              // 暂停
     OCCLUSION = 96,           // 堵管报警
     EXPIRED = 97,             // Patch 已过期
     RESERVOIR_EMPTY = 98,     // 储药器空
     PATCH_FAULT = 99,         // Patch 故障
+    PATCH_FAULT2 = 100,       // Patch 故障2
+    BASE_FAULT = 101,         // 基础率故障
+    BATTERY_OUT = 102,        // 电池耗尽
+    NO_CALIBRATION = 103,     // 无校准
     STOPPED = 128             // 已停止
 };
 
@@ -131,13 +138,24 @@ enum class BasalType : uint8_t {
     STOP_EXPIRED = 21,
     STOP_EMPTY = 22,
     STOP_PATCH_FAULT = 23,
-    STOP_BASE_FAULT = 24,
-    STOP_BATTERY_EMPTY = 25,
-    STOP = 26,
-    PAUSE_INTERRUPT = 27,
-    PRIME = 28,
-    AUTO_MODE_START = 29,
-    AUTO_MODE_EXIT = 30
+    STOP_PATCH_FAULT2 = 24,
+    STOP_BASE_FAULT = 25,
+    STOP_DISCARD = 26,
+    STOP_BATTERY_EMPTY = 27,
+    STOP = 28,
+    PAUSE_INTERRUPT = 29,
+    PRIME = 30,
+    AUTO_MODE_START = 31,
+    AUTO_MODE_EXIT = 32,
+    AUTO_MODE_TARGET_100 = 33,
+    AUTO_MODE_TARGET_110 = 34,
+    AUTO_MODE_TARGET_120 = 35,
+    AUTO_MODE_BREAKFAST = 36,
+    AUTO_MODE_LUNCH = 37,
+    AUTO_MODE_DINNER = 38,
+    AUTO_MODE_SNACK = 39,
+    AUTO_MODE_EXERCISE_START = 40,
+    AUTO_MODE_EXERCISE_EXIT = 41
 };
 
 // =============================================================================
