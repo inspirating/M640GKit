@@ -157,9 +157,17 @@ class GATTServer:
 
         return adv_data
 
-    def send_notification(self, data: bytes) -> bool:
+    def send_notification(self, data: bytes, use_crc_hack: bool = True) -> bool:
         if self._read_handle is None:
             return False
+
+        if use_crc_hack and len(data) > 0 and data[1] != 0x00:
+            if len(data) >= 6:
+                expected_crc = crc8_calculate(data[:-2])
+                actual_data = list(data)
+                if len(actual_data) >= 2 and actual_data[-2] != expected_crc:
+                    actual_data[-1] = 0x00
+                    data = bytes(actual_data)
 
         try:
             self.ble.gatt_server_notify(self._read_handle, data, True)
@@ -167,6 +175,9 @@ class GATTServer:
         except Exception as e:
             print(f"发送通知失败: {e}")
             return False
+
+    def send_notification_with_crc_hack(self, data: bytes) -> bool:
+        return self.send_notification(data, use_crc_hack=True)
 
     def _gatt_server_irq(self, event, data):
         """GATT 服务器中断处理函数"""

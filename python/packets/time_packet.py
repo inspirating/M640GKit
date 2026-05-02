@@ -19,17 +19,16 @@ def m640gkit_seconds() -> int:
     获取 M640GKit 格式的时间戳
 
     M640GKit 使用自定义的时间基准:
-    - 基准时间: 2000年1月1日 00:00:00 UTC
+    - 基准时间: 2014年1月1日 00:00:00 UTC
+    - Unix 时间戳: 1388534400
 
     返回:
         从基准时间到现在的秒数
     """
     import utime
-    BASE_YEAR = 2000
-    SECONDS_PER_YEAR = 31536000
+    BASE_UNIX = 1388534400
     now = utime.time()
-    base = (BASE_YEAR - 1970) * SECONDS_PER_YEAR
-    return now - base
+    return now - BASE_UNIX
 
 
 def date_from_m640gkit_seconds(seconds: int):
@@ -43,9 +42,8 @@ def date_from_m640gkit_seconds(seconds: int):
         元组 (year, month, day, hour, minute, second)
     """
     import utime
-    BASE_YEAR = 2000
-    SECONDS_PER_YEAR = 31536000
-    total = seconds + (BASE_YEAR - 1970) * SECONDS_PER_YEAR
+    BASE_UNIX = 1388534400
+    total = seconds + BASE_UNIX
     return utime.localtime(total)
 
 

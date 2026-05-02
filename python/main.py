@@ -293,8 +293,9 @@ class M640GPumpSimulator:
             ping_data.extend((0).to_bytes(2, 'little'))
             crc = crc8_calculate(bytes(ping_data))
             ping_data.append(crc)
+            ping_data.append(0)
 
-            self.gatt_server.send_notification(bytes(ping_data))
+            self.gatt_server.send_notification_with_crc_hack(bytes(ping_data))
             Logger.debug(f"发送 Ping 心跳 #{self._ping_counter}")
 
     def _check_connection_timeout(self):
@@ -605,7 +606,7 @@ class M640GPumpSimulator:
         Logger.error(f"发送错误响应: {error_code} - {error_desc}: {message}")
         
         response = self._build_error_response(cmd_type, 0, error_code)
-        self.gatt_server.send_notification(response)
+        self.gatt_server.send_notification_with_crc_hack(response)
 
     def _on_subscribe_changed(self, subscribed: bool):
         self.is_subscribed = subscribed
@@ -658,19 +659,19 @@ class M640GPumpSimulator:
 
     def _handle_get_time_request(self, data: bytes, seq_num: int):
         Logger.info("收到获取时间请求")
-        now = utime.time()
-        base_2000 = (2000 - 1970) * 365 * 24 * 3600
-        seconds = int(now - base_2000)
-        response_data = seconds.to_bytes(4, 'little')
+        current_time = m640gkit_seconds()
+        response_data = bytearray()
+        response_data.extend(current_time.to_bytes(4, 'little'))
         response = self._build_response_packet(CommandType.GET_TIME, seq_num, response_data)
         self.gatt_server.send_notification(response)
 
     def _handle_set_time_request(self, data: bytes, seq_num: int):
         Logger.info("收到设置时间请求")
         if len(data) >= 11:
-            time_bytes = data[6:10]
-            pump_time = int.from_bytes(time_bytes, 'little')
-            Logger.info(f"  泵时间已同步")
+            time_bytes = data[7:11]
+            new_time = int.from_bytes(time_bytes, 'little')
+            Logger.info(f"  设置时间戳: {new_time}")
+            self.time_sync_pending = True
         response = self._build_response_packet(CommandType.SET_TIME, seq_num, b'')
         self.gatt_server.send_notification(response)
 
@@ -934,7 +935,7 @@ class M640GPumpSimulator:
         header += (0).to_bytes(2, 'little')
         tmp = bytes(header) + data
         crc = crc8_calculate(tmp)
-        return tmp + bytes([crc])
+        return tmp + bytes([crc]) + bytes([0])
 
     def _build_error_response(self, cmd_type: int, seq_num: int, error_code: int) -> bytes:
         error_data = bytearray([0, 0])
