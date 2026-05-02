@@ -27,33 +27,20 @@ class PumpBaseSettingsViewModel: ObservableObject {
     }
 
     func saveAndContinue() {
-        // 完全绕过序列号验证,允许任何输入通过
-
         guard let pumpManager = pumpManager else {
             logger.error("No pump manager available")
             errorMessage = "No pump manager available"
             return
         }
 
-        var snData = Data()
+        let defaultSN = Data([0x28, 0xD8, 0x12, 0x4A])
 
-        if serialNumber.count >= 8 {
-            let validHex = String(serialNumber.prefix(8)).filter { "0123456789ABCDEFabcdef".contains($0) }
-            if validHex.count >= 8 {
-                snData = Data(hex: String(validHex.prefix(8))) ?? Data([0x28, 0xD8, 0x12, 0x4A])
-            } else {
-                snData = Data([0x28, 0xD8, 0x12, 0x4A])
-            }
-        } else {
-            snData = Data([0x28, 0xD8, 0x12, 0x4A])
-        }
-
-        if pumpManager.state.pumpSN.hexEncodedString().uppercased() != snData.hexEncodedString().uppercased() {
+        if pumpManager.state.pumpSN != defaultSN {
             logger.info("Serial number change detected -> Removing references to old pump base...")
             pumpManager.bluetooth.clearPeripheral()
         }
 
-        pumpManager.state.pumpSN = snData
+        pumpManager.state.pumpSN = defaultSN
         errorMessage = ""
 
         pumpManager.state.isOnboarded = true
