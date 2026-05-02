@@ -210,6 +210,7 @@ class M640GPumpSimulator:
         self.total_elapsed_time += self.update_interval_ms // 1000
         self._update_bolus_delivery()
         self._update_temp_basal()
+        self._update_prime_progress()
 
         if random.randint(0, 1000) == 0:
             self.battery_voltage = max(2.8, self.battery_voltage - 0.01)
@@ -217,6 +218,15 @@ class M640GPumpSimulator:
 
         if self.is_subscribed and self.is_connected:
             self._send_periodic_notification()
+
+    def _update_prime_progress(self):
+        if self.patch_state == PatchState.PRIMING:
+            if not hasattr(self, 'prime_progress'):
+                self.prime_progress = 0
+            self.prime_progress += 1
+            if self.prime_progress >= 240:
+                self.patch_state = PatchState.PRIMED
+                Logger.info("预充完成")
 
     def _update_bolus_delivery(self):
         if self.current_bolus is None:
@@ -280,7 +290,7 @@ class M640GPumpSimulator:
 
         field_mask = (
             MASK_SUSPEND | MASK_NORMAL_BOLUS | MASK_BASAL |
-            MASK_RESERVOIR | MASK_BATTERY | MASK_AGE
+            MASK_RESERVOIR | MASK_BATTERY | MASK_AGE | MASK_SETUP
         )
         data.extend(field_mask.to_bytes(2, 'little'))
 
@@ -322,6 +332,9 @@ class M640GPumpSimulator:
 
         data.extend(self.total_elapsed_time.to_bytes(4, 'little'))
 
+        prime_progress = getattr(self, 'prime_progress', 0) if self.patch_state == PatchState.PRIMING else 0
+        data.append(prime_progress)
+
         return bytes(data)
 
     def _on_write_request(self, data: bytes):
@@ -343,14 +356,24 @@ class M640GPumpSimulator:
             self._handle_synchronize_request(data, seq_num)
         elif cmd_type == CommandType.SUBSCRIBE:
             self._handle_subscribe_request(data, seq_num)
+        elif cmd_type == CommandType.GET_DEVICE_TYPE:
+            self._handle_get_device_type_request(data, seq_num)
         elif cmd_type == CommandType.GET_TIME:
             self._handle_get_time_request(data, seq_num)
         elif cmd_type == CommandType.SET_TIME:
             self._handle_set_time_request(data, seq_num)
+        elif cmd_type == CommandType.SET_TIME_ZONE:
+            self._handle_set_time_zone_request(data, seq_num)
+        elif cmd_type == CommandType.PRIME:
+            self._handle_prime_request(data, seq_num)
         elif cmd_type == CommandType.SET_BOLUS:
             self._handle_set_bolus_request(data, seq_num)
         elif cmd_type == CommandType.CANCEL_BOLUS:
             self._handle_cancel_bolus_request(data, seq_num)
+        elif cmd_type == CommandType.READ_BOLUS_STATE:
+            self._handle_read_bolus_state_request(data, seq_num)
+        elif cmd_type == CommandType.SET_BOLUS_MOTOR:
+            self._handle_set_bolus_motor_request(data, seq_num)
         elif cmd_type == CommandType.SET_TEMP_BASAL:
             self._handle_set_temp_basal_request(data, seq_num)
         elif cmd_type == CommandType.CANCEL_TEMP_BASAL:
@@ -369,8 +392,14 @@ class M640GPumpSimulator:
             self._handle_stop_patch_request(data, seq_num)
         elif cmd_type == CommandType.SET_PATCH:
             self._handle_set_patch_request(data, seq_num)
+        elif cmd_type == CommandType.POLL_PATCH:
+            self._handle_poll_patch_request(data, seq_num)
+        elif cmd_type == CommandType.GET_RECORD:
+            self._handle_get_record_request(data, seq_num)
         else:
             Logger.warning(f"未知命令类型: {cmd_type}")
+            response = self._build_error_response(cmd_type, seq_num, 0x0101)
+            self.gatt_server.send_notification(response)
 
     def _on_subscribe_changed(self, subscribed: bool):
         self.is_subscribed = subscribed
@@ -552,6 +581,74 @@ class M640GPumpSimulator:
     def _handle_set_patch_request(self, data: bytes, seq_num: int):
         Logger.info("收到设置 Patch 请求")
         response = self._build_response_packet(CommandType.SET_PATCH, seq_num, b'')
+        self.gatt_server.send_notification(response)
+
+    def _handle_get_device_type_request(self, data: bytes, seq_num: int):
+        Logger.info("收到获取设备类型请求")
+        response_data = bytearray()
+        response_data.append(self.device_type)
+        response_data.extend(self.sw_version.encode())
+        response = self._build_response_packet(CommandType.GET_DEVICE_TYPE, seq_num, response_data)
+        self.gatt_server.send_notification(response)
+
+    def _handle_set_time_zone_request(self, data: bytes, seq_num: int):
+        Logger.info("收到设置时区请求")
+        if len(data) >= 8:
+            tz_offset = int.from_bytes(data[6:8], 'little', signed=True)
+            Logger.info(f"  时区偏移: {tz_offset} 分钟")
+        response = self._build_response_packet(CommandType.SET_TIME_ZONE, seq_num, b'')
+        self.gatt_server.send_notification(response)
+
+    def _handle_prime_request(self, data: bytes, seq_num: int):
+        Logger.info("收到预充请求")
+        if self.patch_state == PatchState.FILLED:
+            self.patch_state = PatchState.PRIMING
+            Logger.info("  预充已开始")
+        elif self.patch_state == PatchState.PRIMING:
+            Logger.info("  预充进行中")
+        response = self._build_response_packet(CommandType.PRIME, seq_num, b'')
+        self.gatt_server.send_notification(response)
+
+    def _handle_poll_patch_request(self, data: bytes, seq_num: int):
+        Logger.debug("收到轮询 Patch 请求")
+        sync_data = self._build_synchronize_data()
+        response = self._build_response_packet(CommandType.POLL_PATCH, seq_num, sync_data)
+        self.gatt_server.send_notification(response)
+
+    def _handle_read_bolus_state_request(self, data: bytes, seq_num: int):
+        Logger.info("收到读取大剂量状态请求")
+        response_data = bytearray()
+        if self.current_bolus:
+            response_data.append(0x01)
+            amount_raw = int(self.current_bolus['amount'] / 0.05)
+            response_data.extend(amount_raw.to_bytes(2, 'little'))
+            progress = int(self.bolus_delivery_progress * 2.55)
+            response_data.append(progress)
+        else:
+            response_data.append(0x00)
+            response_data.extend((0).to_bytes(2, 'little'))
+            response_data.append(0)
+        response = self._build_response_packet(CommandType.READ_BOLUS_STATE, seq_num, response_data)
+        self.gatt_server.send_notification(response)
+
+    def _handle_set_bolus_motor_request(self, data: bytes, seq_num: int):
+        Logger.info("收到设置大剂量电机请求")
+        if len(data) >= 9:
+            motor_steps = int.from_bytes(data[6:8], 'little')
+            direction = data[8]
+            Logger.info(f"  电机步数: {motor_steps}, 方向: {direction}")
+        response = self._build_response_packet(CommandType.SET_BOLUS_MOTOR, seq_num, b'')
+        self.gatt_server.send_notification(response)
+
+    def _handle_get_record_request(self, data: bytes, seq_num: int):
+        Logger.info("收到获取记录请求")
+        if len(data) >= 8:
+            record_type = data[6]
+            record_index = data[7]
+            Logger.info(f"  记录类型: {record_type}, 索引: {record_index}")
+        response_data = bytearray()
+        response_data.append(0x00)
+        response = self._build_response_packet(CommandType.GET_RECORD, seq_num, response_data)
         self.gatt_server.send_notification(response)
 
     def _build_response_packet(self, cmd_type: int, seq_num: int, data: bytes) -> bytes:
