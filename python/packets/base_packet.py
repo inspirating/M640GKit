@@ -102,6 +102,9 @@ class BasePacket:
             data: 接收到的原始数据
         """
         if not self.total_data:
+            if data[1] != self.command_type:
+                self.failed = True
+
             self.total_data = data[:-1]
             self.data_size = data[0]
             self.sequence_number = data[3]
@@ -110,15 +113,16 @@ class BasePacket:
             initial_crc = crc8_calculate(data[:-1])
             if initial_crc != data[-1]:
                 self.failed = True
-        else:
-            self.total_data += data[4:-1]
-            if data[3] != self.sequence_number + 1:
-                self.failed = True
-            self.sequence_number = data[3]
+            return
 
-            new_crc = crc8_calculate(data[:-1])
-            if new_crc != data[-1]:
-                self.failed = True
+        self.total_data += data[4:-1]
+        self.sequence_number += 1
+
+        new_crc = crc8_calculate(data[:-1])
+        if new_crc != data[-1]:
+            self.failed = True
+        if self.sequence_number != data[3]:
+            self.failed = True
 
     @property
     def is_complete(self) -> bool:
