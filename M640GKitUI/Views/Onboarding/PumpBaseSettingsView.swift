@@ -38,6 +38,7 @@ struct PumpBaseSettingsView: View {
             Button(action: { viewModel.saveAndContinue() }) {
                 Text(LocalizedString("Save and continue", comment: "save and continue"))
             }
+            .disabled(viewModel.serialNumber.count != 8)
             .buttonStyle(ActionButtonStyle())
             .padding([.bottom, .horizontal])
         }

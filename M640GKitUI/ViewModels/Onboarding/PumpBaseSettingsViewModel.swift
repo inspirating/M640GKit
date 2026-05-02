@@ -27,20 +27,35 @@ class PumpBaseSettingsViewModel: ObservableObject {
     }
 
     func saveAndContinue() {
+        guard serialNumber.count == 8 else {
+            logger.error("Serial Number is too short: \(serialNumber)")
+            errorMessage = "Serial Number is too short"
+            return
+        }
+
+        guard let snData = Data(hex: serialNumber), snData.count == 4 else {
+            logger.error("Serial Number is invalid hex format: \(serialNumber)")
+            errorMessage = "Serial Number is invalid hex format"
+            return
+        }
+
         guard let pumpManager = pumpManager else {
             logger.error("No pump manager available")
             errorMessage = "No pump manager available"
             return
         }
 
-        let defaultSN = Data([0x28, 0xD8, 0x12, 0x4A])
-
-        if pumpManager.state.pumpSN != defaultSN {
+        if pumpManager.state.pumpSN.hexEncodedString().uppercased() != serialNumber.uppercased() {
             logger.info("Serial number change detected -> Removing references to old pump base...")
             pumpManager.bluetooth.clearPeripheral()
         }
 
-        pumpManager.state.pumpSN = defaultSN
+        pumpManager.state.pumpSN = snData
+        guard pumpManager.state.model != "INVALID" else {
+            errorMessage = "Incorrect serial number received"
+            return
+        }
+
         errorMessage = ""
 
         pumpManager.state.isOnboarded = true
