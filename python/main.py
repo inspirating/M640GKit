@@ -154,6 +154,13 @@ class M640GPumpSimulator:
         self.gatt_server.on_subscribe = self._on_subscribe_changed
 
         self._sequence_number = 0
+        self._ping_counter = 0
+        self._last_ping_time = 0
+        self._write_queue = []
+        self._processing_write = False
+        self._connection_timeout_ms = 15000
+        self._last_activity_time = utime.ticks_ms()
+        self._connection_tracker = ConnectionTracker()
         self.running = False
         self.update_interval_ms = 100
 
@@ -216,6 +223,9 @@ class M640GPumpSimulator:
         self._update_temp_basal()
         self._update_prime_progress()
         self._check_state_notifications()
+        self._send_ping_heartbeat()
+        self._check_connection_timeout()
+        self._report_connection_stats()
 
         if random.randint(0, 1000) == 0:
             self.battery_voltage = max(2.8, self.battery_voltage - 0.01)
@@ -268,6 +278,48 @@ class M640GPumpSimulator:
             self.gatt_server.send_notification(pkg)
 
         Logger.info(f"状态通知已发送: Patch 状态={self.patch_state}")
+
+    def _send_ping_heartbeat(self):
+        if not self.is_subscribed or not self.is_connected:
+            return
+
+        current_time = utime.ticks_ms()
+        if utime.ticks_diff(current_time, self._last_ping_time) >= 5000:
+            self._last_ping_time = current_time
+            self._ping_counter += 1
+
+            ping_data = bytearray([0x02, 0x00, self._sequence_number, 0])
+            ping_data.extend((0).to_bytes(2, 'little'))
+            crc = crc8_calculate(bytes(ping_data))
+            ping_data.append(crc)
+            ping_data.append(0)
+
+            self.gatt_server.send_notification_with_crc_hack(bytes(ping_data))
+            Logger.debug(f"发送 Ping 心跳 #{self._ping_counter}")
+
+    def _check_connection_timeout(self):
+        if not self.is_connected:
+            return
+
+        current_time = utime.ticks_ms()
+        elapsed = utime.ticks_diff(current_time, self._last_activity_time)
+
+        if elapsed > self._connection_timeout_ms:
+            Logger.warning("连接超时,断开客户端")
+            self._connection_tracker.on_disconnect("连接超时")
+            self.is_connected = False
+            self.is_subscribed = False
+            self.authenticated_clients = []
+            Logger.info(f"连接统计: {self._connection_tracker.get_stats()}")
+            Logger.info("等待重新连接...")
+
+    def _report_connection_stats(self):
+        if not self.is_connected:
+            return
+
+        if random.randint(0, 10000) == 0:
+            stats = self._connection_tracker.get_stats()
+            Logger.debug(f"连接统计: {stats}")
 
     def _update_prime_progress(self):
         if self.patch_state == PatchState.PRIMING:
@@ -407,8 +459,11 @@ class M640GPumpSimulator:
         return bytes(data)
 
     def _on_write_request(self, data: bytes):
+        self._last_activity_time = utime.ticks_ms()
+
         if len(data) < 6:
             Logger.warning(f"数据长度太短: {len(data)} 字节")
+            self._send_error_response(0, 0x0100, "数据长度太短")
             return
 
         packet_len = data[0]
@@ -419,60 +474,131 @@ class M640GPumpSimulator:
 
         Logger.debug(f"收到数据包: 命令={cmd_type}, 序列={seq_num}, 包索引={pkg_index}")
 
-        if cmd_type == CommandType.AUTH_REQ:
-            self._handle_auth_request(data, seq_num)
-        elif cmd_type == CommandType.SYNCHRONIZE:
-            self._handle_synchronize_request(data, seq_num)
-        elif cmd_type == CommandType.SUBSCRIBE:
-            self._handle_subscribe_request(data, seq_num)
-        elif cmd_type == CommandType.GET_DEVICE_TYPE:
-            self._handle_get_device_type_request(data, seq_num)
-        elif cmd_type == CommandType.GET_TIME:
-            self._handle_get_time_request(data, seq_num)
-        elif cmd_type == CommandType.SET_TIME:
-            self._handle_set_time_request(data, seq_num)
-        elif cmd_type == CommandType.SET_TIME_ZONE:
-            self._handle_set_time_zone_request(data, seq_num)
-        elif cmd_type == CommandType.PRIME:
-            self._handle_prime_request(data, seq_num)
-        elif cmd_type == CommandType.SET_BOLUS:
-            self._handle_set_bolus_request(data, seq_num)
-        elif cmd_type == CommandType.CANCEL_BOLUS:
-            self._handle_cancel_bolus_request(data, seq_num)
-        elif cmd_type == CommandType.READ_BOLUS_STATE:
-            self._handle_read_bolus_state_request(data, seq_num)
-        elif cmd_type == CommandType.SET_BOLUS_MOTOR:
-            self._handle_set_bolus_motor_request(data, seq_num)
-        elif cmd_type == CommandType.SET_TEMP_BASAL:
-            self._handle_set_temp_basal_request(data, seq_num)
-        elif cmd_type == CommandType.CANCEL_TEMP_BASAL:
-            self._handle_cancel_temp_basal_request(data, seq_num)
-        elif cmd_type == CommandType.SUSPEND_PUMP:
-            self._handle_suspend_request(data, seq_num)
-        elif cmd_type == CommandType.RESUME_PUMP:
-            self._handle_resume_request(data, seq_num)
-        elif cmd_type == CommandType.SET_BASAL_PROFILE:
-            self._handle_set_basal_profile_request(data, seq_num)
-        elif cmd_type == CommandType.CLEAR_ALARM:
-            self._handle_clear_alarm_request(data, seq_num)
-        elif cmd_type == CommandType.ACTIVATE:
-            self._handle_activate_request(data, seq_num)
-        elif cmd_type == CommandType.STOP_PATCH:
-            self._handle_stop_patch_request(data, seq_num)
-        elif cmd_type == CommandType.SET_PATCH:
-            self._handle_set_patch_request(data, seq_num)
-        elif cmd_type == CommandType.POLL_PATCH:
-            self._handle_poll_patch_request(data, seq_num)
-        elif cmd_type == CommandType.GET_RECORD:
-            self._handle_get_record_request(data, seq_num)
+        if response_code == 16384:
+            Logger.debug("跳过特殊响应码 16384")
+            return
+
+        if not hasattr(self, '_packet_buffer'):
+            self._packet_buffer = bytearray()
+            self._expected_packet_len = 0
+            self._current_cmd_type = None
+            self._current_seq_num = None
+
+        if pkg_index == 0:
+            if cmd_type == 0x00:
+                Logger.debug("收到 Ping 响应,忽略")
+                return
+
+            self._packet_buffer = bytearray(data)
+            self._expected_packet_len = packet_len
+            self._current_cmd_type = cmd_type
+            self._current_seq_num = seq_num
+
+            if len(data) >= packet_len:
+                complete_data = bytes(self._packet_buffer)
+                self._process_complete_command(complete_data)
+                self._packet_buffer = bytearray()
+                self._expected_packet_len = 0
+                self._current_cmd_type = None
+                self._current_seq_num = None
+            else:
+                Logger.debug(f"等待更多数据包, 已收到 {len(data)}/{packet_len} 字节")
+        else:
+            if (self._current_cmd_type is None or 
+                self._current_seq_num is None or
+                seq_num != self._current_seq_num + 1):
+                
+                error_msg = f"序列号不匹配: 期望 {self._current_seq_num + 1}, 收到 {seq_num}"
+                Logger.error(error_msg)
+                self._send_error_response(self._current_cmd_type or cmd_type, 0x0102, error_msg)
+                self._packet_buffer = bytearray()
+                self._expected_packet_len = 0
+                self._current_cmd_type = None
+                self._current_seq_num = None
+                return
+
+            self._packet_buffer.extend(data)
+            self._current_seq_num = seq_num
+
+            if len(self._packet_buffer) >= self._expected_packet_len:
+                complete_data = bytes(self._packet_buffer[:self._expected_packet_len])
+                self._process_complete_command(complete_data)
+                self._packet_buffer = bytearray()
+                self._expected_packet_len = 0
+                self._current_cmd_type = None
+                self._current_seq_num = None
+            else:
+                Logger.debug(f"等待更多数据包, 已收到 {len(self._packet_buffer)}/{self._expected_packet_len} 字节")
+
+    def _process_complete_command(self, data: bytes):
+        cmd_type = data[1]
+        seq_num = data[2]
+
+        command_handlers = {
+            CommandType.AUTH_REQ: self._handle_auth_request,
+            CommandType.SYNCHRONIZE: self._handle_synchronize_request,
+            CommandType.SUBSCRIBE: self._handle_subscribe_request,
+            CommandType.GET_DEVICE_TYPE: self._handle_get_device_type_request,
+            CommandType.GET_TIME: self._handle_get_time_request,
+            CommandType.SET_TIME: self._handle_set_time_request,
+            CommandType.SET_TIME_ZONE: self._handle_set_time_zone_request,
+            CommandType.PRIME: self._handle_prime_request,
+            CommandType.SET_BOLUS: self._handle_set_bolus_request,
+            CommandType.CANCEL_BOLUS: self._handle_cancel_bolus_request,
+            CommandType.READ_BOLUS_STATE: self._handle_read_bolus_state_request,
+            CommandType.SET_BOLUS_MOTOR: self._handle_set_bolus_motor_request,
+            CommandType.SET_TEMP_BASAL: self._handle_set_temp_basal_request,
+            CommandType.CANCEL_TEMP_BASAL: self._handle_cancel_temp_basal_request,
+            CommandType.SUSPEND_PUMP: self._handle_suspend_request,
+            CommandType.RESUME_PUMP: self._handle_resume_request,
+            CommandType.SET_BASAL_PROFILE: self._handle_set_basal_profile_request,
+            CommandType.CLEAR_ALARM: self._handle_clear_alarm_request,
+            CommandType.ACTIVATE: self._handle_activate_request,
+            CommandType.STOP_PATCH: self._handle_stop_patch_request,
+            CommandType.SET_PATCH: self._handle_set_patch_request,
+            CommandType.POLL_PATCH: self._handle_poll_patch_request,
+            CommandType.GET_RECORD: self._handle_get_record_request,
+        }
+
+        handler = command_handlers.get(cmd_type)
+        if handler:
+            try:
+                handler(data, seq_num)
+            except Exception as e:
+                Logger.error(f"处理命令 {cmd_type} 时出错: {e}")
+                self._send_error_response(cmd_type, 0x0105, str(e))
         else:
             Logger.warning(f"未知命令类型: {cmd_type}")
-            response = self._build_error_response(cmd_type, seq_num, 0x0101)
-            self.gatt_server.send_notification(response)
+            self._send_error_response(cmd_type, 0x0101, "未知命令类型")
+
+    def _send_error_response(self, cmd_type: int, error_code: int, message: str):
+        error_messages = {
+            0x0007: "认证失败: 可能使用了错误的会话令牌",
+            0x0008: "状态无效: Patch 不在激活状态(32)",
+            0x0100: "数据长度太短",
+            0x0101: "未知命令类型",
+            0x0102: "序列号不匹配",
+            0x0103: "CRC 校验失败",
+            0x0104: "数据解析失败",
+            0x0105: "内部错误",
+            0x0201: "大剂量正在进行中",
+            0x0202: "储药器余量不足",
+        }
+
+        error_desc = error_messages.get(error_code, f"未知错误 ({error_code})")
+        Logger.error(f"发送错误响应: {error_code} - {error_desc}: {message}")
+        
+        response = self._build_error_response(cmd_type, 0, error_code)
+        self.gatt_server.send_notification_with_crc_hack(response)
 
     def _on_subscribe_changed(self, subscribed: bool):
         self.is_subscribed = subscribed
-        Logger.info(f"订阅状态变化: {'已订阅' if subscribed else '已取消订阅'}")
+        if subscribed:
+            self._connection_tracker.on_connect()
+            Logger.info(f"订阅状态变化: 已订阅")
+        else:
+            self._connection_tracker.on_disconnect("客户端取消订阅")
+            Logger.info(f"订阅状态变化: 已取消订阅")
 
     def _handle_auth_request(self, data: bytes, seq_num: int):
         Logger.info("收到认证请求")
@@ -500,6 +626,7 @@ class M640GPumpSimulator:
         self.is_connected = True
         self.authenticated_clients.append(client_token)
         self.client_info['session_token'] = client_token.hex()
+        Logger.info(f"连接统计: {self._connection_tracker.get_stats()}")
 
     def _handle_synchronize_request(self, data: bytes, seq_num: int):
         Logger.debug("收到同步请求")
