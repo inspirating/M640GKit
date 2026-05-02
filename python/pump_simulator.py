@@ -1,0 +1,970 @@
+"""
+================================================================================
+M640GKit ESP32 泵模拟器核心模块
+================================================================================
+
+该模块模拟 M640G 胰岛素泵, 作为 GATT Server 运行,
+供 iOS Loop app 或其他 BLE 客户端连接和通信
+
+使用方式 (Arduino 风格):
+    from pump_simulator import simulator
+    
+    def setup():
+        simulator.setup()
+    
+    def loop():
+        simulator.loop()
+"""
+
+import time
+import random
+import machine
+import utime
+
+from encryption import crc8_calculate, Crypto
+from enums import (
+    BLEState, PatchState, BasalType, AlarmSettings, CommandType,
+    MASK_SUSPEND, MASK_NORMAL_BOLUS, MASK_EXTENDED_BOLUS, MASK_BASAL,
+    MASK_SETUP, MASK_RESERVOIR, MASK_START_TIME, MASK_BATTERY,
+    MASK_STORAGE, MASK_ALARM, MASK_AGE, MASK_MAGNETO_PLACE,
+    MASK_UNUSED_CGM, MASK_UNUSED_COMMAND_CONFIRM,
+    MASK_UNUSED_AUTO_STATUS, MASK_UNUSED_LEGACY, AlertType
+)
+from packets import (
+    AuthorizePacket, SynchronizePacket, SubscribePacket,
+    SetBolusPacket, CancelBolusPacket, ReadBolusStatePacket,
+    SetTempBasalPacket, CancelTempBasalPacket,
+    SuspendPumpPacket, ResumePumpPacket, StopPatchPacket,
+    ActivatePacket, SetPatchPacket, PrimePacket,
+    GetTimePacket, SetTimePacket, SetTimeZonePacket, ClearAlertPacket,
+    m640gkit_seconds
+)
+from pump_manager import GATTServer, ConnectionTracker, BLEEventManager
+
+PUMP_NAME = "MT"
+PUMP_SN = b'\x28\xd8\x12\x4a'
+DEVICE_TYPE = 1
+SW_VERSION = "1.0.0"
+MANUFACTURER_ID = 0x6A59
+
+MAX_RESERVOIR = 300.0
+MAX_BOLUS = 30.0
+MAX_BASAL_RATE = 60.0
+DEFAULT_HOURLY_MAX = 25.0
+DEFAULT_DAILY_MAX = 200.0
+
+
+class Logger:
+    DEBUG = 0
+    INFO = 1
+    WARNING = 2
+    ERROR = 3
+    current_level = INFO
+
+    @classmethod
+    def set_level(cls, level: int):
+        cls.current_level = level
+
+    @classmethod
+    def _log(cls, level: int, tag: str, message: str):
+        if level >= cls.current_level:
+            timestamp = utime.localtime()
+            time_str = f"{timestamp[3]:02d}:{timestamp[4]:02d}:{timestamp[5]:02d}"
+            level_str = ["D", "I", "W", "E"][level]
+            print(f"[{time_str}][{level_str}][{tag}] {message}")
+
+    @classmethod
+    def debug(cls, message: str):
+        cls._log(cls.DEBUG, "BLE", message)
+
+    @classmethod
+    def info(cls, message: str):
+        cls._log(cls.INFO, "BLE", message)
+
+    @classmethod
+    def warning(cls, message: str):
+        cls._log(cls.WARNING, "BLE", message)
+
+    @classmethod
+    def error(cls, message: str):
+        cls._log(cls.ERROR, "BLE", message)
+
+
+class PumpSimulatorState:
+    INITIALIZING = "initializing"
+    READY = "ready"
+    RUNNING = "running"
+    SUSPENDED = "suspended"
+    EJECTING = "ejecting"
+    ERROR = "error"
+
+
+class M640GPumpSimulator:
+    """
+    M640G 泵模拟器 - Arduino setup/loop 风格
+    
+    使用方式:
+        sim = M640GPumpSimulator()
+        sim.setup()   # 初始化 (调用一次)
+        sim.loop()    # 主循环 (重复调用)
+    """
+
+    def __init__(self):
+        self._initialized = False
+        self._last_update_time = 0
+        self.update_interval_ms = 100
+
+    def setup(self):
+        """Arduino setup() 等价物 - 初始化硬件和状态"""
+        Logger.info("=" * 60)
+        Logger.info("M640G 泵模拟器初始化")
+        Logger.info("=" * 60)
+
+        # BLE 初始化
+        self.ble = machine.BLE()
+        self.ble.active(True)
+        self.ble.config(gap_name=PUMP_NAME)
+
+        # 泵基本信息
+        self.pump_sn = PUMP_SN
+        self.device_type = DEVICE_TYPE
+        self.sw_version = SW_VERSION
+
+        # 状态
+        self.patch_state = PatchState.ACTIVE
+        self.simulator_state = PumpSimulatorState.INITIALIZING
+
+        # 储药器和胰岛素
+        self.reservoir = 200.0
+        self.active_insulin = 0.0
+
+        # 电池
+        self.battery_voltage = 3.8
+        self.battery_level = 100
+
+        # 时间
+        self.patch_start_time = utime.time()
+        self.total_elapsed_time = 0
+
+        # 大剂量
+        self.current_bolus = None
+        self.bolus_delivery_progress = 0
+        self.bolus_history = []
+
+        # 基础率
+        self.basal_profile = self._create_default_basal_profile()
+        self.temp_basal = None
+        self.temp_basal_remaining = 0
+
+        # 警报
+        self.active_alarms = []
+        self.alarm_settings = AlarmSettings.LIGHT_VIBRATE_BEEP
+
+        # 连接状态
+        self.is_connected = False
+        self.is_subscribed = False
+        self.authenticated_clients = []
+        self.client_info = {}
+
+        # 会话
+        self.session_token = self._generate_session_token()
+        self.pump_timezone = 0
+        self.time_sync_pending = False
+
+        # GATT Server
+        self.gatt_server = GATTServer(self.ble)
+        self.gatt_server.on_write_request = self._on_write_request
+        self.gatt_server.on_subscribe = self._on_subscribe_changed
+
+        # 序列号和计时器
+        self._sequence_number = 0
+        self._ping_counter = 0
+        self._last_ping_time = 0
+        self._write_queue = []
+        self._processing_write = False
+        self._connection_timeout_ms = 15000
+        self._last_activity_time = utime.ticks_ms()
+        self._connection_tracker = ConnectionTracker()
+
+        # 启动 GATT Server
+        self.gatt_server.start()
+        self.simulator_state = PumpSimulatorState.READY
+        self._initialized = True
+        self._last_update_time = utime.ticks_ms()
+
+        Logger.info("=" * 60)
+        Logger.info("M640G 泵模拟器启动")
+        Logger.info("=" * 60)
+        Logger.info(f"  设备名称: {PUMP_NAME}")
+        Logger.info(f"  序列号: {self.pump_sn.hex()}")
+        Logger.info(f"  设备类型: {self.device_type}")
+        Logger.info(f"  软件版本: {self.sw_version}")
+        Logger.info("=" * 60)
+
+    def loop(self):
+        """Arduino loop() 等价物 - 主循环体, 每次调用执行一次迭代"""
+        if not self._initialized:
+            Logger.error("模拟器未初始化, 请先调用 setup()")
+            return
+
+        current_time = utime.ticks_ms()
+        if utime.ticks_diff(current_time, self._last_update_time) >= self.update_interval_ms:
+            self._last_update_time = current_time
+            self._update()
+
+    def _update(self):
+        """单次更新 - 包含所有周期性任务"""
+        self.total_elapsed_time += self.update_interval_ms // 1000
+        self._update_bolus_delivery()
+        self._update_temp_basal()
+        self._update_prime_progress()
+        self._check_state_notifications()
+        self._send_ping_heartbeat()
+        self._check_connection_timeout()
+        self._report_connection_stats()
+
+        if random.randint(0, 1000) == 0:
+            self.battery_voltage = max(2.8, self.battery_voltage - 0.01)
+            self.battery_level = max(0, self.battery_level - 1)
+
+        if self.is_subscribed and self.is_connected:
+            self._send_periodic_notification()
+
+    def _generate_session_token(self) -> bytes:
+        return bytes([random.randint(0, 255) for _ in range(4)])
+
+    def _create_default_basal_profile(self) -> bytearray:
+        profile = bytearray()
+        default_rates = [
+            0.6, 0.6, 0.6, 0.6,
+            0.6, 0.6, 0.6, 0.6,
+            0.6, 0.6, 0.6, 0.6,
+            0.7, 0.7, 0.8, 0.9,
+            1.0, 1.0, 0.9, 0.8,
+            0.8, 0.8, 0.8, 0.7,
+            0.7, 0.7, 0.8, 0.9,
+            1.0, 0.9, 0.8, 0.7,
+        ]
+        for rate in default_rates:
+            raw_value = int(rate / 0.05)
+            profile.extend(raw_value.to_bytes(2, 'little'))
+        return profile
+
+    # ========== 通知和状态 ==========
+
+    def _check_state_notifications(self):
+        if not hasattr(self, 'last_notified_state'):
+            self.last_notified_state = None
+
+        if self.patch_state == self.last_notified_state:
+            return
+
+        should_notify = False
+
+        if self.patch_state == PatchState.SUSPENDED:
+            if self.total_elapsed_time % 7200 == 0:
+                Logger.info("通知: 每日最大暂停")
+                should_notify = True
+            if self.total_elapsed_time % 3600 == 0:
+                Logger.info("通知: 每小时最大暂停")
+                should_notify = True
+        elif self.patch_state == PatchState.OCCLUSION:
+            Logger.info("通知: 堵管报警")
+            should_notify = True
+        elif self.patch_state == PatchState.PATCH_FAULT:
+            Logger.info("通知: Patch 故障")
+            should_notify = True
+        elif self.patch_state == PatchState.RESERVOIR_EMPTY:
+            Logger.info("通知: 储药器空")
+            should_notify = True
+
+        if should_notify:
+            self.last_notified_state = self.patch_state
+            self._send_state_notification()
+
+    def _send_state_notification(self):
+        sync_data = self._build_synchronize_data()
+        packet = SynchronizePacket()
+        packet.total_data = sync_data
+        packet.data_size = len(sync_data)
+        packet.response_code = 0
+
+        encoded = packet.encode_notification(self._sequence_number)
+        self._sequence_number = (self._sequence_number + 1) % 254
+
+        for pkg in encoded:
+            self.gatt_server.send_notification(pkg)
+
+        Logger.info(f"状态通知已发送: Patch 状态={self.patch_state}")
+
+    def _send_ping_heartbeat(self):
+        if not self.is_subscribed or not self.is_connected:
+            return
+
+        current_time = utime.ticks_ms()
+        if utime.ticks_diff(current_time, self._last_ping_time) >= 5000:
+            self._last_ping_time = current_time
+            self._ping_counter += 1
+
+            ping_data = bytearray([0x02, 0x00, self._sequence_number, 0])
+            ping_data.extend((0).to_bytes(2, 'little'))
+            crc = crc8_calculate(bytes(ping_data))
+            ping_data.append(crc)
+            ping_data.append(0)
+
+            self.gatt_server.send_notification_with_crc_hack(bytes(ping_data))
+            Logger.debug(f"发送 Ping 心跳 #{self._ping_counter}")
+
+    def _check_connection_timeout(self):
+        if not self.is_connected:
+            return
+
+        current_time = utime.ticks_ms()
+        elapsed = utime.ticks_diff(current_time, self._last_activity_time)
+
+        if elapsed > self._connection_timeout_ms:
+            Logger.warning("连接超时,断开客户端")
+            self._connection_tracker.on_disconnect("连接超时")
+            self.is_connected = False
+            self.is_subscribed = False
+            self.authenticated_clients = []
+            Logger.info(f"连接统计: {self._connection_tracker.get_stats()}")
+            Logger.info("等待重新连接...")
+
+    def _report_connection_stats(self):
+        if not self.is_connected:
+            return
+
+        if random.randint(0, 10000) == 0:
+            stats = self._connection_tracker.get_stats()
+            Logger.debug(f"连接统计: {stats}")
+
+    def _update_prime_progress(self):
+        if self.patch_state == PatchState.PRIMING:
+            if not hasattr(self, 'prime_progress'):
+                self.prime_progress = 0
+            self.prime_progress += 1
+            if self.prime_progress >= 240:
+                self.patch_state = PatchState.PRIMED
+                Logger.info("预充完成")
+
+    def _update_bolus_delivery(self):
+        if self.current_bolus is None:
+            return
+
+        self.bolus_delivery_progress += 2
+        delivered = self.current_bolus['amount'] * (self.bolus_delivery_progress / 100)
+        self.active_insulin += delivered
+
+        if self.bolus_delivery_progress >= 100:
+            self.bolus_history.append({
+                'type': self.current_bolus['type'],
+                'amount': self.current_bolus['amount'],
+                'delivered': self.current_bolus['amount'],
+                'time': utime.time()
+            })
+            self.reservoir = max(0, self.reservoir - self.current_bolus['amount'])
+            self.current_bolus = None
+            self.bolus_delivery_progress = 0
+            Logger.info("大剂量输送完成")
+
+    def _update_temp_basal(self):
+        if self.temp_basal is None:
+            return
+
+        self.temp_basal_remaining -= self.update_interval_ms / 60000
+
+        if self.temp_basal_remaining <= 0:
+            Logger.info("临时基础率结束")
+            self.temp_basal = None
+            self.temp_basal_remaining = 0
+
+    def _send_periodic_notification(self):
+        if self.total_elapsed_time % 5 == 0:
+            self._send_synchronize_notification()
+
+    def _send_synchronize_notification(self):
+        sync_data = self._build_synchronize_data()
+        packet = SynchronizePacket()
+        packet.total_data = sync_data
+        packet.data_size = len(sync_data)
+        packet.response_code = 0
+
+        encoded = packet.encode_notification(self._sequence_number)
+        self._sequence_number = (self._sequence_number + 1) % 254
+
+        for pkg in encoded:
+            self.gatt_server.send_notification(pkg)
+
+    # ========== 同步数据构建 ==========
+
+    def _build_synchronize_data(self) -> bytes:
+        data = bytearray()
+        data.append(self.patch_state)
+
+        field_mask = (
+            MASK_SUSPEND | MASK_NORMAL_BOLUS | MASK_EXTENDED_BOLUS | MASK_BASAL |
+            MASK_SETUP | MASK_RESERVOIR | MASK_START_TIME | MASK_BATTERY |
+            MASK_STORAGE | MASK_ALARM | MASK_AGE | MASK_MAGNETO_PLACE |
+            MASK_UNUSED_CGM | MASK_UNUSED_COMMAND_CONFIRM |
+            MASK_UNUSED_AUTO_STATUS | MASK_UNUSED_LEGACY
+        )
+        data.extend(field_mask.to_bytes(2, 'little'))
+
+        if field_mask & MASK_SUSPEND:
+            suspend_seconds = self.total_elapsed_time
+            data.extend(suspend_seconds.to_bytes(4, 'little'))
+
+        if field_mask & MASK_NORMAL_BOLUS:
+            if self.current_bolus:
+                bolus_type = self.current_bolus['type']
+                completed = 0x80 if self.bolus_delivery_progress >= 100 else 0
+                data.append(bolus_type | completed)
+                delivered = int(self.current_bolus['amount'] * (self.bolus_delivery_progress / 100) / 0.05)
+                data.extend(delivered.to_bytes(2, 'little'))
+            else:
+                data.append(0)
+                data.extend((0).to_bytes(2, 'little'))
+
+        if field_mask & MASK_EXTENDED_BOLUS:
+            data.extend((0).to_bytes(3, 'little'))
+
+        if field_mask & MASK_BASAL:
+            basal_type = BasalType.ABSOLUTE_TEMP if self.temp_basal else BasalType.STANDARD
+            data.append(basal_type)
+            data.extend((0).to_bytes(2, 'little'))
+            patch_id = random.randint(1, 65535)
+            data.extend(patch_id.to_bytes(2, 'little'))
+            start_time_seconds = int(self.patch_start_time - (365 * 24 * 3600 * 20))
+            data.extend(start_time_seconds.to_bytes(4, 'little'))
+            if self.temp_basal:
+                rate = int(self.temp_basal['rate'] / 0.05)
+                delivery = rate
+            else:
+                rate = int(0.6 / 0.05)
+                delivery = 0
+            rate_value = (delivery << 12) | rate
+            data.extend(rate_value.to_bytes(3, 'little'))
+
+        if field_mask & MASK_SETUP:
+            prime_progress = getattr(self, 'prime_progress', 0) if self.patch_state == PatchState.PRIMING else 0
+            data.append(prime_progress)
+
+        if field_mask & MASK_RESERVOIR:
+            reservoir_raw = int(self.reservoir / 0.05)
+            data.extend(reservoir_raw.to_bytes(2, 'little'))
+
+        if field_mask & MASK_START_TIME:
+            start_time_seconds = int(self.patch_start_time - (365 * 24 * 3600 * 20))
+            data.extend(start_time_seconds.to_bytes(4, 'little'))
+
+        if field_mask & MASK_BATTERY:
+            voltage_a_raw = int(self.battery_voltage * 512)
+            voltage_b_raw = int(self.battery_voltage * 512)
+            battery_value = (voltage_b_raw << 12) | voltage_a_raw
+            data.extend(battery_value.to_bytes(3, 'little'))
+
+        if field_mask & MASK_STORAGE:
+            data.extend((0).to_bytes(2, 'little'))
+            data.extend((0).to_bytes(2, 'little'))
+
+        if field_mask & MASK_ALARM:
+            active_alarms_flags = 0
+            data.extend(active_alarms_flags.to_bytes(2, 'little'))
+            data.extend((0).to_bytes(2, 'little'))
+
+        if field_mask & MASK_AGE:
+            data.extend(self.total_elapsed_time.to_bytes(4, 'little'))
+
+        if field_mask & MASK_MAGNETO_PLACE:
+            magneto_value = 100
+            data.extend(magneto_value.to_bytes(2, 'little'))
+
+        if field_mask & MASK_UNUSED_CGM:
+            data.extend((0).to_bytes(5, 'little'))
+
+        if field_mask & MASK_UNUSED_COMMAND_CONFIRM:
+            data.extend((0).to_bytes(2, 'little'))
+
+        if field_mask & MASK_UNUSED_AUTO_STATUS:
+            data.extend((0).to_bytes(2, 'little'))
+
+        if field_mask & MASK_UNUSED_LEGACY:
+            data.extend((0).to_bytes(2, 'little'))
+
+        return bytes(data)
+
+    # ========== BLE 写入处理 ==========
+
+    def _on_write_request(self, data: bytes):
+        self._last_activity_time = utime.ticks_ms()
+
+        if len(data) < 6:
+            Logger.warning(f"数据长度太短: {len(data)} 字节")
+            self._send_error_response(0, 0x0100, "数据长度太短")
+            return
+
+        packet_len = data[0]
+        cmd_type = data[1]
+        seq_num = data[2]
+        pkg_index = data[3]
+        response_code = int.from_bytes(data[4:6], 'little')
+
+        Logger.debug(f"收到数据包: 命令={cmd_type}, 序列={seq_num}, 包索引={pkg_index}")
+
+        if response_code == 16384:
+            Logger.debug("跳过特殊响应码 16384")
+            return
+
+        if not hasattr(self, '_packet_buffer'):
+            self._packet_buffer = bytearray()
+            self._expected_packet_len = 0
+            self._current_cmd_type = None
+            self._current_seq_num = None
+
+        if pkg_index == 0:
+            if cmd_type == 0x00:
+                Logger.debug("收到 Ping 响应,忽略")
+                return
+
+            self._packet_buffer = bytearray(data)
+            self._expected_packet_len = packet_len
+            self._current_cmd_type = cmd_type
+            self._current_seq_num = seq_num
+
+            if len(data) >= packet_len:
+                complete_data = bytes(self._packet_buffer)
+                self._process_complete_command(complete_data)
+                self._packet_buffer = bytearray()
+                self._expected_packet_len = 0
+                self._current_cmd_type = None
+                self._current_seq_num = None
+            else:
+                Logger.debug(f"等待更多数据包, 已收到 {len(data)}/{packet_len} 字节")
+        else:
+            if (self._current_cmd_type is None or 
+                self._current_seq_num is None or
+                seq_num != self._current_seq_num + 1):
+                
+                error_msg = f"序列号不匹配: 期望 {self._current_seq_num + 1}, 收到 {seq_num}"
+                Logger.error(error_msg)
+                self._send_error_response(self._current_cmd_type or cmd_type, 0x0102, error_msg)
+                self._packet_buffer = bytearray()
+                self._expected_packet_len = 0
+                self._current_cmd_type = None
+                self._current_seq_num = None
+                return
+
+            self._packet_buffer.extend(data)
+            self._current_seq_num = seq_num
+
+            if len(self._packet_buffer) >= self._expected_packet_len:
+                complete_data = bytes(self._packet_buffer[:self._expected_packet_len])
+                self._process_complete_command(complete_data)
+                self._packet_buffer = bytearray()
+                self._expected_packet_len = 0
+                self._current_cmd_type = None
+                self._current_seq_num = None
+            else:
+                Logger.debug(f"等待更多数据包, 已收到 {len(self._packet_buffer)}/{self._expected_packet_len} 字节")
+
+    def _process_complete_command(self, data: bytes):
+        cmd_type = data[1]
+        seq_num = data[2]
+
+        command_handlers = {
+            CommandType.AUTH_REQ: self._handle_auth_request,
+            CommandType.SYNCHRONIZE: self._handle_synchronize_request,
+            CommandType.SUBSCRIBE: self._handle_subscribe_request,
+            CommandType.GET_DEVICE_TYPE: self._handle_get_device_type_request,
+            CommandType.GET_TIME: self._handle_get_time_request,
+            CommandType.SET_TIME: self._handle_set_time_request,
+            CommandType.SET_TIME_ZONE: self._handle_set_time_zone_request,
+            CommandType.PRIME: self._handle_prime_request,
+            CommandType.SET_BOLUS: self._handle_set_bolus_request,
+            CommandType.CANCEL_BOLUS: self._handle_cancel_bolus_request,
+            CommandType.READ_BOLUS_STATE: self._handle_read_bolus_state_request,
+            CommandType.SET_BOLUS_MOTOR: self._handle_set_bolus_motor_request,
+            CommandType.SET_TEMP_BASAL: self._handle_set_temp_basal_request,
+            CommandType.CANCEL_TEMP_BASAL: self._handle_cancel_temp_basal_request,
+            CommandType.SUSPEND_PUMP: self._handle_suspend_request,
+            CommandType.RESUME_PUMP: self._handle_resume_request,
+            CommandType.SET_BASAL_PROFILE: self._handle_set_basal_profile_request,
+            CommandType.CLEAR_ALARM: self._handle_clear_alarm_request,
+            CommandType.ACTIVATE: self._handle_activate_request,
+            CommandType.STOP_PATCH: self._handle_stop_patch_request,
+            CommandType.SET_PATCH: self._handle_set_patch_request,
+            CommandType.POLL_PATCH: self._handle_poll_patch_request,
+            CommandType.GET_RECORD: self._handle_get_record_request,
+        }
+
+        handler = command_handlers.get(cmd_type)
+        if handler:
+            try:
+                handler(data, seq_num)
+            except Exception as e:
+                Logger.error(f"处理命令 {cmd_type} 时出错: {e}")
+                self._send_error_response(cmd_type, 0x0105, str(e))
+        else:
+            Logger.warning(f"未知命令类型: {cmd_type}")
+            self._send_error_response(cmd_type, 0x0101, "未知命令类型")
+
+    def _send_error_response(self, cmd_type: int, error_code: int, message: str):
+        error_messages = {
+            0x0007: "认证失败: 可能使用了错误的会话令牌",
+            0x0008: "状态无效: Patch 不在激活状态(32)",
+            0x0100: "数据长度太短",
+            0x0101: "未知命令类型",
+            0x0102: "序列号不匹配",
+            0x0103: "CRC 校验失败",
+            0x0104: "数据解析失败",
+            0x0105: "内部错误",
+            0x0201: "大剂量正在进行中",
+            0x0202: "储药器余量不足",
+        }
+
+        error_desc = error_messages.get(error_code, f"未知错误 ({error_code})")
+        Logger.error(f"发送错误响应: {error_code} - {error_desc}: {message}")
+        
+        response = self._build_error_response(cmd_type, 0, error_code)
+        self.gatt_server.send_notification_with_crc_hack(response)
+
+    def _on_subscribe_changed(self, subscribed: bool):
+        self.is_subscribed = subscribed
+        if subscribed:
+            self._connection_tracker.on_connect()
+            Logger.info(f"订阅状态变化: 已订阅")
+        else:
+            self._connection_tracker.on_disconnect("客户端取消订阅")
+            Logger.info(f"订阅状态变化: 已取消订阅")
+
+    # ========== 命令处理器 ==========
+
+    def _handle_auth_request(self, data: bytes, seq_num: int):
+        Logger.info("收到认证请求")
+
+        role = data[6]
+        client_token = data[7:11]
+        client_key = data[11:15]
+
+        Logger.debug(f"  角色: {role}, 会话令牌: {client_token.hex()}, 密钥: {client_key.hex()}")
+        correct_key = Crypto.gen_key(self.pump_sn)
+        Logger.info("认证成功")
+        Logger.info(f"  设备类型: {self.device_type}")
+        Logger.info(f"  软件版本: {self.sw_version}")
+
+        response_data = bytearray()
+        response_data.append(0x02)
+        response_data.append(self.device_type)
+        response_data.append(1)
+        response_data.append(0)
+        response_data.append(0)
+
+        response = self._build_response_packet(CommandType.AUTH_REQ, seq_num, response_data)
+        self.gatt_server.send_notification(response)
+
+        self.is_connected = True
+        self.authenticated_clients.append(client_token)
+        self.client_info['session_token'] = client_token.hex()
+        Logger.info(f"连接统计: {self._connection_tracker.get_stats()}")
+
+    def _handle_synchronize_request(self, data: bytes, seq_num: int):
+        Logger.debug("收到同步请求")
+        sync_data = self._build_synchronize_data()
+        response = self._build_response_packet(CommandType.SYNCHRONIZE, seq_num, sync_data)
+        self.gatt_server.send_notification(response)
+
+    def _handle_subscribe_request(self, data: bytes, seq_num: int):
+        Logger.info("收到订阅请求")
+        self.is_subscribed = True
+        response = self._build_response_packet(CommandType.SUBSCRIBE, seq_num, b'')
+        self.gatt_server.send_notification(response)
+
+    def _handle_get_time_request(self, data: bytes, seq_num: int):
+        Logger.info("收到获取时间请求")
+        current_time = m640gkit_seconds()
+        response_data = bytearray()
+        response_data.extend(current_time.to_bytes(4, 'little'))
+        response = self._build_response_packet(CommandType.GET_TIME, seq_num, response_data)
+        self.gatt_server.send_notification(response)
+
+    def _handle_set_time_request(self, data: bytes, seq_num: int):
+        Logger.info("收到设置时间请求")
+        if len(data) >= 11:
+            time_bytes = data[7:11]
+            new_time = int.from_bytes(time_bytes, 'little')
+            Logger.info(f"  设置时间戳: {new_time}")
+            self.time_sync_pending = True
+        response = self._build_response_packet(CommandType.SET_TIME, seq_num, b'')
+        self.gatt_server.send_notification(response)
+
+    def _handle_set_bolus_request(self, data: bytes, seq_num: int):
+        Logger.info("收到设置大剂量请求")
+        if len(data) >= 10:
+            bolus_type = data[6]
+            amount_raw = int.from_bytes(data[7:9], 'little')
+            amount = amount_raw * 0.05
+            Logger.info(f"  类型: {bolus_type}, 剂量: {amount} U")
+
+            if self.current_bolus:
+                Logger.warning("  已有大剂量在执行中")
+                response = self._build_error_response(CommandType.SET_BOLUS, seq_num, 0x0201)
+                self.gatt_server.send_notification(response)
+                return
+
+            if amount > self.reservoir:
+                Logger.warning(f"  储药器余量不足: {self.reservoir} U")
+                response = self._build_error_response(CommandType.SET_BOLUS, seq_num, 0x0202)
+                self.gatt_server.send_notification(response)
+                return
+
+            self.current_bolus = {'type': bolus_type, 'amount': amount, 'start_time': utime.time()}
+            self.bolus_delivery_progress = 0
+            Logger.info("  大剂量已开始输送")
+
+        response = self._build_response_packet(CommandType.SET_BOLUS, seq_num, b'')
+        self.gatt_server.send_notification(response)
+
+    def _handle_cancel_bolus_request(self, data: bytes, seq_num: int):
+        Logger.info("收到取消大剂量请求")
+        if self.current_bolus:
+            delivered = self.current_bolus['amount'] * (self.bolus_delivery_progress / 100)
+            self.reservoir += (self.current_bolus['amount'] - delivered)
+            self.current_bolus = None
+            self.bolus_delivery_progress = 0
+            Logger.info(f"  大剂量已取消, 已输送: {delivered} U")
+
+        response = self._build_response_packet(CommandType.CANCEL_BOLUS, seq_num, b'')
+        self.gatt_server.send_notification(response)
+
+    def _handle_set_temp_basal_request(self, data: bytes, seq_num: int):
+        Logger.info("收到设置临时基础率请求")
+        if len(data) >= 12:
+            basal_type = data[6]
+            rate_raw = int.from_bytes(data[7:9], 'little')
+            duration_raw = int.from_bytes(data[9:11], 'little')
+            rate = rate_raw * 0.05
+            duration = duration_raw
+            Logger.info(f"  类型: {basal_type}, 速率: {rate} U/hr, 持续: {duration} 分钟")
+            self.temp_basal = {'type': basal_type, 'rate': rate, 'start_time': utime.time()}
+            self.temp_basal_remaining = duration
+
+        response_data = bytearray()
+        response_data.append(BasalType.ABSOLUTE_TEMP if self.temp_basal else BasalType.STANDARD)
+        basal_value = int((self.temp_basal['rate'] if self.temp_basal else 0.6) / 0.05)
+        response_data.extend(basal_value.to_bytes(2, 'little'))
+        response_data.extend((0).to_bytes(2, 'little'))
+        patch_id = random.randint(1, 65535)
+        response_data.extend(patch_id.to_bytes(2, 'little'))
+        start_time_seconds = int(self.patch_start_time - (365 * 24 * 3600 * 20))
+        response_data.extend(start_time_seconds.to_bytes(4, 'little'))
+
+        response = self._build_response_packet(CommandType.SET_TEMP_BASAL, seq_num, response_data)
+        self.gatt_server.send_notification(response)
+
+    def _handle_cancel_temp_basal_request(self, data: bytes, seq_num: int):
+        Logger.info("收到取消临时基础率请求")
+        self.temp_basal = None
+        self.temp_basal_remaining = 0
+
+        response_data = bytearray()
+        response_data.append(BasalType.STANDARD)
+        basal_value = int(0.6 / 0.05)
+        response_data.extend(basal_value.to_bytes(2, 'little'))
+        response_data.extend((0).to_bytes(2, 'little'))
+        patch_id = random.randint(1, 65535)
+        response_data.extend(patch_id.to_bytes(2, 'little'))
+        start_time_seconds = int(self.patch_start_time - (365 * 24 * 3600 * 20))
+        response_data.extend(start_time_seconds.to_bytes(4, 'little'))
+
+        Logger.info("  临时基础率已取消")
+        response = self._build_response_packet(CommandType.CANCEL_TEMP_BASAL, seq_num, response_data)
+        self.gatt_server.send_notification(response)
+
+    def _handle_suspend_request(self, data: bytes, seq_num: int):
+        Logger.info("收到暂停泵请求")
+        self.patch_state = PatchState.SUSPENDED
+        self.simulator_state = PumpSimulatorState.SUSPENDED
+
+        if self.current_bolus:
+            delivered = self.current_bolus['amount'] * (self.bolus_delivery_progress / 100)
+            self.reservoir += (self.current_bolus['amount'] - delivered)
+            self.current_bolus = None
+            self.bolus_delivery_progress = 0
+
+        self.temp_basal = None
+        self.temp_basal_remaining = 0
+        Logger.info("  泵已暂停")
+        response = self._build_response_packet(CommandType.SUSPEND_PUMP, seq_num, b'')
+        self.gatt_server.send_notification(response)
+
+    def _handle_resume_request(self, data: bytes, seq_num: int):
+        Logger.info("收到恢复泵请求")
+        self.patch_state = PatchState.ACTIVE
+        self.simulator_state = PumpSimulatorState.RUNNING
+        Logger.info("  泵已恢复")
+        response = self._build_response_packet(CommandType.RESUME_PUMP, seq_num, b'')
+        self.gatt_server.send_notification(response)
+
+    def _handle_set_basal_profile_request(self, data: bytes, seq_num: int):
+        Logger.info("收到设置基础率配置文件请求")
+
+        response_data = bytearray()
+        response_data.append(BasalType.STANDARD)
+        basal_value = int(0.6 / 0.05)
+        response_data.extend(basal_value.to_bytes(2, 'little'))
+        response_data.extend((0).to_bytes(2, 'little'))
+        patch_id = random.randint(1, 65535)
+        response_data.extend(patch_id.to_bytes(2, 'little'))
+        start_time_seconds = int(self.patch_start_time - (365 * 24 * 3600 * 20))
+        response_data.extend(start_time_seconds.to_bytes(4, 'little'))
+
+        response = self._build_response_packet(CommandType.SET_BASAL_PROFILE, seq_num, response_data)
+        self.gatt_server.send_notification(response)
+
+    def _handle_clear_alarm_request(self, data: bytes, seq_num: int):
+        Logger.info("收到清除警报请求")
+        self.active_alarms = []
+        response = self._build_response_packet(CommandType.CLEAR_ALARM, seq_num, b'')
+        self.gatt_server.send_notification(response)
+
+    def _handle_activate_request(self, data: bytes, seq_num: int):
+        Logger.info("收到激活 Patch 请求")
+        self.patch_state = PatchState.ACTIVE
+        self.simulator_state = PumpSimulatorState.RUNNING
+        self.reservoir = MAX_RESERVOIR
+        self.patch_start_time = utime.time()
+        self.total_elapsed_time = 0
+
+        response_data = bytearray()
+        patch_id = random.randint(1, 65535)
+        response_data.extend(patch_id.to_bytes(4, 'little'))
+        start_time_seconds = int(self.patch_start_time - (365 * 24 * 3600 * 20))
+        response_data.extend(start_time_seconds.to_bytes(4, 'little'))
+        response_data.append(BasalType.STANDARD)
+        basal_value = int(0.6 / 0.05)
+        response_data.extend(basal_value.to_bytes(2, 'little'))
+        response_data.extend((0).to_bytes(2, 'little'))
+        response_data.extend(patch_id.to_bytes(2, 'little'))
+        response_data.extend(start_time_seconds.to_bytes(4, 'little'))
+
+        Logger.info("  Patch 已激活")
+        response = self._build_response_packet(CommandType.ACTIVATE, seq_num, response_data)
+        self.gatt_server.send_notification(response)
+
+    def _handle_stop_patch_request(self, data: bytes, seq_num: int):
+        Logger.info("收到停止 Patch 请求")
+        self.patch_state = PatchState.STOPPED
+        self.simulator_state = PumpSimulatorState.EJECTING
+
+        response_data = bytearray()
+        response_data.extend((0).to_bytes(2, 'little'))
+        response_data.extend((0).to_bytes(2, 'little'))
+
+        Logger.info("  Patch 已停止")
+        response = self._build_response_packet(CommandType.STOP_PATCH, seq_num, response_data)
+        self.gatt_server.send_notification(response)
+
+    def _handle_set_patch_request(self, data: bytes, seq_num: int):
+        Logger.info("收到设置 Patch 请求")
+        response = self._build_response_packet(CommandType.SET_PATCH, seq_num, b'')
+        self.gatt_server.send_notification(response)
+
+    def _handle_get_device_type_request(self, data: bytes, seq_num: int):
+        Logger.info("收到获取设备类型请求")
+        response_data = bytearray()
+        response_data.append(self.device_type)
+        response_data.append(1)
+        response_data.append(0)
+        response_data.append(1)
+        response_data.append(0)
+        response_data.append(0)
+        response_data.extend(self.pump_sn)
+        response = self._build_response_packet(CommandType.GET_DEVICE_TYPE, seq_num, response_data)
+        self.gatt_server.send_notification(response)
+
+    def _handle_set_time_zone_request(self, data: bytes, seq_num: int):
+        Logger.info("收到设置时区请求")
+        if len(data) >= 8:
+            tz_offset = int.from_bytes(data[6:8], 'little', signed=True)
+            Logger.info(f"  时区偏移: {tz_offset} 分钟")
+            self.pump_timezone = tz_offset
+        response = self._build_response_packet(CommandType.SET_TIME_ZONE, seq_num, b'')
+        self.gatt_server.send_notification(response)
+
+    def _handle_prime_request(self, data: bytes, seq_num: int):
+        Logger.info("收到预充请求")
+        if self.patch_state == PatchState.FILLED:
+            self.patch_state = PatchState.PRIMING
+            Logger.info("  预充已开始")
+        elif self.patch_state == PatchState.PRIMING:
+            Logger.info("  预充进行中")
+        response = self._build_response_packet(CommandType.PRIME, seq_num, b'')
+        self.gatt_server.send_notification(response)
+
+    def _handle_poll_patch_request(self, data: bytes, seq_num: int):
+        Logger.debug("收到轮询 Patch 请求")
+        sync_data = self._build_synchronize_data()
+        response = self._build_response_packet(CommandType.POLL_PATCH, seq_num, sync_data)
+        self.gatt_server.send_notification(response)
+
+    def _handle_read_bolus_state_request(self, data: bytes, seq_num: int):
+        Logger.info("收到读取大剂量状态请求")
+        response_data = bytearray()
+        if self.current_bolus:
+            bolus_id = self.current_bolus.get('id', 1)
+            response_data.append(bolus_id)
+            response_data.append(0x01)
+            amount_raw = int(self.current_bolus['amount'] / 0.05)
+            delivered_raw = int(amount_raw * self.bolus_delivery_progress / 100)
+            remaining_raw = amount_raw - delivered_raw
+            response_data.extend(delivered_raw.to_bytes(2, 'little'))
+            response_data.extend(remaining_raw.to_bytes(2, 'little'))
+            response_data.extend(amount_raw.to_bytes(2, 'little'))
+            response_data.extend((0).to_bytes(2, 'little'))
+        else:
+            response_data.append(0x00)
+            response_data.append(0x00)
+            response_data.extend((0).to_bytes(2, 'little'))
+            response_data.extend((0).to_bytes(2, 'little'))
+            response_data.extend((0).to_bytes(2, 'little'))
+            response_data.extend((0).to_bytes(2, 'little'))
+        response = self._build_response_packet(CommandType.READ_BOLUS_STATE, seq_num, response_data)
+        self.gatt_server.send_notification(response)
+
+    def _handle_set_bolus_motor_request(self, data: bytes, seq_num: int):
+        Logger.info("收到设置大剂量电机请求")
+        if len(data) >= 9:
+            motor_steps = int.from_bytes(data[6:8], 'little')
+            direction = data[8]
+            Logger.info(f"  电机步数: {motor_steps}, 方向: {direction}")
+        response = self._build_response_packet(CommandType.SET_BOLUS_MOTOR, seq_num, b'')
+        self.gatt_server.send_notification(response)
+
+    def _handle_get_record_request(self, data: bytes, seq_num: int):
+        Logger.info("收到获取记录请求")
+        if len(data) >= 8:
+            record_type = data[6]
+            record_index = data[7]
+            Logger.info(f"  记录类型: {record_type}, 索引: {record_index}")
+        response_data = bytearray()
+        response_data.append(0x00)
+        response_data.extend((0).to_bytes(3, 'little'))
+        response = self._build_response_packet(CommandType.GET_RECORD, seq_num, response_data)
+        self.gatt_server.send_notification(response)
+
+    def _build_response_packet(self, cmd_type: int, seq_num: int, data: bytes) -> bytes:
+        header = bytearray([len(data) + 6, cmd_type, seq_num, 0])
+        header += (0).to_bytes(2, 'little')
+        tmp = bytes(header) + data
+        crc = crc8_calculate(tmp)
+        return tmp + bytes([crc]) + bytes([0])
+
+    def _build_error_response(self, cmd_type: int, seq_num: int, error_code: int) -> bytes:
+        error_data = bytearray([0, 0])
+        error_data.extend(error_code.to_bytes(2, 'little'))
+        return self._build_response_packet(cmd_type, seq_num, error_data)
+
+
+# 全局单例
+simulator = M640GPumpSimulator()
