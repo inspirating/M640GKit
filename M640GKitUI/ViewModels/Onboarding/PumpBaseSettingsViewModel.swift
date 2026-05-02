@@ -33,11 +33,11 @@ class PumpBaseSettingsViewModel: ObservableObject {
             return
         }
 
-        guard let snData = Data(hex: serialNumber), snData.count == 4 else {
-            logger.error("Serial Number is invalid hex format: \(serialNumber)")
-            errorMessage = "Serial Number is invalid hex format"
-            return
-        }
+//        guard let snData = Data(hex: serialNumber), snData.count == 4 else {
+//            logger.error("Serial Number is invalid hex format: \(serialNumber)")
+//            errorMessage = "Serial Number is invalid hex format"
+//            return
+//        }
 
         guard let pumpManager = pumpManager else {
             logger.error("No pump manager available")
@@ -45,18 +45,28 @@ class PumpBaseSettingsViewModel: ObservableObject {
             return
         }
 
+        // 将任意8字符转换为4字节Data（非hex字符替换为0）
+        let validHexChars = CharacterSet(charactersIn: "0123456789abcdefABCDEF")
+        let cleaned = serialNumber.map { char -> String in
+            let s = String(char)
+            return s.rangeOfCharacter(from: validHexChars) != nil ? s.lowercased() : "0"
+        }.joined()
+        
+        let snData = Data(hex: cleaned) ?? Data([0x00, 0x00, 0x00, 0x00])
+        let finalSnData = snData.count == 4 ? snData : Data([0x00, 0x00, 0x00, 0x00])
+
         if pumpManager.state.pumpSN.hexEncodedString().uppercased() != serialNumber.uppercased() {
             logger.info("Serial number change detected -> Removing references to old pump base...")
             pumpManager.bluetooth.clearPeripheral()
         }
 
-        pumpManager.state.pumpSN = snData
-        guard pumpManager.state.model != "INVALID" else {
-            errorMessage = "Incorrect serial number received"
-            return
-        }
-
-        errorMessage = ""
+        pumpManager.state.pumpSN = finalSnData
+//        guard pumpManager.state.model != "INVALID" else {
+//            errorMessage = "Incorrect serial number received"
+//            return
+//        }
+//
+//        errorMessage = ""
 
         pumpManager.state.isOnboarded = true
         pumpManager.notifyStateDidChange()
