@@ -149,8 +149,8 @@ class SynchronizeResponseParser:
         if field_mask & SynchronizeResponseParser.MASK_BATTERY:
             value = int.from_bytes(sync_data[offset:offset+3], 'little')
             result['battery'] = {
-                'voltage_a': (value & 0xFFF) * 0.001,
-                'voltage_b': (value >> 12) * 0.001
+                'voltage_a': (value & 0xFFF) / 512,
+                'voltage_b': (value >> 12) / 512
             }
             offset += 3
 
@@ -162,17 +162,19 @@ class SynchronizeResponseParser:
             offset += 4
 
         if field_mask & SynchronizeResponseParser.MASK_ALARM:
-            alarm_count = sync_data[offset]
-            offset += 1
-            result['active_alarms'] = list(sync_data[offset:offset+alarm_count])
-            offset += alarm_count
+            flags = int.from_bytes(sync_data[offset:offset+2], 'little')
+            if flags != 0:
+                for i in range(3):
+                    if flags & (1 << i):
+                        result['active_alarms'].append(1 << i)
+            offset += 4
 
         if field_mask & SynchronizeResponseParser.MASK_AGE:
             result['patch_age'] = int.from_bytes(sync_data[offset:offset+4], 'little')
             offset += 4
 
         if field_mask & SynchronizeResponseParser.MASK_MAGNETO_PLACE:
-            result['magneto_placement'] = int.from_bytes(sync_data[offset:offset+2], 'little') * 0.01
+            result['magneto_placement'] = int.from_bytes(sync_data[offset:offset+2], 'little')
             offset += 2
 
         return result

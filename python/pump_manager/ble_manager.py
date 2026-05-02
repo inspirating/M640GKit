@@ -81,11 +81,17 @@ class M640GKitBLE:
     - 发送数据包并等待响应
     - 处理通知
     - 管理连接状态
+    - 自动重连
+    - 心跳保活
     """
 
     SCAN_TIMEOUT_MS = 15000
     CONNECT_TIMEOUT_MS = 15000
     WRITE_TIMEOUT_MS = 30000
+    PING_INTERVAL_MS = 5000
+    RECONNECT_MAX_ATTEMPTS = 5
+    RECONNECT_INTERVAL_MS = 3000
+    CONNECTION_IDLE_TIMEOUT_MS = 60000
 
     def __init__(self, name: str = "M640G"):
         self.name = name
@@ -113,6 +119,14 @@ class M640GKitBLE:
 
         self._response_callback = None
         self._notify_callback = None
+
+        self._reconnect_attempts = 0
+        self._last_activity_time = 0
+        self._ping_timer = 0
+        self._rssi_history = []
+        self._max_rssi_history = 20
+        self._write_queue = []
+        self._is_processing_queue = False
 
         self._register_callbacks()
 
@@ -153,12 +167,16 @@ class M640GKitBLE:
                 'name': name,
                 'adv_data': adv_data
             })
+            self.add_rssi(rssi)
             if self.callbacks:
                 self.callbacks.on_scan_result(addr, rssi, name, adv_data)
 
     def _handle_connect(self, conn_id, addr):
         self._conn_id = conn_id
         self._server_addr = addr
+        self._reconnect_attempts = 0
+        self._last_activity_time = time.ticks_ms()
+        self._ping_timer = time.ticks_ms()
         self._set_state(BLEState.CONNECTED)
         if self.callbacks:
             self.callbacks.on_connect(conn_id, addr)
@@ -172,11 +190,16 @@ class M640GKitBLE:
         if self.callbacks:
             self.callbacks.on_disconnect(conn_id, addr)
 
+        if self.auto_reconnect and self._server_addr:
+            self._schedule_reconnect()
+
     def _handle_write_done(self, conn_id, value, status):
+        self.update_activity()
         if self.callbacks:
             self.callbacks.on_write(conn_id, value)
 
     def _handle_notify(self, conn_id, value_handle, data):
+        self.update_activity()
         if self._is_read_characteristic(value_handle):
             if self._notify_callback:
                 self._notify_callback(conn_id, value_handle, data)
@@ -401,3 +424,95 @@ class M640GKitBLE:
             编码后的数据包列表
         """
         return packet.encode(sequence_number)
+
+    def _schedule_reconnect(self):
+        if self._reconnect_attempts >= self.RECONNECT_MAX_ATTEMPTS:
+            if self.callbacks:
+                self.callbacks.on_error("reconnect_failed",
+                                        f"重连失败, 已达最大尝试次数 {self.RECONNECT_MAX_ATTEMPTS}")
+            return
+
+        self._reconnect_attempts += 1
+        time.sleep_ms(self.RECONNECT_INTERVAL_MS)
+
+        if self._server_addr:
+            try:
+                self.connect(self._server_addr)
+            except Exception as e:
+                if self.callbacks:
+                    self.callbacks.on_error("reconnect_error", str(e))
+
+    def check_connection_health(self):
+        now = time.ticks_ms()
+
+        if self.is_connected:
+            elapsed_since_activity = time.ticks_diff(now, self._last_activity_time)
+            if elapsed_since_activity > self.CONNECTION_IDLE_TIMEOUT_MS:
+                if self.callbacks:
+                    self.callbacks.on_error("connection_idle",
+                                            "连接空闲超时, 可能已断开")
+                self.disconnect()
+                return False
+
+            elapsed_since_ping = time.ticks_diff(now, self._ping_timer)
+            if elapsed_since_ping >= self.PING_INTERVAL_MS:
+                self._send_ping()
+                self._ping_timer = now
+
+        self._check_write_timeout()
+        return True
+
+    def _send_ping(self):
+        if not self.is_connected or not self._tx_handle:
+            return
+
+        try:
+            ping_data = bytes([0x01, 0x00, 0x00, 0x00])
+            self.ble.gattc_write(self._conn_id, self._tx_handle, ping_data)
+        except Exception:
+            pass
+
+    def update_activity(self):
+        self._last_activity_time = time.ticks_ms()
+
+    def add_rssi(self, rssi: int):
+        self._rssi_history.append(rssi)
+        if len(self._rssi_history) > self._max_rssi_history:
+            self._rssi_history.pop(0)
+
+    def get_average_rssi(self) -> int:
+        if not self._rssi_history:
+            return 0
+        return sum(self._rssi_history) // len(self._rssi_history)
+
+    def get_connection_stats(self) -> dict:
+        return {
+            'state': self._state,
+            'reconnect_attempts': self._reconnect_attempts,
+            'average_rssi': self.get_average_rssi(),
+            'write_queue_size': len(self._write_queue)
+        }
+
+    def enqueue_write(self, packet):
+        self._write_queue.append(packet)
+        if not self._is_processing_queue:
+            self._process_write_queue()
+
+    def _process_write_queue(self):
+        if not self._write_queue:
+            self._is_processing_queue = False
+            return
+
+        self._is_processing_queue = True
+        packet = self._write_queue.pop(0)
+
+        success, response, error_code = self.write_packet(packet)
+
+        if not success and error_code == 0x0101:
+            self._write_queue.insert(0, packet)
+            time.sleep_ms(100)
+
+        if self._write_queue:
+            self._process_write_queue()
+        else:
+            self._is_processing_queue = False

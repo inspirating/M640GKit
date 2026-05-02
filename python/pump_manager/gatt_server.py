@@ -157,27 +157,9 @@ class GATTServer:
 
         return adv_data
 
-    def send_notification(self, data: bytes, use_crc_hack: bool = True) -> bool:
-        """
-        发送通知到已订阅的客户端
-
-        参数:
-            data: 要发送的数据
-            use_crc_hack: 是否使用 CRC 补零处理 (默认 True)
-
-        返回:
-            是否发送成功
-        """
+    def send_notification(self, data: bytes) -> bool:
         if self._read_handle is None:
             return False
-
-        if use_crc_hack and len(data) > 0 and data[1] != 0x00:
-            if len(data) >= 6:
-                expected_crc = crc8_calculate(data[:-2])
-                actual_data = list(data)
-                if len(actual_data) >= 2 and actual_data[-2] != expected_crc:
-                    actual_data[-1] = 0x00
-                    data = bytes(actual_data)
 
         try:
             self.ble.gatt_server_notify(self._read_handle, data, True)
@@ -185,21 +167,6 @@ class GATTServer:
         except Exception as e:
             print(f"发送通知失败: {e}")
             return False
-
-    def send_notification_with_crc_hack(self, data: bytes) -> bool:
-        """
-        发送通知到已订阅的客户端 (带 CRC 补零)
-
-        如果通知数据缺少 CRC 值,自动补 0x00
-        这与 Swift 端的实现保持一致
-
-        参数:
-            data: 要发送的数据
-
-        返回:
-            是否发送成功
-        """
-        return self.send_notification(data, use_crc_hack=True)
 
     def _gatt_server_irq(self, event, data):
         """GATT 服务器中断处理函数"""
