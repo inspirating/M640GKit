@@ -296,6 +296,9 @@ public class M640GKitPumpState: RawRepresentable {
     }
 
     public var model: String {
+        guard !pumpSN.isEmpty else {
+            return "INVALID"
+        }
         let type = Crypto.simpleDecrypt(Data(pumpSN.reversed())).toUInt64()
 
         if (126_000_000 ..< 126_999_999).contains(type) {
@@ -311,7 +314,7 @@ public class M640GKitPumpState: RawRepresentable {
         } else if (148_000_000 ..< 148_999_999).contains(type) {
             return "MD8301"
         } else {
-            return "INVALID"
+            return "MD8301"
         }
     }
 
