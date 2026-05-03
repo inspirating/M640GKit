@@ -6,6 +6,11 @@ M640GKit ESP32 泵模拟器核心 (C++ 版本)
 该程序模拟 M640G 胰岛素泵, 作为 GATT Server 运行,
 供 iOS Loop app 或其他 BLE 客户端连接和通信
 
+通信流程:
+  1. BLE 连接 → 2. 认证(AUTH_REQ) → 3. 同步(SYNCHRONIZE) →
+  4. 订阅(SUBSCRIBE) → 5. 预充(PRIME) → 6. 激活(ACTIVATE) →
+  7. 正常运行(大剂量/基础率/暂停等)
+
 对应 Python: pump_simulator.py
 ================================================================================
 */
@@ -17,6 +22,7 @@ M640GKit ESP32 泵模拟器核心 (C++ 版本)
 #include <vector>
 #include <cstdint>
 #include <cstring>
+#include <cmath>
 
 #include "enums.h"
 #include "encryption/crc8.h"
@@ -35,7 +41,6 @@ M640GKit ESP32 泵模拟器核心 (C++ 版本)
 
 namespace M640GKit {
 
-// 常量定义
 static constexpr const char* PUMP_NAME = "MT";
 static constexpr uint8_t PUMP_SN[4] = {0x28, 0xD8, 0x12, 0x4A};
 static constexpr uint8_t DEVICE_TYPE = 1;
@@ -48,7 +53,8 @@ static constexpr double MAX_BASAL_RATE = 60.0;
 static constexpr double DEFAULT_HOURLY_MAX = 25.0;
 static constexpr double DEFAULT_DAILY_MAX = 200.0;
 
-// 日志级别
+static constexpr uint32_t M640G_BASE_UNIX = 1388534400; // 2014-01-01T00:00:00+0000
+
 enum class LogLevel : uint8_t {
     DEBUG = 0,
     INFO = 1,
@@ -73,15 +79,24 @@ public:
         }
     }
 
+    static void hexDump(const char* tag, const char* direction, const uint8_t* data, size_t len) {
+        if (static_cast<uint8_t>(LogLevel::DEBUG) >= static_cast<uint8_t>(currentLevel)) {
+            Serial.printf("[%s] %s (%d bytes): ", tag, direction, len);
+            for (size_t i = 0; i < len; i++) {
+                Serial.printf("%02X ", data[i]);
+            }
+            Serial.println();
+        }
+    }
+
     static void debug(const char* msg) { log(LogLevel::DEBUG, "BLE", msg); }
     static void info(const char* msg) { log(LogLevel::INFO, "BLE", msg); }
     static void warning(const char* msg) { log(LogLevel::WARNING, "BLE", msg); }
     static void error(const char* msg) { log(LogLevel::ERROR, "BLE", msg); }
 };
 
-LogLevel Logger::currentLevel = LogLevel::INFO;
+LogLevel Logger::currentLevel = LogLevel::DEBUG;
 
-// 模拟器状态
 enum class SimulatorState : uint8_t {
     INITIALIZING = 0,
     READY,
@@ -91,14 +106,12 @@ enum class SimulatorState : uint8_t {
     ERROR
 };
 
-// 大剂量数据结构
 struct BolusInfo {
     uint8_t type;
     double amount;
     uint32_t startTime;
 };
 
-// 临时基础率数据结构
 struct TempBasalInfo {
     uint8_t type;
     double rate;
@@ -108,35 +121,33 @@ struct TempBasalInfo {
 class M640GPumpSimulator {
 public:
     M640GPumpSimulator() : initialized(false), lastUpdateTime(0), updateIntervalMs(100),
-        patchState(PatchState::ACTIVE), simulatorState(SimulatorState::INITIALIZING),
-        reservoir(200.0), activeInsulin(0.0), batteryVoltage(3.8), batteryLevel(100),
+        patchState(PatchState::FILLED), simulatorState(SimulatorState::INITIALIZING),
+        reservoir(MAX_RESERVOIR), activeInsulin(0.0), batteryVoltage(3.8), batteryLevel(100),
         patchStartTime(0), totalElapsedTime(0), currentBolus(nullptr),
-        bolusDeliveryProgress(0), tempBasal(nullptr), tempBasalRemaining(0),
+        bolusDeliveryProgress(0), primeProgress(0), tempBasal(nullptr), tempBasalRemaining(0),
         isConnected(false), isSubscribed(false), sessionToken{0}, pumpTimezone(0),
         timeSyncPending(false), sequenceNumber(0), pingCounter(0), lastPingTime(0),
-        connectionTimeoutMs(15000), lastActivityTime(0) {
+        connectionTimeoutMs(15000), lastActivityTime(0), patchId(0),
+        lastNotifiedState(PatchState::NONE) {
         currentBolus = nullptr;
         tempBasal = nullptr;
     }
 
     void setup() {
-        Logger::info("=");
-        Logger::info("M640G 泵模拟器初始化");
-        Logger::info("=");
+        Logger::info("========================================");
+        Logger::info("  M640G 泵模拟器初始化");
+        Logger::info("========================================");
 
-        // 初始化随机数
         randomSeed(millis());
 
-        // 生成会话令牌
         generateSessionToken();
 
-        // 设置初始时间
-        patchStartTime = millis() / 1000;
+        uint32_t now = millis() / 1000;
+        patchStartTime = now;
+        patchId = random(65535) + 1;
 
-        // 创建默认基础率配置文件
         createDefaultBasalProfile();
 
-        // 初始化 GATT Server
         gattServer.onWriteRequest = handleWriteRequestStatic;
         gattServer.onSubscribe = handleSubscribeStatic;
         gattServer.onConnect = handleConnectStatic;
@@ -147,14 +158,13 @@ public:
         initialized = true;
         lastUpdateTime = millis();
 
-        Logger::info("=");
-        Logger::info("M640G 泵模拟器启动");
-        Logger::info("=");
         Logger::info("设备名称: MT");
         Logger::info("序列号: 28D8124A");
         Logger::info("设备类型: 1");
         Logger::info("软件版本: 1.0.0");
-        Logger::info("=");
+        Logger::info("初始状态: FILLED (等待预充)");
+        Logger::info("Patch ID: " + String(patchId));
+        Logger::info("========================================");
     }
 
     void loop() {
@@ -175,59 +185,104 @@ private:
     uint32_t lastUpdateTime;
     uint16_t updateIntervalMs;
 
-    // 泵状态
     PatchState patchState;
     SimulatorState simulatorState;
 
-    // 储药器和胰岛素
     double reservoir;
     double activeInsulin;
 
-    // 电池
     double batteryVoltage;
     uint8_t batteryLevel;
 
-    // 时间
     uint32_t patchStartTime;
     uint32_t totalElapsedTime;
+    uint32_t patchId;
 
-    // 大剂量
     BolusInfo* currentBolus;
     uint8_t bolusDeliveryProgress;
     std::vector<BolusInfo> bolusHistory;
 
-    // 基础率
+    uint8_t primeProgress;
+
     std::vector<uint8_t> basalProfile;
     TempBasalInfo* tempBasal;
     double tempBasalRemaining;
 
-    // 连接状态
     bool isConnected;
     bool isSubscribed;
     std::vector<uint32_t> authenticatedClients;
 
-    // 会话
     uint8_t sessionToken[4];
     int16_t pumpTimezone;
     bool timeSyncPending;
 
-    // GATT Server
     GATTServer gattServer;
     ConnectionTracker connectionTracker;
 
-    // 序列号和计时器
     uint8_t sequenceNumber;
     uint32_t pingCounter;
     uint32_t lastPingTime;
     uint16_t connectionTimeoutMs;
     uint32_t lastActivityTime;
 
-    // 数据包缓冲
     std::vector<uint8_t> packetBuffer;
     uint8_t expectedPacketLen;
     uint8_t currentCmdType;
     uint8_t currentSeqNum;
     uint8_t currentPkgIndex;
+
+    PatchState lastNotifiedState;
+
+    const char* getStateName(PatchState s) {
+        switch (s) {
+            case PatchState::NONE: return "NONE";
+            case PatchState::IDLE: return "IDLE";
+            case PatchState::FILLED: return "FILLED";
+            case PatchState::PRIMING: return "PRIMING";
+            case PatchState::PRIMED: return "PRIMED";
+            case PatchState::EJECTING: return "EJECTING";
+            case PatchState::EJECTED: return "EJECTED";
+            case PatchState::ACTIVE: return "ACTIVE";
+            case PatchState::ACTIVE_ALT: return "ACTIVE_ALT";
+            case PatchState::SUSPENDED: return "SUSPENDED";
+            case PatchState::STOPPED: return "STOPPED";
+            case PatchState::OCCLUSION: return "OCCLUSION";
+            case PatchState::EXPIRED: return "EXPIRED";
+            case PatchState::RESERVOIR_EMPTY: return "RESERVOIR_EMPTY";
+            case PatchState::PATCH_FAULT: return "PATCH_FAULT";
+            case PatchState::PATCH_FAULT2: return "PATCH_FAULT2";
+            default: return "UNKNOWN";
+        }
+    }
+
+    const char* getCommandName(uint8_t cmd) {
+        switch (static_cast<CommandType>(cmd)) {
+            case CommandType::SYNCHRONIZE: return "SYNCHRONIZE";
+            case CommandType::SUBSCRIBE: return "SUBSCRIBE";
+            case CommandType::AUTH_REQ: return "AUTH_REQ";
+            case CommandType::GET_DEVICE_TYPE: return "GET_DEVICE_TYPE";
+            case CommandType::SET_TIME: return "SET_TIME";
+            case CommandType::GET_TIME: return "GET_TIME";
+            case CommandType::SET_TIME_ZONE: return "SET_TIME_ZONE";
+            case CommandType::PRIME: return "PRIME";
+            case CommandType::ACTIVATE: return "ACTIVATE";
+            case CommandType::SET_BOLUS: return "SET_BOLUS";
+            case CommandType::CANCEL_BOLUS: return "CANCEL_BOLUS";
+            case CommandType::SET_BASAL_PROFILE: return "SET_BASAL_PROFILE";
+            case CommandType::SET_TEMP_BASAL: return "SET_TEMP_BASAL";
+            case CommandType::CANCEL_TEMP_BASAL: return "CANCEL_TEMP_BASAL";
+            case CommandType::SUSPEND_PUMP: return "SUSPEND_PUMP";
+            case CommandType::RESUME_PUMP: return "RESUME_PUMP";
+            case CommandType::POLL_PATCH: return "POLL_PATCH";
+            case CommandType::STOP_PATCH: return "STOP_PATCH";
+            case CommandType::READ_BOLUS_STATE: return "READ_BOLUS_STATE";
+            case CommandType::SET_PATCH: return "SET_PATCH";
+            case CommandType::SET_BOLUS_MOTOR: return "SET_BOLUS_MOTOR";
+            case CommandType::GET_RECORD: return "GET_RECORD";
+            case CommandType::CLEAR_ALARM: return "CLEAR_ALARM";
+            default: return "UNKNOWN";
+        }
+    }
 
     void generateSessionToken() {
         for (int i = 0; i < 4; i++) {
@@ -236,14 +291,17 @@ private:
     }
 
     void createDefaultBasalProfile() {
-        double defaultRates[32] = {
+        double defaultRates[48] = {
             0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6,
             0.6, 0.6, 0.6, 0.6, 0.7, 0.7, 0.8, 0.9,
             1.0, 1.0, 0.9, 0.8, 0.8, 0.8, 0.8, 0.7,
-            0.7, 0.7, 0.8, 0.9, 1.0, 0.9, 0.8, 0.7
+            0.7, 0.7, 0.8, 0.9, 1.0, 0.9, 0.8, 0.7,
+            0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6,
+            0.6, 0.6, 0.6, 0.6, 0.7, 0.7, 0.8, 0.9
         };
-        for (int i = 0; i < 32; i++) {
-            uint16_t rawValue = static_cast<uint16_t>(defaultRates[i] / 0.05);
+        basalProfile.clear();
+        for (int i = 0; i < 48; i++) {
+            uint16_t rawValue = static_cast<uint16_t>(round(defaultRates[i] / 0.05));
             basalProfile.push_back(rawValue & 0xFF);
             basalProfile.push_back((rawValue >> 8) & 0xFF);
         }
@@ -254,12 +312,12 @@ private:
         updateBolusDelivery();
         updateTempBasal();
         updatePrimeProgress();
-        checkStateNotifications();
+        checkAndSendStateNotification();
         sendPingHeartbeat();
         checkConnectionTimeout();
 
         if (random(1000) == 0) {
-            batteryVoltage = max(2.8, batteryVoltage - 0.01);
+            batteryVoltage = max(2.8, batteryVoltage - 0.001);
             batteryLevel = max(0, batteryLevel - 1);
         }
 
@@ -272,16 +330,16 @@ private:
         if (currentBolus == nullptr) return;
 
         bolusDeliveryProgress += 2;
-        double delivered = currentBolus->amount * (bolusDeliveryProgress / 100.0);
-        activeInsulin += delivered;
-
         if (bolusDeliveryProgress >= 100) {
+            double delivered = currentBolus->amount;
+            reservoir = max(0.0, reservoir - delivered);
+            activeInsulin = max(0.0, activeInsulin - delivered);
             bolusHistory.push_back(*currentBolus);
-            reservoir = max(0.0, reservoir - currentBolus->amount);
+            Logger::info("大剂量输送完成: " + String(currentBolus->amount) + "U");
             delete currentBolus;
             currentBolus = nullptr;
             bolusDeliveryProgress = 0;
-            Logger::info("大剂量输送完成");
+            sendStateNotification();
         }
     }
 
@@ -295,50 +353,41 @@ private:
             delete tempBasal;
             tempBasal = nullptr;
             tempBasalRemaining = 0;
+            sendStateNotification();
         }
     }
 
     void updatePrimeProgress() {
-        static uint8_t primeProgress = 0;
         if (patchState == PatchState::PRIMING) {
             primeProgress++;
-            if (primeProgress >= 240) {
-                patchState = PatchState::PRIMED;
-                Logger::info("预充完成");
+            if (primeProgress >= 10) {
+                setPatchState(PatchState::PRIMED);
+                primeProgress = 0;
+                Logger::info("预充完成 -> PRIMED");
             }
         }
     }
 
-    void checkStateNotifications() {
-        static PatchState lastNotifiedState = PatchState::NONE;
-        if (patchState == lastNotifiedState) return;
+    void setPatchState(PatchState newState) {
+        if (patchState == newState) return;
+        PatchState oldState = patchState;
+        patchState = newState;
+        Logger::info("状态变更: " + String(getStateName(oldState)) + " -> " + String(getStateName(newState)));
+        sendStateNotification();
+    }
 
-        bool shouldNotify = false;
-        if (patchState == PatchState::SUSPENDED) {
-            if (totalElapsedTime % 7200 == 0) {
-                Logger::info("通知: 每日最大暂停");
-                shouldNotify = true;
-            }
-        } else if (patchState == PatchState::OCCLUSION) {
-            Logger::info("通知: 堵管报警");
-            shouldNotify = true;
-        } else if (patchState == PatchState::PATCH_FAULT) {
-            Logger::info("通知: Patch 故障");
-            shouldNotify = true;
-        } else if (patchState == PatchState::RESERVOIR_EMPTY) {
-            Logger::info("通知: 储药器空");
-            shouldNotify = true;
-        }
-
-        if (shouldNotify) {
+    void checkAndSendStateNotification() {
+        if (patchState != lastNotifiedState) {
             lastNotifiedState = patchState;
             sendStateNotification();
         }
     }
 
     void sendStateNotification() {
+        if (!isSubscribed || !isConnected) return;
         std::vector<uint8_t> syncData = buildSynchronizeData();
-        gattServer.sendNotification(syncData.data(), syncData.size(), false);
+        sendNotificationPacket(syncData);
+        Logger::debug("发送状态通知, 状态=" + String(getStateName(patchState)));
     }
 
     void sendPingHeartbeat() {
@@ -355,6 +404,7 @@ private:
             pingData[7] = 0;
 
             gattServer.sendNotificationWithCrcHack(pingData, 8);
+            Logger::debug("发送 Ping 心跳 #" + String(pingCounter));
         }
     }
 
@@ -371,14 +421,14 @@ private:
     }
 
     void sendPeriodicNotification() {
-        if (totalElapsedTime % 5 == 0) {
+        if (totalElapsedTime % 10 == 0) {
             sendSynchronizeNotification();
         }
     }
 
     void sendSynchronizeNotification() {
         std::vector<uint8_t> syncData = buildSynchronizeData();
-        gattServer.sendNotification(syncData.data(), syncData.size(), false);
+        sendNotificationPacket(syncData);
     }
 
     std::vector<uint8_t> buildSynchronizeData() {
@@ -396,15 +446,18 @@ private:
         data.push_back((fieldMask >> 8) & 0xFF);
 
         if (fieldMask & MASK_SUSPEND) {
-            data.push_back(totalElapsedTime & 0xFF);
-            data.push_back((totalElapsedTime >> 8) & 0xFF);
-            data.push_back((totalElapsedTime >> 16) & 0xFF);
-            data.push_back((totalElapsedTime >> 24) & 0xFF);
+            uint32_t suspendTime = (patchState == PatchState::SUSPENDED) ? totalElapsedTime : 0;
+            data.push_back(suspendTime & 0xFF);
+            data.push_back((suspendTime >> 8) & 0xFF);
+            data.push_back((suspendTime >> 16) & 0xFF);
+            data.push_back((suspendTime >> 24) & 0xFF);
         }
 
         if (fieldMask & MASK_NORMAL_BOLUS) {
             if (currentBolus) {
-                data.push_back(currentBolus->type | (bolusDeliveryProgress >= 100 ? 0x80 : 0));
+                uint8_t flags = currentBolus->type & 0x7F;
+                if (bolusDeliveryProgress >= 100) flags |= 0x80;
+                data.push_back(flags);
                 uint16_t delivered = static_cast<uint16_t>(currentBolus->amount * (bolusDeliveryProgress / 100.0) / 0.05);
                 data.push_back(delivered & 0xFF);
                 data.push_back((delivered >> 8) & 0xFF);
@@ -422,10 +475,17 @@ private:
         }
 
         if (fieldMask & MASK_BASAL) {
-            data.push_back(tempBasal ? static_cast<uint8_t>(BasalType::ABSOLUTE_TEMP) : static_cast<uint8_t>(BasalType::STANDARD));
+            BasalType basalType = BasalType::STANDARD;
+            if (tempBasal) {
+                basalType = BasalType::ABSOLUTE_TEMP;
+            } else if (patchState == PatchState::SUSPENDED) {
+                basalType = BasalType::SUSPEND_MANUAL;
+            } else if (patchState == PatchState::STOPPED) {
+                basalType = BasalType::STOP;
+            }
+            data.push_back(static_cast<uint8_t>(basalType));
             data.push_back(0);
             data.push_back(0);
-            uint16_t patchId = random(65535) + 1;
             data.push_back(patchId & 0xFF);
             data.push_back((patchId >> 8) & 0xFF);
             uint32_t startTime = patchStartTime;
@@ -433,7 +493,7 @@ private:
             data.push_back((startTime >> 8) & 0xFF);
             data.push_back((startTime >> 16) & 0xFF);
             data.push_back((startTime >> 24) & 0xFF);
-            uint16_t rate = tempBasal ? static_cast<uint16_t>(tempBasal->rate / 0.05) : static_cast<uint16_t>(0.6 / 0.05);
+            uint16_t rate = tempBasal ? static_cast<uint16_t>(round(tempBasal->rate / 0.05)) : static_cast<uint16_t>(round(0.6 / 0.05));
             uint16_t delivery = tempBasal ? rate : 0;
             uint32_t rateDelivery = (static_cast<uint32_t>(delivery) << 12) | (rate & 0x0FFF);
             data.push_back(rateDelivery & 0xFF);
@@ -442,11 +502,11 @@ private:
         }
 
         if (fieldMask & MASK_SETUP) {
-            data.push_back(patchState == PatchState::PRIMING ? 100 : 0);
+            data.push_back(patchState == PatchState::PRIMING ? primeProgress : 0);
         }
 
         if (fieldMask & MASK_RESERVOIR) {
-            uint16_t reservoirRaw = static_cast<uint16_t>(reservoir / 0.05);
+            uint16_t reservoirRaw = static_cast<uint16_t>(round(reservoir / 0.05));
             data.push_back(reservoirRaw & 0xFF);
             data.push_back((reservoirRaw >> 8) & 0xFF);
         }
@@ -459,8 +519,8 @@ private:
         }
 
         if (fieldMask & MASK_BATTERY) {
-            uint16_t voltageA = static_cast<uint16_t>(batteryVoltage * 512);
-            uint16_t voltageB = static_cast<uint16_t>(batteryVoltage * 512);
+            uint16_t voltageA = static_cast<uint16_t>(round(batteryVoltage * 512));
+            uint16_t voltageB = static_cast<uint16_t>(round(batteryVoltage * 512));
             uint32_t packed = (static_cast<uint32_t>(voltageB) << 12) | (voltageA & 0x0FFF);
             data.push_back(packed & 0xFF);
             data.push_back((packed >> 8) & 0xFF);
@@ -470,8 +530,8 @@ private:
         if (fieldMask & MASK_STORAGE) {
             data.push_back(0);
             data.push_back(0);
-            data.push_back(0);
-            data.push_back(0);
+            data.push_back(patchId & 0xFF);
+            data.push_back((patchId >> 8) & 0xFF);
         }
 
         if (fieldMask & MASK_ALARM) {
@@ -515,10 +575,7 @@ private:
         return data;
     }
 
-    // 静态回调处理函数
     static void handleWriteRequestStatic(const uint8_t* data, size_t len) {
-        // 这里需要通过单例或全局指针访问实例
-        // 简化处理: 使用全局实例
         extern M640GPumpSimulator* gSimulator;
         if (gSimulator) {
             gSimulator->handleWriteRequest(data, len);
@@ -549,8 +606,10 @@ private:
     void handleWriteRequest(const uint8_t* data, size_t len) {
         lastActivityTime = millis();
 
+        Logger::hexDump("RX", "<--", data, len);
+
         if (len < 4) {
-            Logger::warning("数据长度太短");
+            Logger::warning("数据长度太短: " + String(len));
             return;
         }
 
@@ -559,10 +618,17 @@ private:
         uint8_t seqNum = data[2];
         uint8_t pkgIndex = data[3];
 
-        if (cmdType == 0x00) return;
+        if (cmdType == 0x00) {
+            Logger::debug("忽略 Ping 消息");
+            return;
+        }
+
+        Logger::info("收到命令: " + String(getCommandName(cmdType)) +
+            " len=" + String(packetLen) + " seq=" + String(seqNum) + " pkg=" + String(pkgIndex));
 
         if (packetBuffer.empty()) {
-            packetBuffer.assign(data, data + len - 1);
+            size_t copyLen = min((size_t)packetLen, len - 1);
+            packetBuffer.assign(data, data + copyLen);
             expectedPacketLen = packetLen;
             currentCmdType = cmdType;
             currentSeqNum = seqNum;
@@ -573,19 +639,24 @@ private:
                 packetBuffer.clear();
                 expectedPacketLen = 0;
                 currentCmdType = 0;
+            } else {
+                Logger::debug("等待更多数据包... (" + String(packetBuffer.size()) + "/" + String(expectedPacketLen) + ")");
             }
         } else {
             if (cmdType != currentCmdType || pkgIndex != currentPkgIndex + 1) {
-                Logger::error("包索引不匹配");
-                sendErrorResponse(static_cast<CommandType>(currentCmdType), 0x0102);
+                Logger::error("包索引不匹配: 期望 pkg=" + String(currentPkgIndex + 1) + " 收到 pkg=" + String(pkgIndex));
+                sendErrorResponse(static_cast<CommandType>(currentCmdType), BLEErrorCode::TIMEOUT);
                 packetBuffer.clear();
                 expectedPacketLen = 0;
                 currentCmdType = 0;
                 return;
             }
 
-            packetBuffer.insert(packetBuffer.end(), data + 4, data + len - 1);
+            size_t copyLen = min((size_t)(expectedPacketLen - packetBuffer.size()), len - 4);
+            packetBuffer.insert(packetBuffer.end(), data + 4, data + 4 + copyLen);
             currentPkgIndex = pkgIndex;
+
+            Logger::debug("收到分包 " + String(pkgIndex) + " (" + String(packetBuffer.size()) + "/" + String(expectedPacketLen) + ")");
 
             if (packetBuffer.size() >= expectedPacketLen) {
                 processCompleteCommand(packetBuffer.data(), expectedPacketLen);
@@ -600,29 +671,43 @@ private:
         isSubscribed = subscribed;
         if (subscribed) {
             connectionTracker.onConnect();
-            Logger::info("订阅状态变化: 已订阅");
+            Logger::info("客户端已订阅通知");
+            sendStateNotification();
         } else {
             connectionTracker.onDisconnect("客户端取消订阅");
-            Logger::info("订阅状态变化: 已取消订阅");
+            Logger::info("客户端已取消订阅");
         }
     }
 
     void handleBleConnect() {
-        Logger::info("BLE 客户端已连接");
+        Logger::info("========== BLE 客户端已连接 ==========");
+        isConnected = true;
         lastActivityTime = millis();
     }
 
     void handleBleDisconnect() {
-        Logger::info("BLE 客户端已断开");
+        Logger::info("========== BLE 客户端已断开 ==========");
         isConnected = false;
         isSubscribed = false;
         authenticatedClients.clear();
+        packetBuffer.clear();
+        expectedPacketLen = 0;
+        currentCmdType = 0;
         connectionTracker.onDisconnect("BLE 断开");
+
+        if (currentBolus) {
+            Logger::warning("BLE 断开时有大剂量在进行中");
+        }
+        if (tempBasal) {
+            Logger::warning("BLE 断开时有临时基础率在进行中");
+        }
     }
 
     void processCompleteCommand(const uint8_t* data, uint8_t len) {
         uint8_t cmdType = data[1];
         uint8_t seqNum = data[2];
+
+        Logger::info("处理完整命令: " + String(getCommandName(cmdType)) + " (" + String(len) + " bytes)");
 
         switch (static_cast<CommandType>(cmdType)) {
             case CommandType::AUTH_REQ:
@@ -695,17 +780,17 @@ private:
                 handleSetBolusMotorRequest(data, len, seqNum);
                 break;
             default:
-                Logger::warning("未知命令类型");
-                sendErrorResponse(static_cast<CommandType>(cmdType), 0x0101);
+                Logger::warning("未知命令类型: " + String(cmdType));
+                sendErrorResponse(static_cast<CommandType>(cmdType), BLEErrorCode::INVALID_PARAMETER);
         }
     }
 
     void handleAuthRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到认证请求");
+        Logger::info("=== 认证请求 ===");
 
         if (len < 13) {
-            Logger::error("认证请求数据长度不足");
-            sendErrorResponse(CommandType::AUTH_REQ, 0x0101);
+            Logger::error("认证请求数据长度不足: " + String(len));
+            sendErrorResponse(CommandType::AUTH_REQ, BLEErrorCode::INVALID_PARAMETER);
             return;
         }
 
@@ -713,17 +798,23 @@ private:
         uint8_t clientToken[4] = {data[5], data[6], data[7], data[8]};
         uint8_t clientKey[4] = {data[9], data[10], data[11], data[12]};
 
+        Logger::info("角色: " + String(role));
+        Logger::info("客户端令牌: " + String(clientToken[0], HEX) + String(clientToken[1], HEX) + String(clientToken[2], HEX) + String(clientToken[3], HEX));
+
         uint8_t reversedSN[4] = {PUMP_SN[3], PUMP_SN[2], PUMP_SN[1], PUMP_SN[0]};
         uint8_t correctKey[4];
         Crypto::genKey(reversedSN, correctKey);
 
+        Logger::info("期望密钥: " + String(correctKey[0], HEX) + String(correctKey[1], HEX) + String(correctKey[2], HEX) + String(correctKey[3], HEX));
+        Logger::info("收到密钥: " + String(clientKey[0], HEX) + String(clientKey[1], HEX) + String(clientKey[2], HEX) + String(clientKey[3], HEX));
+
         if (memcmp(clientKey, correctKey, 4) != 0) {
             Logger::error("认证失败: 密钥不匹配");
-            sendErrorResponse(CommandType::AUTH_REQ, 0x0201);
+            sendErrorResponse(CommandType::AUTH_REQ, BLEErrorCode::AUTH_FAILED);
             return;
         }
 
-        Logger::info("认证成功");
+        Logger::info("认证成功!");
 
         uint8_t responseData[5] = {0x02, DEVICE_TYPE, 1, 0, 0};
         sendResponse(CommandType::AUTH_REQ, seqNum, responseData, 5);
@@ -734,77 +825,95 @@ private:
     }
 
     void handleSynchronizeRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到同步请求");
+        Logger::info("=== 同步请求 ===");
         std::vector<uint8_t> syncData = buildSynchronizeData();
+        Logger::info("返回同步数据: " + String(syncData.size()) + " bytes, 状态=" + String(getStateName(patchState)));
         sendResponse(CommandType::SYNCHRONIZE, seqNum, syncData.data(), syncData.size());
     }
 
     void handleSubscribeRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到订阅请求");
+        Logger::info("=== 订阅请求 ===");
+        if (len >= 6) {
+            uint16_t subValue = data[4] | (data[5] << 8);
+            Logger::info("订阅值: " + String(subValue));
+        }
         isSubscribed = true;
         sendResponse(CommandType::SUBSCRIBE, seqNum, nullptr, 0);
+        Logger::info("订阅成功, 开始发送通知");
+        sendStateNotification();
     }
 
     void handleGetDeviceTypeRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到获取设备类型请求");
+        Logger::info("=== 获取设备类型 ===");
         uint8_t responseData[10] = {DEVICE_TYPE, 1, 0, 1, 0, 0, PUMP_SN[0], PUMP_SN[1], PUMP_SN[2], PUMP_SN[3]};
         sendResponse(CommandType::GET_DEVICE_TYPE, seqNum, responseData, 10);
     }
 
     void handleGetTimeRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到获取时间请求");
-        uint32_t currentTime = millis() / 1000;
+        Logger::info("=== 获取时间 ===");
+        uint32_t currentTime = patchStartTime + totalElapsedTime;
         uint8_t responseData[4] = {
             static_cast<uint8_t>(currentTime & 0xFF),
             static_cast<uint8_t>((currentTime >> 8) & 0xFF),
             static_cast<uint8_t>((currentTime >> 16) & 0xFF),
             static_cast<uint8_t>((currentTime >> 24) & 0xFF)
         };
+        Logger::info("当前泵时间: " + String(currentTime));
         sendResponse(CommandType::GET_TIME, seqNum, responseData, 4);
     }
 
     void handleSetTimeRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到设置时间请求");
+        Logger::info("=== 设置时间 ===");
         if (len >= 9) {
+            uint8_t prefix = data[4];
             uint32_t newTime = data[5] | (data[6] << 8) | (data[7] << 16) | (data[8] << 24);
             patchStartTime = newTime;
             timeSyncPending = false;
-            Logger::info("时间已同步");
+            Logger::info("时间已同步: prefix=" + String(prefix) + " time=" + String(newTime));
         }
         sendResponse(CommandType::SET_TIME, seqNum, nullptr, 0);
     }
 
     void handleSetTimeZoneRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到设置时区请求");
+        Logger::info("=== 设置时区 ===");
         if (len >= 10) {
             int16_t tzOffset = data[4] | (data[5] << 8);
             pumpTimezone = tzOffset;
             uint32_t timeVal = data[6] | (data[7] << 8) | (data[8] << 16) | (data[9] << 24);
             patchStartTime = timeVal;
-            Logger::info("时区和时间已更新");
+            Logger::info("时区偏移: " + String(tzOffset) + " 分钟, 时间: " + String(timeVal));
         }
         sendResponse(CommandType::SET_TIME_ZONE, seqNum, nullptr, 0);
     }
 
     void handlePrimeRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到预充请求");
-        if (patchState == PatchState::FILLED || patchState == PatchState::ACTIVE) {
-            patchState = PatchState::PRIMING;
-            Logger::info("预充已开始");
-        } else {
-            Logger::warning("当前状态不允许预充");
-            sendErrorResponse(CommandType::PRIME, 0x0400);
+        Logger::info("=== 预充请求 ===");
+
+        if (patchState == PatchState::PRIMING) {
+            Logger::warning("已在预充中");
+            sendErrorResponse(CommandType::PRIME, BLEErrorCode::INVALID_STATE);
             return;
         }
+
+        if (patchState == PatchState::STOPPED || patchState == PatchState::EXPIRED ||
+            patchState == PatchState::PATCH_FAULT || patchState == PatchState::PATCH_FAULT2) {
+            Logger::warning("当前状态不允许预充: " + String(getStateName(patchState)));
+            sendErrorResponse(CommandType::PRIME, BLEErrorCode::INVALID_STATE);
+            return;
+        }
+
+        setPatchState(PatchState::PRIMING);
+        primeProgress = 0;
+        Logger::info("预充已开始 -> PRIMING");
         sendResponse(CommandType::PRIME, seqNum, nullptr, 0);
     }
 
     void handleSetBolusRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到设置大剂量请求");
+        Logger::info("=== 设置大剂量 ===");
 
         if (patchState != PatchState::ACTIVE && patchState != PatchState::ACTIVE_ALT) {
-            Logger::warning("泵未处于运行状态,无法执行大剂量");
-            sendErrorResponse(CommandType::SET_BOLUS, 0x0400);
+            Logger::warning("泵未处于运行状态(" + String(getStateName(patchState)) + "),无法执行大剂量");
+            sendErrorResponse(CommandType::SET_BOLUS, BLEErrorCode::INVALID_STATE);
             return;
         }
 
@@ -813,45 +922,67 @@ private:
             uint16_t amountRaw = data[5] | (data[6] << 8);
             double amount = amountRaw * 0.05;
 
+            Logger::info("大剂量类型: " + String(bolusType) + ", 金额: " + String(amount) + "U");
+
+            if (amountRaw == 0) {
+                Logger::warning("大剂量金额为0,无效请求");
+                sendErrorResponse(CommandType::SET_BOLUS, BLEErrorCode::INVALID_PARAMETER);
+                return;
+            }
+
             if (currentBolus != nullptr) {
                 Logger::warning("已有大剂量在执行中");
-                sendErrorResponse(CommandType::SET_BOLUS, 0x0201);
+                sendErrorResponse(CommandType::SET_BOLUS, BLEErrorCode::PUMP_BUSY);
                 return;
             }
 
             if (amount > reservoir) {
-                Logger::warning("储药器余量不足");
-                sendErrorResponse(CommandType::SET_BOLUS, 0x0202);
+                Logger::warning("储药器余量不足: 需要" + String(amount) + "U, 剩余" + String(reservoir) + "U");
+                sendErrorResponse(CommandType::SET_BOLUS, BLEErrorCode::RESERVOIR_LOW);
+                return;
+            }
+
+            if (amount > MAX_BOLUS) {
+                Logger::warning("超过最大大剂量限制: " + String(amount) + "U > " + String(MAX_BOLUS) + "U");
+                sendErrorResponse(CommandType::SET_BOLUS, BLEErrorCode::MAX_BOLUS_EXCEEDED);
                 return;
             }
 
             currentBolus = new BolusInfo{bolusType, amount, millis() / 1000};
             bolusDeliveryProgress = 0;
-            Logger::info("大剂量已开始输送");
+            Logger::info("大剂量已开始输送: " + String(amount) + "U");
         }
         sendResponse(CommandType::SET_BOLUS, seqNum, nullptr, 0);
     }
 
     void handleCancelBolusRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到取消大剂量请求");
+        Logger::info("=== 取消大剂量 ===");
+        if (len >= 5) {
+            uint8_t bolusType = data[4];
+            Logger::info("取消大剂量类型: " + String(bolusType));
+        }
         if (currentBolus) {
             double delivered = currentBolus->amount * (bolusDeliveryProgress / 100.0);
             reservoir += (currentBolus->amount - delivered);
+            Logger::info("大剂量已取消, 已输送: " + String(delivered) + "U, 退回: " + String(currentBolus->amount - delivered) + "U");
             delete currentBolus;
             currentBolus = nullptr;
             bolusDeliveryProgress = 0;
+            sendStateNotification();
+        } else {
+            Logger::info("没有进行中的大剂量");
         }
         sendResponse(CommandType::CANCEL_BOLUS, seqNum, nullptr, 0);
     }
 
     void handleReadBolusStateRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到读取大剂量状态请求");
+        Logger::info("=== 读取大剂量状态 ===");
         uint8_t responseData[10];
         if (currentBolus) {
             responseData[0] = 1;
             responseData[1] = 0x01;
-            uint16_t amountRaw = static_cast<uint16_t>(currentBolus->amount / 0.05);
-            uint16_t deliveredRaw = static_cast<uint16_t>(amountRaw * bolusDeliveryProgress / 100.0);
+            uint16_t amountRaw = static_cast<uint16_t>(round(currentBolus->amount / 0.05));
+            uint16_t deliveredRaw = static_cast<uint16_t>(amountRaw * bolusDeliveryProgress / 100);
             uint16_t remainingRaw = amountRaw - deliveredRaw;
             responseData[2] = deliveredRaw & 0xFF;
             responseData[3] = (deliveredRaw >> 8) & 0xFF;
@@ -861,18 +992,20 @@ private:
             responseData[7] = (amountRaw >> 8) & 0xFF;
             responseData[8] = 0;
             responseData[9] = 0;
+            Logger::info("大剂量进行中: " + String(currentBolus->amount) + "U, 进度: " + String(bolusDeliveryProgress) + "%");
         } else {
             memset(responseData, 0, 10);
+            Logger::info("无进行中的大剂量");
         }
         sendResponse(CommandType::READ_BOLUS_STATE, seqNum, responseData, 10);
     }
 
     void handleSetTempBasalRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到设置临时基础率请求");
+        Logger::info("=== 设置临时基础率 ===");
 
         if (patchState != PatchState::ACTIVE && patchState != PatchState::ACTIVE_ALT) {
             Logger::warning("泵未处于运行状态,无法设置临时基础率");
-            sendErrorResponse(CommandType::SET_TEMP_BASAL, 0x0400);
+            sendErrorResponse(CommandType::SET_TEMP_BASAL, BLEErrorCode::INVALID_STATE);
             return;
         }
 
@@ -881,6 +1014,7 @@ private:
             uint16_t rateRaw = data[5] | (data[6] << 8);
             uint16_t durationRaw = data[7] | (data[8] << 8);
             double rate = rateRaw * 0.05;
+            Logger::info("类型: " + String(basalType) + ", 速率: " + String(rate) + "U/hr, 时长: " + String(durationRaw) + "分钟");
 
             if (tempBasal) delete tempBasal;
             tempBasal = new TempBasalInfo{basalType, rate, millis() / 1000};
@@ -889,12 +1023,11 @@ private:
 
         uint8_t responseData[11];
         responseData[0] = tempBasal ? static_cast<uint8_t>(BasalType::ABSOLUTE_TEMP) : static_cast<uint8_t>(BasalType::STANDARD);
-        uint16_t basalValue = tempBasal ? static_cast<uint16_t>(tempBasal->rate / 0.05) : static_cast<uint16_t>(0.6 / 0.05);
+        uint16_t basalValue = tempBasal ? static_cast<uint16_t>(round(tempBasal->rate / 0.05)) : static_cast<uint16_t>(round(0.6 / 0.05));
         responseData[1] = basalValue & 0xFF;
         responseData[2] = (basalValue >> 8) & 0xFF;
         responseData[3] = 0;
         responseData[4] = 0;
-        uint16_t patchId = random(65535) + 1;
         responseData[5] = patchId & 0xFF;
         responseData[6] = (patchId >> 8) & 0xFF;
         uint32_t startTime = patchStartTime;
@@ -904,24 +1037,27 @@ private:
         responseData[10] = (startTime >> 24) & 0xFF;
 
         sendResponse(CommandType::SET_TEMP_BASAL, seqNum, responseData, 11);
+        sendStateNotification();
     }
 
     void handleCancelTempBasalRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到取消临时基础率请求");
+        Logger::info("=== 取消临时基础率 ===");
         if (tempBasal) {
+            Logger::info("取消临时基础率: " + String(tempBasal->rate) + "U/hr");
             delete tempBasal;
             tempBasal = nullptr;
             tempBasalRemaining = 0;
+        } else {
+            Logger::info("无进行中的临时基础率");
         }
 
         uint8_t responseData[11];
         responseData[0] = static_cast<uint8_t>(BasalType::STANDARD);
-        uint16_t basalValue = static_cast<uint16_t>(0.6 / 0.05);
+        uint16_t basalValue = static_cast<uint16_t>(round(0.6 / 0.05));
         responseData[1] = basalValue & 0xFF;
         responseData[2] = (basalValue >> 8) & 0xFF;
         responseData[3] = 0;
         responseData[4] = 0;
-        uint16_t patchId = random(65535) + 1;
         responseData[5] = patchId & 0xFF;
         responseData[6] = (patchId >> 8) & 0xFF;
         uint32_t startTime = patchStartTime;
@@ -931,21 +1067,29 @@ private:
         responseData[10] = (startTime >> 24) & 0xFF;
 
         sendResponse(CommandType::CANCEL_TEMP_BASAL, seqNum, responseData, 11);
+        sendStateNotification();
     }
 
     void handleSuspendRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到暂停泵请求");
+        Logger::info("=== 暂停泵 ===");
 
         if (patchState != PatchState::ACTIVE && patchState != PatchState::ACTIVE_ALT) {
-            Logger::warning("泵未处于运行状态,无法暂停");
-            sendErrorResponse(CommandType::SUSPEND_PUMP, 0x0400);
+            Logger::warning("泵未处于运行状态,无法暂停: " + String(getStateName(patchState)));
+            sendErrorResponse(CommandType::SUSPEND_PUMP, BLEErrorCode::INVALID_STATE);
             return;
         }
 
-        patchState = PatchState::SUSPENDED;
+        if (len >= 6) {
+            uint8_t cause = data[4];
+            uint8_t duration = data[5];
+            Logger::info("暂停原因: " + String(cause) + ", 时长: " + String(duration) + "分钟");
+        }
+
+        setPatchState(PatchState::SUSPENDED);
         simulatorState = SimulatorState::SUSPENDED;
 
         if (currentBolus) {
+            Logger::info("暂停时取消大剂量");
             double delivered = currentBolus->amount * (bolusDeliveryProgress / 100.0);
             reservoir += (currentBolus->amount - delivered);
             delete currentBolus;
@@ -954,6 +1098,7 @@ private:
         }
 
         if (tempBasal) {
+            Logger::info("暂停时取消临时基础率");
             delete tempBasal;
             tempBasal = nullptr;
             tempBasalRemaining = 0;
@@ -963,32 +1108,36 @@ private:
     }
 
     void handleResumeRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到恢复泵请求");
+        Logger::info("=== 恢复泵 ===");
 
         if (patchState != PatchState::SUSPENDED) {
-            Logger::warning("泵未处于暂停状态,无法恢复");
-            sendErrorResponse(CommandType::RESUME_PUMP, 0x0400);
+            Logger::warning("泵未处于暂停状态,无法恢复: " + String(getStateName(patchState)));
+            sendErrorResponse(CommandType::RESUME_PUMP, BLEErrorCode::INVALID_STATE);
             return;
         }
 
-        patchState = PatchState::ACTIVE;
+        setPatchState(PatchState::ACTIVE);
         simulatorState = SimulatorState::RUNNING;
+        Logger::info("泵已恢复 -> ACTIVE");
         sendResponse(CommandType::RESUME_PUMP, seqNum, nullptr, 0);
     }
 
     void handleSetBasalProfileRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到设置基础率配置文件请求");
+        Logger::info("=== 设置基础率配置文件 ===");
         if (len >= 5) {
             uint8_t profileType = data[4];
+            Logger::info("配置文件类型: " + String(profileType));
+            if (len > 5) {
+                Logger::info("配置文件数据: " + String(len - 5) + " bytes");
+            }
         }
         uint8_t responseData[11];
         responseData[0] = static_cast<uint8_t>(BasalType::STANDARD);
-        uint16_t basalValue = static_cast<uint16_t>(0.6 / 0.05);
+        uint16_t basalValue = static_cast<uint16_t>(round(0.6 / 0.05));
         responseData[1] = basalValue & 0xFF;
         responseData[2] = (basalValue >> 8) & 0xFF;
         responseData[3] = 0;
         responseData[4] = 0;
-        uint16_t patchId = random(65535) + 1;
         responseData[5] = patchId & 0xFF;
         responseData[6] = (patchId >> 8) & 0xFF;
         uint32_t startTime = patchStartTime;
@@ -1000,30 +1149,49 @@ private:
     }
 
     void handleClearAlarmRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到清除警报请求");
+        Logger::info("=== 清除警报 ===");
         if (len >= 6) {
             uint16_t alertType = data[4] | (data[5] << 8);
+            Logger::info("警报类型: " + String(alertType));
         }
         sendResponse(CommandType::CLEAR_ALARM, seqNum, nullptr, 0);
     }
 
     void handleActivateRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到激活 Patch 请求");
+        Logger::info("=== 激活 Patch ===");
 
-        if (patchState != PatchState::PRIMED) {
-            Logger::warning("Patch 未完成预充,无法激活");
-            sendErrorResponse(CommandType::ACTIVATE, 0x0400);
+        if (patchState == PatchState::ACTIVE || patchState == PatchState::ACTIVE_ALT) {
+            Logger::info("Patch 已处于激活状态,返回当前状态");
+        } else if (patchState != PatchState::PRIMED) {
+            Logger::warning("Patch 未完成预充,无法激活: " + String(getStateName(patchState)));
+            sendErrorResponse(CommandType::ACTIVATE, BLEErrorCode::INVALID_STATE);
             return;
         }
 
-        patchState = PatchState::ACTIVE;
+        if (len >= 14) {
+            uint8_t autoSuspendEnable = data[4];
+            uint8_t autoSuspendTime = data[5];
+            uint8_t expirationTimer = data[6];
+            uint8_t alarmSetting = data[7];
+            uint8_t lowSuspend = data[8];
+            uint8_t predictiveLowSuspend = data[9];
+            uint8_t predictiveLowSuspendRange = data[10];
+            uint16_t hourlyMaxInsulin = data[11] | (data[12] << 8);
+            uint16_t dailyMaxInsulin = data[13] | (data[14] << 8);
+            Logger::info("激活参数: expirationTimer=" + String(expirationTimer) +
+                " alarmSetting=" + String(alarmSetting) +
+                " hourlyMax=" + String(hourlyMaxInsulin * 0.05) + "U" +
+                " dailyMax=" + String(dailyMaxInsulin * 0.05) + "U");
+        }
+
+        setPatchState(PatchState::ACTIVE);
         simulatorState = SimulatorState::RUNNING;
         reservoir = MAX_RESERVOIR;
         patchStartTime = millis() / 1000;
         totalElapsedTime = 0;
+        Logger::info("Patch 已激活 -> ACTIVE");
 
         uint8_t responseData[19];
-        uint32_t patchId = random(65535) + 1;
         responseData[0] = patchId & 0xFF;
         responseData[1] = (patchId >> 8) & 0xFF;
         responseData[2] = (patchId >> 16) & 0xFF;
@@ -1034,7 +1202,7 @@ private:
         responseData[6] = (startTime >> 16) & 0xFF;
         responseData[7] = (startTime >> 24) & 0xFF;
         responseData[8] = static_cast<uint8_t>(BasalType::STANDARD);
-        uint16_t basalValue = static_cast<uint16_t>(0.6 / 0.05);
+        uint16_t basalValue = static_cast<uint16_t>(round(0.6 / 0.05));
         responseData[9] = basalValue & 0xFF;
         responseData[10] = (basalValue >> 8) & 0xFF;
         responseData[11] = 0;
@@ -1049,35 +1217,77 @@ private:
     }
 
     void handleStopPatchRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到停止 Patch 请求");
-        patchState = PatchState::STOPPED;
+        Logger::info("=== 停止 Patch ===");
+        setPatchState(PatchState::STOPPED);
         simulatorState = SimulatorState::EJECTING;
-        uint8_t responseData[4] = {0, 0, 0, 0};
+
+        if (currentBolus) {
+            delete currentBolus;
+            currentBolus = nullptr;
+            bolusDeliveryProgress = 0;
+        }
+        if (tempBasal) {
+            delete tempBasal;
+            tempBasal = nullptr;
+            tempBasalRemaining = 0;
+        }
+
+        uint8_t responseData[4] = {0, 0, static_cast<uint8_t>(patchId & 0xFF), static_cast<uint8_t>((patchId >> 8) & 0xFF)};
         sendResponse(CommandType::STOP_PATCH, seqNum, responseData, 4);
     }
 
     void handleSetPatchRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到设置 Patch 请求");
+        Logger::info("=== 设置 Patch 参数 ===");
+        if (len >= 5) {
+            uint8_t alarmSettings = data[4];
+            Logger::info("警报设置: " + String(alarmSettings));
+        }
+        if (len >= 7) {
+            uint16_t hourlyMax = data[5] | (data[6] << 8);
+            Logger::info("每小时最大: " + String(hourlyMax * 0.05) + "U");
+        }
+        if (len >= 9) {
+            uint16_t dailyMax = data[7] | (data[8] << 8);
+            Logger::info("每日最大: " + String(dailyMax * 0.05) + "U");
+        }
         sendResponse(CommandType::SET_PATCH, seqNum, nullptr, 0);
     }
 
     void handlePollPatchRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到轮询 Patch 请求");
+        Logger::info("=== 轮询 Patch 状态 ===");
         std::vector<uint8_t> syncData = buildSynchronizeData();
         sendResponse(CommandType::POLL_PATCH, seqNum, syncData.data(), syncData.size());
     }
 
     void handleGetRecordRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到获取记录请求");
-        uint8_t responseData[4] = {0, 0, 0, 0};
-        sendResponse(CommandType::GET_RECORD, seqNum, responseData, 4);
+        Logger::info("=== 获取记录 ===");
+        if (len >= 6) {
+            uint8_t recordType = data[4];
+            uint8_t recordIndex = data[5];
+            Logger::info("记录类型: " + String(recordType) + ", 索引: " + String(recordIndex));
+        }
+
+        uint8_t responseData[20];
+        memset(responseData, 0, 20);
+        responseData[0] = 0x01;
+        responseData[1] = 0x00;
+        uint32_t timestamp = patchStartTime + totalElapsedTime;
+        responseData[2] = timestamp & 0xFF;
+        responseData[3] = (timestamp >> 8) & 0xFF;
+        responseData[4] = (timestamp >> 16) & 0xFF;
+        responseData[5] = (timestamp >> 24) & 0xFF;
+        responseData[6] = 0x0A;
+        responseData[7] = 0x00;
+
+        sendResponse(CommandType::GET_RECORD, seqNum, responseData, 20);
     }
 
     void handleSetBolusMotorRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
-        Logger::info("收到设置大剂量电机请求");
+        Logger::info("=== 设置大剂量电机 ===");
         if (len >= 7) {
             uint16_t motorSteps = data[4] | (data[5] << 8);
             uint8_t direction = data[6];
+            Logger::info("电机步数: " + String(motorSteps) + ", 方向: " + String(direction));
         }
         sendResponse(CommandType::SET_BOLUS_MOTOR, seqNum, nullptr, 0);
     }
@@ -1104,10 +1314,14 @@ private:
         packet[totalContentLen + 4] = crc;
         packet[totalContentLen + 5] = 0;
 
+        Logger::hexDump("TX", "-->", packet, totalContentLen + 6);
         gattServer.sendResponse(packet, totalContentLen + 6);
     }
 
     void sendErrorResponse(CommandType cmdType, uint16_t errorCode) {
+        Logger::warning("发送错误响应: cmd=" + String(getCommandName(static_cast<uint8_t>(cmdType))) +
+            " code=0x" + String(errorCode, HEX) + " (" + String(BLEErrorCode::toString(errorCode)) + ")");
+
         uint8_t header[4] = {
             7,
             static_cast<uint8_t>(cmdType),
@@ -1121,11 +1335,17 @@ private:
         uint8_t crc = crc8Calculate(packet, 6);
         packet[6] = crc;
         packet[7] = 0;
+
+        Logger::hexDump("TX", "-->", packet, 8);
         gattServer.sendResponse(packet, 8);
+    }
+
+    void sendNotificationPacket(const std::vector<uint8_t>& syncData) {
+        Logger::hexDump("NTF", "~~>", syncData.data(), syncData.size());
+        gattServer.sendRawNotification(syncData.data(), syncData.size());
     }
 };
 
-// 全局实例指针 (用于静态回调)
 M640GPumpSimulator* gSimulator = nullptr;
 
 } // namespace M640GKit

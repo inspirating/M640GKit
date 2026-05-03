@@ -129,6 +129,13 @@ public:
         return sendNotification(data, len, true);
     }
 
+    bool sendRawNotification(const uint8_t* data, size_t len) {
+        if (readCharacteristic == nullptr) return false;
+        readCharacteristic->setValue(data, len);
+        readCharacteristic->notify();
+        return true;
+    }
+
     bool sendResponse(const uint8_t* data, size_t len) {
         if (writeCharacteristic == nullptr) return false;
 
