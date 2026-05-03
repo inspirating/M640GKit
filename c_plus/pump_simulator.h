@@ -174,7 +174,8 @@ public:
         gattServer.onConnect = handleConnectStatic;
         gattServer.onDisconnect = handleDisconnectStatic;
         gattServer.start();
-
+        Serial.println("BLE 广播已启动");
+        
         simulatorState = SimulatorState::READY;
         initialized = true;
         lastUpdateTime = millis();

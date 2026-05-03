@@ -106,7 +106,7 @@ public:
         pAdvertising->addServiceUUID(SERVICE_UUID);
         pAdvertising->setScanResponse(true);
         pAdvertising->setMinPreferred(0x06);
-        pAdvertising->setMinPreferred(0x12);
+        pAdvertising->setMaxPreferred(0x12);
 
         // Match iOS `BluetoothManager.centralManager(_:didDiscover:)` parsing:
         // [0-1] company id LE, [2-5] pump SN, [6] device type, [7] version (>= 8 bytes).
@@ -127,9 +127,11 @@ public:
             mfgStr += (char)mfg[i];
         }
 
-        BLEAdvertisementData advData;
-        advData.setManufacturerData(mfgStr);
-        pAdvertising->setAdvertisementData(advData);
+        // 不手动设置广播数据, 让库自动处理(包含设备名称和服务UUID)
+        // 只在扫描响应中添加 Manufacturer Data
+        BLEAdvertisementData scanResponseData;
+        scanResponseData.setManufacturerData(mfgStr);
+        pAdvertising->setScanResponseData(scanResponseData);
 
         BLEDevice::startAdvertising();
     }
