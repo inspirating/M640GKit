@@ -127,11 +127,10 @@ public:
             mfgStr += (char)mfg[i];
         }
 
-        // 不手动设置广播数据, 让库自动处理(包含设备名称和服务UUID)
-        // 只在扫描响应中添加 Manufacturer Data
-        BLEAdvertisementData scanResponseData;
-        scanResponseData.setManufacturerData(mfgStr);
-        pAdvertising->setScanResponseData(scanResponseData);
+        BLEAdvertisementData advData;
+        advData.setName("MT");
+        advData.setManufacturerData(mfgStr);
+        pAdvertising->setAdvertisementData(advData);
 
         BLEDevice::startAdvertising();
     }

@@ -480,7 +480,7 @@ private:
     void updatePrimeProgress() {
         if (patchState == PatchState::PRIMING) {
             primeProgress++;
-            if (primeProgress >= 10) {
+            if (primeProgress >= 240) {
                 setPatchState(PatchState::PRIMED);
                 primeProgress = 0;
                 Logger::info("预充完成 -> PRIMED");
