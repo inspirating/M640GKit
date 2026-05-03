@@ -538,8 +538,6 @@ private:
         }
         if (currentBolus != nullptr || !bolusHistory.empty()) {
             fieldMask |= MASK_NORMAL_BOLUS;
-        } else {
-            fieldMask |= MASK_NORMAL_BOLUS;
         }
         fieldMask |= MASK_BASAL;
         if (patchState == PatchState::PRIMING) {
@@ -1337,7 +1335,7 @@ private:
             return;
         }
 
-        if (len >= 14) {
+        if (len >= 15) {
             uint8_t autoSuspendEnable = data[4];
             uint8_t autoSuspendTime = data[5];
             expirationTimer = data[6];

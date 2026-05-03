@@ -313,9 +313,6 @@ extension PeripheralManager: CBPeripheralDelegate {
             self.writeTimeoutTask = nil
 
             if packet.responseCode != 0 {
-                // Examples for invalid codes:
-                // 7 -> Invalid authorization: propably wrong session token used
-                // 8 -> Invalid state: The patch is not in state 32 (active), which is required for that command
                 self.log.error("Invalid responseCode: \(packet.responseCode)")
                 writeCallback.yield(.failure(error: .invalidResponse(code: packet.responseCode)))
             } else if packet.failed {
