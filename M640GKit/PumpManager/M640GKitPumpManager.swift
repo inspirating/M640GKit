@@ -892,6 +892,7 @@ public extension M640GKitPumpManager {
                 self.state.initialReservoir = nil
                 self.state.patchId = data.patchId
                 self.state.patchActivatedAt = Date.now
+                self.state.pumpState = .active
                 self.state.lastSync = Date.now
                 self.notifyStateDidChange()
 

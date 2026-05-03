@@ -803,9 +803,8 @@ private:
         isConnected = true;
         lastActivityTime = millis();
         connectionTracker.onConnect();
-        isSubscribed = true;
-        Logger::info("客户端已订阅通知");
-        sendStateNotification();
+        // 不要在这里设置 isSubscribed = true
+        // 等待客户端真正订阅通知特征后，handleSubscribe(true) 会被调用
     }
 
     void handleBleDisconnect() {
@@ -1413,7 +1412,8 @@ private:
         basalSequence = 0;
         Logger::info("Patch 已激活 -> ACTIVE");
 
-        uint8_t responseData[19];
+        uint8_t responseData[25];
+        memset(responseData, 0, 25);
         responseData[0] = patchId & 0xFF;
         responseData[1] = (patchId >> 8) & 0xFF;
         responseData[2] = (patchId >> 16) & 0xFF;
@@ -1435,7 +1435,15 @@ private:
         responseData[16] = (startTime >> 8) & 0xFF;
         responseData[17] = (startTime >> 16) & 0xFF;
         responseData[18] = (startTime >> 24) & 0xFF;
-        sendResponse(CommandType::ACTIVATE, seqNum, responseData, 19);
+        // [19-20] basalPatchId (重复 patchId)
+        responseData[19] = patchId & 0xFF;
+        responseData[20] = (patchId >> 8) & 0xFF;
+        // [21-24] basalStartTime (重复 startTime)
+        responseData[21] = startTime & 0xFF;
+        responseData[22] = (startTime >> 8) & 0xFF;
+        responseData[23] = (startTime >> 16) & 0xFF;
+        responseData[24] = (startTime >> 24) & 0xFF;
+        sendResponse(CommandType::ACTIVATE, seqNum, responseData, 25);
     }
 
     void handleStopPatchRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
