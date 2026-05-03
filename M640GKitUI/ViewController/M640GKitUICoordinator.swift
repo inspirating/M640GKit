@@ -87,6 +87,9 @@ class M640GKitUICoordinator: UINavigationController, PumpManagerOnboarding, Comp
         }
 
         if pumpManager.state.pumpState.rawValue < PatchState.priming.rawValue {
+            if pumpManager.isOnboarded {
+                return [.patchPrimingScreen]
+            }
             return [.settingsScreen, .pumpBaseSettingsScreen]
         }
 
