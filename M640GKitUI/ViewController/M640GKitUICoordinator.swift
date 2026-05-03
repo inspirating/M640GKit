@@ -155,6 +155,8 @@ class M640GKitUICoordinator: UINavigationController, PumpManagerOnboarding, Comp
 
         case .pumpBaseSettingsScreen:
             let nextStep = {
+                self.navigateTo(.patchPrimingScreen)
+
                 if let pumpManager = self.pumpManager {
                     pumpManager.state.isOnboarded = true
                     pumpManager.notifyStateDidChange()
@@ -165,8 +167,6 @@ class M640GKitUICoordinator: UINavigationController, PumpManagerOnboarding, Comp
                         self.logger.warning("Not onboarded -> no onboardDelegate...")
                     }
                 }
-
-                self.navigateTo(.patchPrimingScreen)
             }
 
             let viewModel = PumpBaseSettingsViewModel(pumpManager, nextStep)

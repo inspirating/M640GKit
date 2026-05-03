@@ -747,8 +747,39 @@ public extension M640GKitPumpManager {
         limits: LoopKit.DeliveryLimits,
         completion: @escaping (Result<LoopKit.DeliveryLimits, any Error>) -> Void
     ) {
-        log.warning("Skipping sync delivery limits (not supported by M640GKit)")
-        completion(.success(limits))
+        log.info("Sync-ing delivery limits...")
+
+        bluetooth.ensureConnected { error in
+            if let error = error {
+                self.log.error("Failed to connect: \(error.localizedDescription)")
+                completion(.failure(error))
+                return
+            }
+
+            let hourlyMax = limits.maximumBolus?.doubleValue(for: .internationalUnit()) ?? self.state.maxHourlyInsulin
+            let dailyMax = self.state.maxDailyInsulin
+
+            let packet = SetPatchPacket(
+                alarmSettings: self.state.alarmSetting,
+                hourlyMaxInsulin: hourlyMax,
+                dailyMaxInsulin: dailyMax,
+                expirationTimer: self.state.expiryMode.timer
+            )
+            let result = await self.bluetooth.write(packet)
+
+            if case let .failure(error) = result {
+                self.log.error("Failed to sync delivery limits: \(error.localizedDescription)")
+                completion(.failure(error))
+                return
+            }
+
+            self.state.maxHourlyInsulin = hourlyMax
+            self.state.lastSync = Date.now
+            self.notifyStateDidChange()
+
+            self.log.info("Delivery limits synced!")
+            completion(.success(limits))
+        }
     }
 
     func primePatch(_ completion: @escaping (M640GKitPrimePatchResult) -> Void) {
