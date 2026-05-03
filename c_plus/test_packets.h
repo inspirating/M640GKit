@@ -13,13 +13,13 @@
 #define M640G_TEST_PACKETS_H
 
 #include <Arduino.h>
-#include "../packets/base_packet.h"
-#include "../packets/authorize_packet.h"
-#include "../packets/synchronize_packet.h"
-#include "../packets/bolus_packet.h"
-#include "../packets/basal_packet.h"
-#include "../packets/time_packet.h"
-#include "../packets/pump_control_packet.h"
+#include "base_packet.h"
+#include "authorize_packet.h"
+#include "synchronize_packet.h"
+#include "bolus_packet.h"
+#include "basal_packet.h"
+#include "time_packet.h"
+#include "pump_control_packet.h"
 
 namespace M640GKit {
 

@@ -25,19 +25,19 @@ M640GKit ESP32 泵模拟器核心 (C++ 版本)
 #include <cmath>
 
 #include "enums.h"
-#include "encryption/crc8.h"
-#include "encryption/crypto.h"
-#include "packets/base_packet.h"
-#include "packets/authorize_packet.h"
-#include "packets/synchronize_packet.h"
-#include "packets/subscribe_packet.h"
-#include "packets/bolus_packet.h"
-#include "packets/basal_packet.h"
-#include "packets/pump_control_packet.h"
-#include "packets/time_packet.h"
-#include "packets/misc_packet.h"
-#include "pump_manager/gatt_server.h"
-#include "pump_manager/connection_tracker.h"
+#include "crc8.h"
+#include "crypto.h"
+#include "base_packet.h"
+#include "authorize_packet.h"
+#include "synchronize_packet.h"
+#include "subscribe_packet.h"
+#include "bolus_packet.h"
+#include "basal_packet.h"
+#include "pump_control_packet.h"
+#include "time_packet.h"
+#include "misc_packet.h"
+#include "gatt_server.h"
+#include "connection_tracker.h"
 
 namespace M640GKit {
 

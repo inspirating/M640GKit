@@ -20,8 +20,8 @@ GATT 服务器 (C++ 版本 - Arduino BLE 库)
 #include <BLEUtils.h>
 #include <BLE2902.h>
 #include <BLEAdvertising.h>
-#include "../enums.h"
-#include "../encryption/crc8.h"
+#include "enums.h"
+#include "crc8.h"
 
 namespace M640GKit {
 

@@ -9,7 +9,7 @@ c_plus/
 ├── M640GKit.ino              # Arduino 入口文件 (setup/loop)
 ├── enums.h                   # 枚举和常量定义
 ├── pump_simulator.h          # 泵模拟器主类
-├── encryption/
+├── 
 │   ├── crc8.h               # CRC8 校验模块
 │   └── crypto.h             # 加密解密模块
 ├── packets/
@@ -89,8 +89,8 @@ c_plus/
 | Python 文件 | C++ 文件 | 说明 |
 |------------|---------|------|
 | `enums.py` | `enums.h` | 枚举和常量 |
-| `encryption/crc8.py` | `encryption/crc8.h` | CRC8 校验 |
-| `encryption/crypto.py` | `encryption/crypto.h` | 加密解密 |
+| `crc8.py` | `crc8.h` | CRC8 校验 |
+| `crypto.py` | `crypto.h` | 加密解密 |
 | `packets/base_packet.py` | `packets/base_packet.h` | 数据包基类 |
 | `packets/*.py` | `packets/*.h` | 各类数据包 |
 | `pump_manager/gatt_server.py` | `pump_manager/gatt_server.h` | GATT 服务器 |

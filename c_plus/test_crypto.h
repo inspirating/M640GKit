@@ -13,8 +13,8 @@
 #define M640G_TEST_CRYPTO_H
 
 #include <Arduino.h>
-#include "../encryption/crc8.h"
-#include "../encryption/crypto.h"
+#include "crc8.h"
+#include "crypto.h"
 
 namespace M640GKit {
 

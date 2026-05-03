@@ -11,7 +11,7 @@
 #define M640G_AUTHORIZE_PACKET_H
 
 #include "base_packet.h"
-#include "../encryption/crypto.h"
+#include "crypto.h"
 
 namespace M640GKit {
 

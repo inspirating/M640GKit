@@ -24,8 +24,8 @@
 #include <cstdint>
 #include <cstddef>
 #include <vector>
-#include "../enums.h"
-#include "../encryption/crc8.h"
+#include "enums.h"
+#include "crc8.h"
 
 namespace M640GKit {
 
