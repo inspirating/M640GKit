@@ -113,6 +113,7 @@ enum class SimulatorState : uint8_t {
 struct BolusInfo {
     uint8_t type;
     double amount;
+    double delivered;
     uint32_t startTime;
 };
 
@@ -120,6 +121,7 @@ struct BolusInfo {
 struct TempBasalInfo {
     uint8_t type;
     double rate;
+    uint16_t durationMinutes;
     uint32_t startTime;
 };
 
@@ -133,7 +135,12 @@ public:
         isConnected(false), isSubscribed(false), sessionToken{0}, pumpTimezone(0),
         timeSyncPending(false), sequenceNumber(0), pingCounter(0), lastPingTime(0),
         connectionTimeoutMs(15000), lastActivityTime(0), patchId(0),
-        lastNotifiedState(PatchState::NONE) {
+        lastNotifiedState(PatchState::NONE),
+        hourlyMaxInsulin(DEFAULT_HOURLY_MAX), dailyMaxInsulin(DEFAULT_DAILY_MAX),
+        hourlyDelivered(0.0), dailyDelivered(0.0),
+        currentBasalRate(0.6), basalSequence(0),
+        expirationTimer(0), alarmSetting(0),
+        predictiveLowSuspend(0), predictiveLowSuspendRange(30) {
         currentBolus = nullptr;
         tempBasal = nullptr;
     }
@@ -254,6 +261,17 @@ private:
 
     PatchState lastNotifiedState;
 
+    double hourlyMaxInsulin;
+    double dailyMaxInsulin;
+    double hourlyDelivered;
+    double dailyDelivered;
+    double currentBasalRate;
+    uint16_t basalSequence;
+    uint8_t expirationTimer;
+    uint8_t alarmSetting;
+    uint8_t predictiveLowSuspend;
+    uint8_t predictiveLowSuspendRange;
+
     const char* getStateName(PatchState s) {
         switch (s) {
             case PatchState::NONE: return "NONE";
@@ -265,13 +283,22 @@ private:
             case PatchState::EJECTED: return "EJECTED";
             case PatchState::ACTIVE: return "ACTIVE";
             case PatchState::ACTIVE_ALT: return "ACTIVE_ALT";
+            case PatchState::LOW_BG_SUSPENDED: return "LOW_BG_SUSPENDED";
+            case PatchState::LOW_BG_SUSPENDED2: return "LOW_BG_SUSPENDED2";
+            case PatchState::AUTO_SUSPENDED: return "AUTO_SUSPENDED";
+            case PatchState::HOURLY_MAX_SUSPENDED: return "HOURLY_MAX_SUSPENDED";
+            case PatchState::DAILY_MAX_SUSPENDED: return "DAILY_MAX_SUSPENDED";
             case PatchState::SUSPENDED: return "SUSPENDED";
-            case PatchState::STOPPED: return "STOPPED";
+            case PatchState::PAUSED: return "PAUSED";
             case PatchState::OCCLUSION: return "OCCLUSION";
             case PatchState::EXPIRED: return "EXPIRED";
             case PatchState::RESERVOIR_EMPTY: return "RESERVOIR_EMPTY";
             case PatchState::PATCH_FAULT: return "PATCH_FAULT";
             case PatchState::PATCH_FAULT2: return "PATCH_FAULT2";
+            case PatchState::BASE_FAULT: return "BASE_FAULT";
+            case PatchState::BATTERY_OUT: return "BATTERY_OUT";
+            case PatchState::NO_CALIBRATION: return "NO_CALIBRATION";
+            case PatchState::STOPPED: return "STOPPED";
             default: return "UNKNOWN";
         }
     }
@@ -329,10 +356,17 @@ private:
     }
 
     void update() {
-        totalElapsedTime += updateIntervalMs / 1000;
+        static uint32_t elapsedAccumulator = 0;
+        elapsedAccumulator += updateIntervalMs;
+        if (elapsedAccumulator >= 1000) {
+            totalElapsedTime += elapsedAccumulator / 1000;
+            elapsedAccumulator %= 1000;
+        }
         updateBolusDelivery();
         updateTempBasal();
+        updateNormalBasalDelivery();
         updatePrimeProgress();
+        resetHourlyDailyCounters();
         checkAndSendStateNotification();
         sendPingHeartbeat();
         checkConnectionTimeout();
@@ -347,16 +381,52 @@ private:
         }
     }
 
+    void updateNormalBasalDelivery() {
+        if (patchState != PatchState::ACTIVE && patchState != PatchState::ACTIVE_ALT) return;
+        if (tempBasal != nullptr) return;
+
+        double basalStepU = currentBasalRate * (updateIntervalMs / 3600000.0);
+        reservoir = max(0.0, reservoir - basalStepU);
+        activeInsulin += basalStepU;
+        hourlyDelivered += basalStepU;
+        dailyDelivered += basalStepU;
+    }
+
+    void resetHourlyDailyCounters() {
+        static uint32_t lastHourReset = 0;
+        static uint32_t lastDayReset = 0;
+        uint32_t now = millis() / 1000;
+
+        if (now - lastHourReset >= 3600) {
+            hourlyDelivered = 0.0;
+            lastHourReset = now;
+        }
+        if (now - lastDayReset >= 86400) {
+            dailyDelivered = 0.0;
+            lastDayReset = now;
+        }
+    }
+
     void updateBolusDelivery() {
         if (currentBolus == nullptr) return;
 
-        bolusDeliveryProgress += 2;
-        if (bolusDeliveryProgress >= 100) {
-            double delivered = currentBolus->amount;
-            reservoir = max(0.0, reservoir - delivered);
-            activeInsulin = max(0.0, activeInsulin - delivered);
+        double bolusStep = currentBolus->amount / 50.0;
+        double stepDelivery = min(bolusStep, currentBolus->amount - currentBolus->delivered);
+
+        currentBolus->delivered += stepDelivery;
+        reservoir = max(0.0, reservoir - stepDelivery);
+        activeInsulin += stepDelivery;
+        hourlyDelivered += stepDelivery;
+        dailyDelivered += stepDelivery;
+
+        bolusDeliveryProgress = static_cast<uint8_t>(
+            min(100.0, (currentBolus->delivered / currentBolus->amount) * 100.0)
+        );
+
+        if (currentBolus->delivered >= currentBolus->amount - 0.001) {
+            double finalDelivered = currentBolus->amount;
             bolusHistory.push_back(*currentBolus);
-            Logger::info("大剂量输送完成: " + String(currentBolus->amount) + "U");
+            Logger::info("大剂量输送完成: " + String(finalDelivered) + "U");
             delete currentBolus;
             currentBolus = nullptr;
             bolusDeliveryProgress = 0;
@@ -366,6 +436,12 @@ private:
 
     void updateTempBasal() {
         if (tempBasal == nullptr) return;
+
+        double basalStepU = tempBasal->rate * (updateIntervalMs / 3600000.0);
+        reservoir = max(0.0, reservoir - basalStepU);
+        activeInsulin += basalStepU;
+        hourlyDelivered += basalStepU;
+        dailyDelivered += basalStepU;
 
         tempBasalRemaining -= updateIntervalMs / 60000.0;
 
@@ -456,18 +532,32 @@ private:
         std::vector<uint8_t> data;
         data.push_back(static_cast<uint8_t>(patchState));
 
-        uint16_t fieldMask = (
-            MASK_SUSPEND | MASK_NORMAL_BOLUS | MASK_EXTENDED_BOLUS | MASK_BASAL |
-            MASK_SETUP | MASK_RESERVOIR | MASK_START_TIME | MASK_BATTERY |
-            MASK_STORAGE | MASK_ALARM | MASK_AGE | MASK_MAGNETO_PLACE |
-            MASK_UNUSED_CGM | MASK_UNUSED_COMMAND_CONFIRM |
-            MASK_UNUSED_AUTO_STATUS | MASK_UNUSED_LEGACY
-        );
+        uint16_t fieldMask = 0;
+        if (patchState == PatchState::SUSPENDED) {
+            fieldMask |= MASK_SUSPEND;
+        }
+        if (currentBolus != nullptr || !bolusHistory.empty()) {
+            fieldMask |= MASK_NORMAL_BOLUS;
+        } else {
+            fieldMask |= MASK_NORMAL_BOLUS;
+        }
+        fieldMask |= MASK_BASAL;
+        if (patchState == PatchState::PRIMING) {
+            fieldMask |= MASK_SETUP;
+        }
+        fieldMask |= MASK_RESERVOIR;
+        fieldMask |= MASK_START_TIME;
+        fieldMask |= MASK_BATTERY;
+        fieldMask |= MASK_STORAGE;
+        fieldMask |= MASK_ALARM;
+        fieldMask |= MASK_AGE;
+        fieldMask |= MASK_MAGNETO_PLACE;
+
         data.push_back(fieldMask & 0xFF);
         data.push_back((fieldMask >> 8) & 0xFF);
 
         if (fieldMask & MASK_SUSPEND) {
-            uint32_t suspendTime = (patchState == PatchState::SUSPENDED) ? totalElapsedTime : 0;
+            uint32_t suspendTime = totalElapsedTime;
             data.push_back(suspendTime & 0xFF);
             data.push_back((suspendTime >> 8) & 0xFF);
             data.push_back((suspendTime >> 16) & 0xFF);
@@ -477,36 +567,47 @@ private:
         if (fieldMask & MASK_NORMAL_BOLUS) {
             if (currentBolus) {
                 uint8_t flags = currentBolus->type & 0x7F;
-                if (bolusDeliveryProgress >= 100) flags |= 0x80;
+                if (currentBolus->delivered >= currentBolus->amount - 0.001) flags |= 0x80;
                 data.push_back(flags);
-                uint16_t delivered = static_cast<uint16_t>(currentBolus->amount * (bolusDeliveryProgress / 100.0) / 0.05);
-                data.push_back(delivered & 0xFF);
-                data.push_back((delivered >> 8) & 0xFF);
+                uint16_t deliveredRaw = static_cast<uint16_t>(round(currentBolus->delivered / 0.05));
+                data.push_back(deliveredRaw & 0xFF);
+                data.push_back((deliveredRaw >> 8) & 0xFF);
             } else {
-                data.push_back(0);
+                data.push_back(0x80);
                 data.push_back(0);
                 data.push_back(0);
             }
-        }
-
-        if (fieldMask & MASK_EXTENDED_BOLUS) {
-            data.push_back(0);
-            data.push_back(0);
-            data.push_back(0);
         }
 
         if (fieldMask & MASK_BASAL) {
             BasalType basalType = BasalType::STANDARD;
+            double basalRate = currentBasalRate;
             if (tempBasal) {
                 basalType = BasalType::ABSOLUTE_TEMP;
+                basalRate = tempBasal->rate;
             } else if (patchState == PatchState::SUSPENDED) {
                 basalType = BasalType::SUSPEND_MANUAL;
+                basalRate = 0;
             } else if (patchState == PatchState::STOPPED) {
                 basalType = BasalType::STOP;
+                basalRate = 0;
+            } else if (patchState == PatchState::LOW_BG_SUSPENDED || patchState == PatchState::LOW_BG_SUSPENDED2) {
+                basalType = BasalType::SUSPEND_LOW_GLUCOSE;
+                basalRate = 0;
+            } else if (patchState == PatchState::AUTO_SUSPENDED) {
+                basalType = BasalType::SUSPEND_AUTO;
+                basalRate = 0;
+            } else if (patchState == PatchState::HOURLY_MAX_SUSPENDED) {
+                basalType = BasalType::SUSPEND_MORE_THAN_MAX_PER_HOUR;
+                basalRate = 0;
+            } else if (patchState == PatchState::DAILY_MAX_SUSPENDED) {
+                basalType = BasalType::SUSPEND_MORE_THAN_MAX_PER_DAY;
+                basalRate = 0;
             }
+
             data.push_back(static_cast<uint8_t>(basalType));
-            data.push_back(0);
-            data.push_back(0);
+            data.push_back(basalSequence & 0xFF);
+            data.push_back((basalSequence >> 8) & 0xFF);
             data.push_back(patchId & 0xFF);
             data.push_back((patchId >> 8) & 0xFF);
             uint32_t startTime = patchStartTime;
@@ -514,16 +615,17 @@ private:
             data.push_back((startTime >> 8) & 0xFF);
             data.push_back((startTime >> 16) & 0xFF);
             data.push_back((startTime >> 24) & 0xFF);
-            uint16_t rate = tempBasal ? static_cast<uint16_t>(round(tempBasal->rate / 0.05)) : static_cast<uint16_t>(round(0.6 / 0.05));
-            uint16_t delivery = tempBasal ? rate : 0;
-            uint32_t rateDelivery = (static_cast<uint32_t>(delivery) << 12) | (rate & 0x0FFF);
+
+            uint16_t rateRaw = static_cast<uint16_t>(round(basalRate / 0.05));
+            uint16_t deliveryRaw = 0;
+            uint32_t rateDelivery = (static_cast<uint32_t>(deliveryRaw) << 12) | (rateRaw & 0x0FFF);
             data.push_back(rateDelivery & 0xFF);
             data.push_back((rateDelivery >> 8) & 0xFF);
             data.push_back((rateDelivery >> 16) & 0xFF);
         }
 
         if (fieldMask & MASK_SETUP) {
-            data.push_back(patchState == PatchState::PRIMING ? primeProgress : 0);
+            data.push_back(primeProgress);
         }
 
         if (fieldMask & MASK_RESERVOIR) {
@@ -549,8 +651,8 @@ private:
         }
 
         if (fieldMask & MASK_STORAGE) {
-            data.push_back(0);
-            data.push_back(0);
+            data.push_back(basalSequence & 0xFF);
+            data.push_back((basalSequence >> 8) & 0xFF);
             data.push_back(patchId & 0xFF);
             data.push_back((patchId >> 8) & 0xFF);
         }
@@ -571,25 +673,6 @@ private:
 
         if (fieldMask & MASK_MAGNETO_PLACE) {
             data.push_back(100);
-            data.push_back(0);
-        }
-
-        if (fieldMask & MASK_UNUSED_CGM) {
-            for (int i = 0; i < 5; i++) data.push_back(0);
-        }
-
-        if (fieldMask & MASK_UNUSED_COMMAND_CONFIRM) {
-            data.push_back(0);
-            data.push_back(0);
-        }
-
-        if (fieldMask & MASK_UNUSED_AUTO_STATUS) {
-            data.push_back(0);
-            data.push_back(0);
-        }
-
-        if (fieldMask & MASK_UNUSED_LEGACY) {
-            data.push_back(0);
             data.push_back(0);
         }
 
@@ -725,6 +808,17 @@ private:
     }
 
     void processCompleteCommand(const uint8_t* data, uint8_t len) {
+        if (len < 6) {
+            Logger::error("完整命令数据长度不足: " + String(len));
+            return;
+        }
+
+        uint8_t expectedCrc = crc8Calculate(data, len - 2);
+        if (data[len - 2] != expectedCrc) {
+            Logger::error("CRC校验失败: 期望=0x" + String(expectedCrc, HEX) + " 收到=0x" + String(data[len - 2], HEX));
+            return;
+        }
+
         uint8_t cmdType = data[1];
         uint8_t seqNum = data[2];
 
@@ -898,7 +992,8 @@ private:
     void handleSetTimeZoneRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
         Logger::info("=== 设置时区 ===");
         if (len >= 10) {
-            int16_t tzOffset = data[4] | (data[5] << 8);
+            uint16_t tzOffsetRaw = static_cast<uint16_t>(data[4] | (data[5] << 8));
+            int16_t tzOffset = static_cast<int16_t>(tzOffsetRaw);
             pumpTimezone = tzOffset;
             uint32_t timeVal = data[6] | (data[7] << 8) | (data[8] << 16) | (data[9] << 24);
             patchStartTime = timeVal;
@@ -943,7 +1038,7 @@ private:
             uint16_t amountRaw = data[5] | (data[6] << 8);
             double amount = amountRaw * 0.05;
 
-            Logger::info("大剂量类型: " + String(bolusType) + ", 金额: " + String(amount) + "U");
+            Logger::info("大剂量类型: " + String(bolusType) + ", 剂量: " + String(amount) + "U");
 
             if (amountRaw == 0) {
                 Logger::warning("大剂量金额为0,无效请求");
@@ -959,7 +1054,7 @@ private:
 
             if (amount > reservoir) {
                 Logger::warning("储药器余量不足: 需要" + String(amount) + "U, 剩余" + String(reservoir) + "U");
-                sendErrorResponse(CommandType::SET_BOLUS, BLEErrorCode::RESERVOIR_LOW);
+                sendErrorResponse(CommandType::SET_BOLUS, BLEErrorCode::RESERVOIR_EMPTY);
                 return;
             }
 
@@ -969,7 +1064,19 @@ private:
                 return;
             }
 
-            currentBolus = new BolusInfo{bolusType, amount, millis() / 1000};
+            if (amount + hourlyDelivered > hourlyMaxInsulin) {
+                Logger::warning("超过每小时最大胰岛素限制: " + String(amount + hourlyDelivered) + "U > " + String(hourlyMaxInsulin) + "U");
+                sendErrorResponse(CommandType::SET_BOLUS, BLEErrorCode::HOURLY_MAX_EXCEEDED);
+                return;
+            }
+
+            if (amount + dailyDelivered > dailyMaxInsulin) {
+                Logger::warning("超过每日最大胰岛素限制: " + String(amount + dailyDelivered) + "U > " + String(dailyMaxInsulin) + "U");
+                sendErrorResponse(CommandType::SET_BOLUS, BLEErrorCode::DAILY_MAX_EXCEEDED);
+                return;
+            }
+
+            currentBolus = new BolusInfo{bolusType, amount, 0.0, millis() / 1000};
             bolusDeliveryProgress = 0;
             Logger::info("大剂量已开始输送: " + String(amount) + "U");
         }
@@ -983,9 +1090,8 @@ private:
             Logger::info("取消大剂量类型: " + String(bolusType));
         }
         if (currentBolus) {
-            double delivered = currentBolus->amount * (bolusDeliveryProgress / 100.0);
-            reservoir += (currentBolus->amount - delivered);
-            Logger::info("大剂量已取消, 已输送: " + String(delivered) + "U, 退回: " + String(currentBolus->amount - delivered) + "U");
+            double undelivered = currentBolus->amount - currentBolus->delivered;
+            Logger::info("大剂量已取消, 已输送: " + String(currentBolus->delivered) + "U, 未输送: " + String(undelivered) + "U");
             delete currentBolus;
             currentBolus = nullptr;
             bolusDeliveryProgress = 0;
@@ -1003,7 +1109,7 @@ private:
             responseData[0] = 1;
             responseData[1] = 0x01;
             uint16_t amountRaw = static_cast<uint16_t>(round(currentBolus->amount / 0.05));
-            uint16_t deliveredRaw = static_cast<uint16_t>(amountRaw * bolusDeliveryProgress / 100);
+            uint16_t deliveredRaw = static_cast<uint16_t>(round(currentBolus->delivered / 0.05));
             uint16_t remainingRaw = amountRaw - deliveredRaw;
             responseData[2] = deliveredRaw & 0xFF;
             responseData[3] = (deliveredRaw >> 8) & 0xFF;
@@ -1013,7 +1119,7 @@ private:
             responseData[7] = (amountRaw >> 8) & 0xFF;
             responseData[8] = 0;
             responseData[9] = 0;
-            Logger::info("大剂量进行中: " + String(currentBolus->amount) + "U, 进度: " + String(bolusDeliveryProgress) + "%");
+            Logger::info("大剂量进行中: " + String(currentBolus->amount) + "U, 已输送: " + String(currentBolus->delivered) + "U");
         } else {
             memset(responseData, 0, 10);
             Logger::info("无进行中的大剂量");
@@ -1037,18 +1143,44 @@ private:
             double rate = rateRaw * 0.05;
             Logger::info("类型: " + String(basalType) + ", 速率: " + String(rate) + "U/hr, 时长: " + String(durationRaw) + "分钟");
 
+            if (rate > MAX_BASAL_RATE) {
+                Logger::warning("超过最大基础率限制: " + String(rate) + "U/hr > " + String(MAX_BASAL_RATE) + "U/hr");
+                sendErrorResponse(CommandType::SET_TEMP_BASAL, BLEErrorCode::MAX_BASAL_EXCEEDED);
+                return;
+            }
+
+            if (reservoir <= 0) {
+                Logger::warning("储药器已空,无法设置临时基础率");
+                sendErrorResponse(CommandType::SET_TEMP_BASAL, BLEErrorCode::RESERVOIR_EMPTY);
+                return;
+            }
+
+            double estimatedDelivery = rate * durationRaw / 60.0;
+            if (estimatedDelivery + hourlyDelivered > hourlyMaxInsulin) {
+                Logger::warning("临时基础率可能超过每小时最大胰岛素限制");
+                sendErrorResponse(CommandType::SET_TEMP_BASAL, BLEErrorCode::HOURLY_MAX_EXCEEDED);
+                return;
+            }
+
+            if (estimatedDelivery + dailyDelivered > dailyMaxInsulin) {
+                Logger::warning("临时基础率可能超过每日最大胰岛素限制");
+                sendErrorResponse(CommandType::SET_TEMP_BASAL, BLEErrorCode::DAILY_MAX_EXCEEDED);
+                return;
+            }
+
             if (tempBasal) delete tempBasal;
-            tempBasal = new TempBasalInfo{basalType, rate, millis() / 1000};
+            tempBasal = new TempBasalInfo{basalType, rate, durationRaw, millis() / 1000};
             tempBasalRemaining = durationRaw;
+            basalSequence++;
         }
 
         uint8_t responseData[11];
         responseData[0] = tempBasal ? static_cast<uint8_t>(BasalType::ABSOLUTE_TEMP) : static_cast<uint8_t>(BasalType::STANDARD);
-        uint16_t basalValue = tempBasal ? static_cast<uint16_t>(round(tempBasal->rate / 0.05)) : static_cast<uint16_t>(round(0.6 / 0.05));
+        uint16_t basalValue = tempBasal ? static_cast<uint16_t>(round(tempBasal->rate / 0.05)) : static_cast<uint16_t>(round(currentBasalRate / 0.05));
         responseData[1] = basalValue & 0xFF;
         responseData[2] = (basalValue >> 8) & 0xFF;
-        responseData[3] = 0;
-        responseData[4] = 0;
+        responseData[3] = basalSequence & 0xFF;
+        responseData[4] = (basalSequence >> 8) & 0xFF;
         responseData[5] = patchId & 0xFF;
         responseData[6] = (patchId >> 8) & 0xFF;
         uint32_t startTime = patchStartTime;
@@ -1068,17 +1200,18 @@ private:
             delete tempBasal;
             tempBasal = nullptr;
             tempBasalRemaining = 0;
+            basalSequence++;
         } else {
             Logger::info("无进行中的临时基础率");
         }
 
         uint8_t responseData[11];
         responseData[0] = static_cast<uint8_t>(BasalType::STANDARD);
-        uint16_t basalValue = static_cast<uint16_t>(round(0.6 / 0.05));
+        uint16_t basalValue = static_cast<uint16_t>(round(currentBasalRate / 0.05));
         responseData[1] = basalValue & 0xFF;
         responseData[2] = (basalValue >> 8) & 0xFF;
-        responseData[3] = 0;
-        responseData[4] = 0;
+        responseData[3] = basalSequence & 0xFF;
+        responseData[4] = (basalSequence >> 8) & 0xFF;
         responseData[5] = patchId & 0xFF;
         responseData[6] = (patchId >> 8) & 0xFF;
         uint32_t startTime = patchStartTime;
@@ -1110,16 +1243,14 @@ private:
         simulatorState = SimulatorState::SUSPENDED;
 
         if (currentBolus) {
-            Logger::info("暂停时取消大剂量");
-            double delivered = currentBolus->amount * (bolusDeliveryProgress / 100.0);
-            reservoir += (currentBolus->amount - delivered);
+            Logger::info("暂停时取消大剂量, 已输送: " + String(currentBolus->delivered) + "U");
             delete currentBolus;
             currentBolus = nullptr;
             bolusDeliveryProgress = 0;
         }
 
         if (tempBasal) {
-            Logger::info("暂停时取消临时基础率");
+            Logger::info("暂停时暂停临时基础率(保留记录以便恢复后继续)");
             delete tempBasal;
             tempBasal = nullptr;
             tempBasalRemaining = 0;
@@ -1131,7 +1262,15 @@ private:
     void handleResumeRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
         Logger::info("=== 恢复泵 ===");
 
-        if (patchState != PatchState::SUSPENDED) {
+        bool canResume = (patchState == PatchState::SUSPENDED ||
+                          patchState == PatchState::LOW_BG_SUSPENDED ||
+                          patchState == PatchState::LOW_BG_SUSPENDED2 ||
+                          patchState == PatchState::AUTO_SUSPENDED ||
+                          patchState == PatchState::HOURLY_MAX_SUSPENDED ||
+                          patchState == PatchState::DAILY_MAX_SUSPENDED ||
+                          patchState == PatchState::PAUSED);
+
+        if (!canResume) {
             Logger::warning("泵未处于暂停状态,无法恢复: " + String(getStateName(patchState)));
             sendErrorResponse(CommandType::RESUME_PUMP, BLEErrorCode::INVALID_STATE);
             return;
@@ -1149,16 +1288,25 @@ private:
             uint8_t profileType = data[4];
             Logger::info("配置文件类型: " + String(profileType));
             if (len > 5) {
-                Logger::info("配置文件数据: " + String(len - 5) + " bytes");
+                size_t profileLen = len - 5;
+                basalProfile.assign(data + 5, data + 5 + profileLen);
+                Logger::info("配置文件数据: " + String(profileLen) + " bytes");
+
+                if (profileLen >= 2) {
+                    uint16_t firstRateRaw = data[5] | (data[6] << 8);
+                    currentBasalRate = firstRateRaw * 0.05;
+                    Logger::info("当前基础率(第一时段): " + String(currentBasalRate) + "U/hr");
+                }
             }
+            basalSequence++;
         }
         uint8_t responseData[11];
         responseData[0] = static_cast<uint8_t>(BasalType::STANDARD);
-        uint16_t basalValue = static_cast<uint16_t>(round(0.6 / 0.05));
+        uint16_t basalValue = static_cast<uint16_t>(round(currentBasalRate / 0.05));
         responseData[1] = basalValue & 0xFF;
         responseData[2] = (basalValue >> 8) & 0xFF;
-        responseData[3] = 0;
-        responseData[4] = 0;
+        responseData[3] = basalSequence & 0xFF;
+        responseData[4] = (basalSequence >> 8) & 0xFF;
         responseData[5] = patchId & 0xFF;
         responseData[6] = (patchId >> 8) & 0xFF;
         uint32_t startTime = patchStartTime;
@@ -1192,17 +1340,35 @@ private:
         if (len >= 14) {
             uint8_t autoSuspendEnable = data[4];
             uint8_t autoSuspendTime = data[5];
-            uint8_t expirationTimer = data[6];
-            uint8_t alarmSetting = data[7];
+            expirationTimer = data[6];
+            alarmSetting = data[7];
             uint8_t lowSuspend = data[8];
-            uint8_t predictiveLowSuspend = data[9];
-            uint8_t predictiveLowSuspendRange = data[10];
-            uint16_t hourlyMaxInsulin = data[11] | (data[12] << 8);
-            uint16_t dailyMaxInsulin = data[13] | (data[14] << 8);
+            predictiveLowSuspend = data[9];
+            predictiveLowSuspendRange = data[10];
+            uint16_t hourlyMax = data[11] | (data[12] << 8);
+            uint16_t dailyMax = data[13] | (data[14] << 8);
+            hourlyMaxInsulin = hourlyMax * 0.05;
+            dailyMaxInsulin = dailyMax * 0.05;
             Logger::info("激活参数: expirationTimer=" + String(expirationTimer) +
                 " alarmSetting=" + String(alarmSetting) +
-                " hourlyMax=" + String(hourlyMaxInsulin * 0.05) + "U" +
-                " dailyMax=" + String(dailyMaxInsulin * 0.05) + "U");
+                " hourlyMax=" + String(hourlyMaxInsulin) + "U" +
+                " dailyMax=" + String(dailyMaxInsulin) + "U");
+
+            if (len >= 17) {
+                uint16_t currentTDDRaw = data[15] | (data[16] << 8);
+                Logger::info("当前TDD: " + String(currentTDDRaw * 0.05) + "U");
+            }
+
+            if (len > 18) {
+                size_t profileLen = len - 18;
+                basalProfile.assign(data + 18, data + 18 + profileLen);
+                Logger::info("基础率配置文件: " + String(profileLen) + " bytes");
+                if (profileLen >= 2) {
+                    uint16_t firstRateRaw = data[18] | (data[19] << 8);
+                    currentBasalRate = firstRateRaw * 0.05;
+                    Logger::info("当前基础率: " + String(currentBasalRate) + "U/hr");
+                }
+            }
         }
 
         setPatchState(PatchState::ACTIVE);
@@ -1210,6 +1376,9 @@ private:
         reservoir = MAX_RESERVOIR;
         patchStartTime = millis() / 1000;
         totalElapsedTime = 0;
+        hourlyDelivered = 0;
+        dailyDelivered = 0;
+        basalSequence = 0;
         Logger::info("Patch 已激活 -> ACTIVE");
 
         uint8_t responseData[19];
@@ -1223,11 +1392,11 @@ private:
         responseData[6] = (startTime >> 16) & 0xFF;
         responseData[7] = (startTime >> 24) & 0xFF;
         responseData[8] = static_cast<uint8_t>(BasalType::STANDARD);
-        uint16_t basalValue = static_cast<uint16_t>(round(0.6 / 0.05));
+        uint16_t basalValue = static_cast<uint16_t>(round(currentBasalRate / 0.05));
         responseData[9] = basalValue & 0xFF;
         responseData[10] = (basalValue >> 8) & 0xFF;
-        responseData[11] = 0;
-        responseData[12] = 0;
+        responseData[11] = basalSequence & 0xFF;
+        responseData[12] = (basalSequence >> 8) & 0xFF;
         responseData[13] = patchId & 0xFF;
         responseData[14] = (patchId >> 8) & 0xFF;
         responseData[15] = startTime & 0xFF;
@@ -1253,23 +1422,49 @@ private:
             tempBasalRemaining = 0;
         }
 
-        uint8_t responseData[4] = {0, 0, static_cast<uint8_t>(patchId & 0xFF), static_cast<uint8_t>((patchId >> 8) & 0xFF)};
+        basalSequence++;
+        uint8_t responseData[4] = {
+            basalSequence & 0xFF,
+            static_cast<uint8_t>((basalSequence >> 8) & 0xFF),
+            static_cast<uint8_t>(patchId & 0xFF),
+            static_cast<uint8_t>((patchId >> 8) & 0xFF)
+        };
         sendResponse(CommandType::STOP_PATCH, seqNum, responseData, 4);
     }
 
     void handleSetPatchRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
         Logger::info("=== 设置 Patch 参数 ===");
         if (len >= 5) {
-            uint8_t alarmSettings = data[4];
-            Logger::info("警报设置: " + String(alarmSettings));
+            alarmSetting = data[4];
+            Logger::info("警报设置: " + String(alarmSetting));
         }
         if (len >= 7) {
             uint16_t hourlyMax = data[5] | (data[6] << 8);
-            Logger::info("每小时最大: " + String(hourlyMax * 0.05) + "U");
+            hourlyMaxInsulin = hourlyMax * 0.05;
+            Logger::info("每小时最大: " + String(hourlyMaxInsulin) + "U");
         }
         if (len >= 9) {
             uint16_t dailyMax = data[7] | (data[8] << 8);
-            Logger::info("每日最大: " + String(dailyMax * 0.05) + "U");
+            dailyMaxInsulin = dailyMax * 0.05;
+            Logger::info("每日最大: " + String(dailyMaxInsulin) + "U");
+        }
+        if (len >= 10) {
+            expirationTimer = data[9];
+            Logger::info("过期计时器: " + String(expirationTimer));
+        }
+        if (len >= 14) {
+            uint8_t autoSuspendEnable = data[10];
+            uint8_t autoSuspendTime = data[11];
+            uint8_t lowSuspend = data[12];
+            predictiveLowSuspend = data[13];
+            Logger::info("自动暂停: enable=" + String(autoSuspendEnable) +
+                " time=" + String(autoSuspendTime) +
+                " lowSuspend=" + String(lowSuspend) +
+                " predictiveLowSuspend=" + String(predictiveLowSuspend));
+        }
+        if (len >= 15) {
+            predictiveLowSuspendRange = data[14];
+            Logger::info("预测低血糖暂停范围: " + String(predictiveLowSuspendRange));
         }
         sendResponse(CommandType::SET_PATCH, seqNum, nullptr, 0);
     }
@@ -1346,7 +1541,7 @@ private:
         uint8_t header[4] = {
             7,
             static_cast<uint8_t>(cmdType),
-            0,
+            static_cast<uint8_t>(sequenceNumber),
             0
         };
         uint8_t packet[8];
@@ -1362,8 +1557,21 @@ private:
     }
 
     void sendNotificationPacket(const std::vector<uint8_t>& syncData) {
-        Logger::hexDump("NTF", "~~>", syncData.data(), syncData.size());
-        gattServer.sendRawNotification(syncData.data(), syncData.size());
+        if (syncData.empty()) return;
+
+        size_t packetLen = syncData.size() + 1;
+
+        if (packetLen > 256) {
+            Logger::error("通知数据过长: " + String(packetLen) + " bytes");
+            return;
+        }
+
+        uint8_t packet[256];
+        memcpy(packet, syncData.data(), syncData.size());
+        packet[syncData.size()] = 0;
+
+        Logger::hexDump("NTF", "~~>", packet, packetLen);
+        gattServer.sendNotification(packet, packetLen);
     }
 };
 

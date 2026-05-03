@@ -252,6 +252,8 @@ namespace BLEErrorCode {
     constexpr uint16_t PATCH_EXPIRED = 0x0307;
     constexpr uint16_t MAX_BOLUS_EXCEEDED = 0x0308;
     constexpr uint16_t MAX_BASAL_EXCEEDED = 0x0309;
+    constexpr uint16_t HOURLY_MAX_EXCEEDED = 0x030A;
+    constexpr uint16_t DAILY_MAX_EXCEEDED = 0x030B;
 
     // 状态错误
     constexpr uint16_t INVALID_STATE = 0x0400;
@@ -280,6 +282,8 @@ namespace BLEErrorCode {
             case PATCH_EXPIRED: return "Patch已过期";
             case MAX_BOLUS_EXCEEDED: return "超过最大大剂量";
             case MAX_BASAL_EXCEEDED: return "超过最大基础率";
+            case HOURLY_MAX_EXCEEDED: return "超过每小时最大量";
+            case DAILY_MAX_EXCEEDED: return "超过每日最大量";
             case INVALID_STATE: return "状态无效";
             case NOT_INITIALIZED: return "未初始化";
             case ALREADY_INITIALIZED: return "已初始化";
