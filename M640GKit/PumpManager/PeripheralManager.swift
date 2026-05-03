@@ -172,19 +172,20 @@ extension PeripheralManager {
         case .success:
             log.info("Connected to pump!")
 
-            pumpManager.state.isConnected = false
+            pumpManager.state.isConnected = true
             pumpManager.notifyStateDidChange()
             completion?(nil)
         }
     }
 
     private func parseStateUpdate(_ syncResponse: SynchronizePacketResponse, duringReconnect: Bool) {
-        // TEMP
-        do {
-            log.info("State update: \(String(data: try JSONEncoder().encode(syncResponse), encoding: .utf8) ?? "")")
-        } catch {
-            log.warning("State update: Failed to encode JSON - \(error)")
-        }
+        #if M640GKit_DEBUG_LOGS
+            do {
+                log.info("State update: \(String(data: try JSONEncoder().encode(syncResponse), encoding: .utf8) ?? "")")
+            } catch {
+                log.warning("State update: Failed to encode JSON - \(error)")
+            }
+        #endif
 
         StateSyncer.sync(
             syncResponse: syncResponse,
@@ -304,8 +305,9 @@ extension PeripheralManager: CBPeripheralDelegate {
             }
 
             if packet.responseCode == 16384 {
-                // Need to skip to packet
-                self.log.debug("Skipping this message - data: \(packet.totalData.hexEncodedString())")
+                self.log.debug("Intermediate response 0x4000; resetting reassembly for continuation")
+                packet.resetReassemblyAfterIntermediate16384Response()
+                self.currentPacket = packet
                 return
             }
 

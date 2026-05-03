@@ -13,10 +13,12 @@ GATT 服务器 (C++ 版本 - Arduino BLE 库)
 #define M640G_GATT_SERVER_H
 
 #include <Arduino.h>
+#include <string>
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
+#include <BLEAdvertising.h>
 #include "../enums.h"
 #include "../encryption/crc8.h"
 
@@ -103,6 +105,23 @@ public:
         pAdvertising->setScanResponse(true);
         pAdvertising->setMinPreferred(0x06);
         pAdvertising->setMinPreferred(0x12);
+
+        // Match iOS `BluetoothManager.centralManager(_:didDiscover:)` parsing:
+        // [0-1] company id LE, [2-5] pump SN, [6] device type, [7] version (>= 8 bytes).
+        const uint8_t mfg[] = {
+            0x59,
+            0x6A,
+            0x28,
+            0xD8,
+            0x12,
+            0x4A,
+            0x01,
+            0x01,
+        };
+        BLEAdvertisementData advData;
+        advData.setManufacturerData(std::string(reinterpret_cast<const char*>(mfg), sizeof(mfg)));
+        pAdvertising->setAdvertisementData(advData);
+
         BLEDevice::startAdvertising();
     }
 

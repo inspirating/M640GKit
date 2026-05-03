@@ -247,11 +247,13 @@ public extension M640GKitPumpManager {
                     return
                 }
 
-                do {
-                    self.log.info("Manual sync: \(String(data: try JSONEncoder().encode(syncResponse), encoding: .utf8) ?? "")")
-                } catch {
-                    self.log.warning("State update: Failed to encode JSON")
-                }
+                #if M640GKit_DEBUG_LOGS
+                    do {
+                        self.log.info("Manual sync: \(String(data: try JSONEncoder().encode(syncResponse), encoding: .utf8) ?? "")")
+                    } catch {
+                        self.log.warning("State update: Failed to encode JSON")
+                    }
+                #endif
 
                 self.state.lastSync = Date.now
                 self.notifyStateDidChange()

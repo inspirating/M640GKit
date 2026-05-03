@@ -223,15 +223,17 @@ extension BluetoothManager {
 
         let manufacturerData = advertisementData[CBAdvertisementDataManufacturerDataKey]
         guard let manufacturerData = manufacturerData as? Data, manufacturerData.count >= 7 else {
-            // Simulator bypass
-            scanCompletion?(
-                .success(
-                    peripheral: peripheral,
-                    pumpSN: Data([0x28, 0xD8, 0x12, 0x4A]),
-                    deviceType: 1,
-                    version: 1
+            #if DEBUG
+                // ESP32 / dev simulator may omit manufacturer data; never accept this in Release builds.
+                scanCompletion?(
+                    .success(
+                        peripheral: peripheral,
+                        pumpSN: Data([0x28, 0xD8, 0x12, 0x4A]),
+                        deviceType: 1,
+                        version: 1
+                    )
                 )
-            )
+            #endif
             return
         }
 
