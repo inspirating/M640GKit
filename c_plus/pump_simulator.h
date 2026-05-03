@@ -41,6 +41,7 @@ M640GKit ESP32 泵模拟器核心 (C++ 版本)
 
 namespace M640GKit {
 
+// 常量定义
 static constexpr const char* PUMP_NAME = "MT";
 static constexpr uint8_t PUMP_SN[4] = {0x28, 0xD8, 0x12, 0x4A};
 static constexpr uint8_t DEVICE_TYPE = 1;
@@ -55,6 +56,7 @@ static constexpr double DEFAULT_DAILY_MAX = 200.0;
 
 static constexpr uint32_t M640G_BASE_UNIX = 1388534400; // 2014-01-01T00:00:00+0000
 
+// 日志级别
 enum class LogLevel : uint8_t {
     DEBUG = 0,
     INFO = 1,
@@ -97,6 +99,7 @@ public:
 
 LogLevel Logger::currentLevel = LogLevel::DEBUG;
 
+// 模拟器状态
 enum class SimulatorState : uint8_t {
     INITIALIZING = 0,
     READY,
@@ -106,12 +109,14 @@ enum class SimulatorState : uint8_t {
     ERROR
 };
 
+// 大剂量数据结构
 struct BolusInfo {
     uint8_t type;
     double amount;
     uint32_t startTime;
 };
 
+// 临时基础率数据结构
 struct TempBasalInfo {
     uint8_t type;
     double rate;
@@ -138,16 +143,21 @@ public:
         Logger::info("  M640G 泵模拟器初始化");
         Logger::info("========================================");
 
+        // 初始化随机数
         randomSeed(millis());
 
+        // 生成会话令牌
         generateSessionToken();
 
+        // 设置初始时间
         uint32_t now = millis() / 1000;
         patchStartTime = now;
         patchId = random(65535) + 1;
 
+        // 创建默认基础率配置文件
         createDefaultBasalProfile();
 
+        // 初始化 GATT Server
         gattServer.onWriteRequest = handleWriteRequestStatic;
         gattServer.onSubscribe = handleSubscribeStatic;
         gattServer.onConnect = handleConnectStatic;
@@ -185,46 +195,57 @@ private:
     uint32_t lastUpdateTime;
     uint16_t updateIntervalMs;
 
+    // 泵状态
     PatchState patchState;
     SimulatorState simulatorState;
 
+    // 储药器和胰岛素
     double reservoir;
     double activeInsulin;
 
+    // 电池
     double batteryVoltage;
     uint8_t batteryLevel;
 
+    // 时间
     uint32_t patchStartTime;
     uint32_t totalElapsedTime;
     uint32_t patchId;
 
+    // 大剂量
     BolusInfo* currentBolus;
     uint8_t bolusDeliveryProgress;
     std::vector<BolusInfo> bolusHistory;
 
     uint8_t primeProgress;
 
+    // 基础率
     std::vector<uint8_t> basalProfile;
     TempBasalInfo* tempBasal;
     double tempBasalRemaining;
 
+    // 连接状态
     bool isConnected;
     bool isSubscribed;
     std::vector<uint32_t> authenticatedClients;
 
+    // 会话
     uint8_t sessionToken[4];
     int16_t pumpTimezone;
     bool timeSyncPending;
 
+    // GATT Server
     GATTServer gattServer;
     ConnectionTracker connectionTracker;
 
+    // 序列号和计时器
     uint8_t sequenceNumber;
     uint32_t pingCounter;
     uint32_t lastPingTime;
     uint16_t connectionTimeoutMs;
     uint32_t lastActivityTime;
 
+    // 数据包缓冲
     std::vector<uint8_t> packetBuffer;
     uint8_t expectedPacketLen;
     uint8_t currentCmdType;
