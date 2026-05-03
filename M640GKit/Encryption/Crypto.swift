@@ -19,10 +19,8 @@ enum Crypto {
             logger.warning("SecRandomCopyBytes failed (status \(status), attempt \(attempt)/5)")
         }
 
-        var fallback = UUID()
-        let data = withUnsafeBytes(of: &fallback) { Data($0.prefix(4)) }
-        logger.error("SecRandomCopyBytes failed repeatedly; using UUID-derived token")
-        return data
+        logger.error("SecRandomCopyBytes failed repeatedly; cannot generate secure token")
+        fatalError("无法生成安全的会话令牌，请重启设备")
     }
 
     static func simpleDecrypt(_ input: Data) -> Data {

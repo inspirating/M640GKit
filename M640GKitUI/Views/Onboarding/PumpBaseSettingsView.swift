@@ -17,8 +17,8 @@ struct PumpBaseSettingsView: View {
                             Text(LocalizedString("Serial number", comment: "Label for serial number"))
                                 .foregroundStyle(.primary)
                             Spacer()
-                            TextField("1234ABCD", text: $viewModel.serialNumber.max(8))
-                                .multilineTextAlignment(.trailing)
+                            // 1234ABCD
+                            TextField("28D8124A", text: $viewModel.serialNumber.max(8)).multilineTextAlignment(.trailing)
                         }
                         Text(LocalizedString(
                             "Make sure the Serial Number is correct before connecting it to the patch.",

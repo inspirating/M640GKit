@@ -28,21 +28,22 @@ namespace M640GKit {
 // 回调函数类型定义
 typedef void (*WriteRequestCallback)(const uint8_t* data, size_t len);
 typedef void (*SubscribeCallback)(bool subscribed);
+typedef void (*DisconnectCallback)();
+typedef void (*ConnectCallback)();
+
+// 前向声明，避免循环引用
+class GATTServer;
 
 class GATTServerCallbacks : public BLEServerCallbacks, public BLECharacteristicCallbacks {
 public:
-    GATTServer* server;
+    GATTServer* server = nullptr;
 
-    GATTServerCallbacks(GATTServer* srv) : server(srv) {}
+    GATTServerCallbacks() = default;
 
     void onConnect(BLEServer* pServer) override;
     void onDisconnect(BLEServer* pServer) override;
     void onWrite(BLECharacteristic* pCharacteristic) override;
-    void onSubscribe(BLECharacteristic* pCharacteristic, uint16_t subValue) override;
 };
-
-typedef void (*DisconnectCallback)();
-typedef void (*ConnectCallback)();
 
 class GATTServer {
 public:
@@ -53,7 +54,7 @@ public:
     ConnectCallback onConnect = nullptr;
 
     GATTServer() : server(nullptr), service(nullptr), readCharacteristic(nullptr),
-                   writeCharacteristic(nullptr), callbacks(this) {}
+                   writeCharacteristic(nullptr) {}
 
     void start() {
         if (isRunning) return;
@@ -62,6 +63,7 @@ public:
         BLEDevice::init("MT");
         server = BLEDevice::createServer();
         server->setCallbacks(&callbacks);
+        callbacks.server = this;
 
         // 创建服务
         service = server->createService(SERVICE_UUID);
@@ -69,7 +71,7 @@ public:
         // 创建写入特征 (可写)
         writeCharacteristic = service->createCharacteristic(
             WRITE_UUID,
-            BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY
+            BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR
         );
         writeCharacteristic->setCallbacks(&callbacks);
 
@@ -79,7 +81,6 @@ public:
             BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
         );
         readCharacteristic->addDescriptor(new BLE2902());
-        readCharacteristic->setCallbacks(&callbacks);
 
         // 启动服务
         service->start();
@@ -119,8 +120,15 @@ public:
             0x01,
             0x01,
         };
+
+        String mfgStr;
+        mfgStr.reserve(sizeof(mfg));
+        for (size_t i = 0; i < sizeof(mfg); i++) {
+            mfgStr += (char)mfg[i];
+        }
+
         BLEAdvertisementData advData;
-        advData.setManufacturerData(std::string(reinterpret_cast<const char*>(mfg), sizeof(mfg)));
+        advData.setManufacturerData(mfgStr);
         pAdvertising->setAdvertisementData(advData);
 
         BLEDevice::startAdvertising();
@@ -131,12 +139,10 @@ public:
 
         std::vector<uint8_t> payload(data, data + len);
 
-        if (useCrcHack && len > 0 && data[1] != 0x00) {
-            if (len >= 6) {
-                uint8_t expectedCrc = crc8Calculate(data, len - 2);
-                if (payload[len - 2] != expectedCrc) {
-                    payload[len - 1] = 0x00;
-                }
+        if (useCrcHack && len > 0 && len >= 6 && data[1] != 0x00) {
+            uint8_t expectedCrc = crc8Calculate(data, len - 2);
+            if (payload[len - 2] != expectedCrc) {
+                payload[len - 1] = 0x00;
             }
         }
 
@@ -193,14 +199,10 @@ inline void GATTServerCallbacks::onDisconnect(BLEServer* pServer) {
 
 inline void GATTServerCallbacks::onWrite(BLECharacteristic* pCharacteristic) {
     if (server && server->onWriteRequest) {
-        std::string value = pCharacteristic->getValue();
-        server->onWriteRequest(reinterpret_cast<const uint8_t*>(value.data()), value.length());
-    }
-}
-
-inline void GATTServerCallbacks::onSubscribe(BLECharacteristic* pCharacteristic, uint16_t subValue) {
-    if (server && server->onSubscribe) {
-        server->onSubscribe(subValue != 0);
+        String value = pCharacteristic->getValue();
+        if (value.length() > 0) {
+            server->onWriteRequest(reinterpret_cast<const uint8_t*>(value.c_str()), value.length());
+        }
     }
 }
 

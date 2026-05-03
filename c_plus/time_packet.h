@@ -19,21 +19,30 @@ namespace M640GKit {
 static constexpr uint32_t BASE_UNIX = 1388534400;
 
 inline uint32_t m640gkitSeconds() {
-    // 在 Arduino 中, 使用 time(nullptr) 获取当前时间
-    // 这里返回从 2014-01-01 开始的秒数
-    // 实际实现需要在主程序中传入当前时间
-    return 0;  // 占位, 实际值由调用者设置
+    // 在 Arduino ESP32 中, 使用 time(nullptr) 获取当前 Unix 时间
+    // 返回从 2014-01-01 开始的秒数
+    time_t now = time(nullptr);
+    if (now < (time_t)BASE_UNIX) {
+        return 0;
+    }
+    return (uint32_t)(now - BASE_UNIX);
 }
 
 inline void dateFromM640gkitSeconds(uint32_t seconds, int& year, int& month, int& day,
                                      int& hour, int& minute, int& second) {
-    // 简化的日期转换, 实际实现可使用标准库
-    year = 2014;
-    month = 1;
-    day = 1;
-    hour = 0;
-    minute = 0;
-    second = 0;
+    time_t unixTime = (time_t)seconds + BASE_UNIX;
+    struct tm* tmInfo = gmtime(&unixTime);
+    if (tmInfo) {
+        year = tmInfo->tm_year + 1900;
+        month = tmInfo->tm_mon + 1;
+        day = tmInfo->tm_mday;
+        hour = tmInfo->tm_hour;
+        minute = tmInfo->tm_min;
+        second = tmInfo->tm_sec;
+    } else {
+        year = 2014; month = 1; day = 1;
+        hour = 0; minute = 0; second = 0;
+    }
 }
 
 class GetTimePacket : public BasePacket {

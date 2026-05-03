@@ -631,7 +631,7 @@ public extension M640GKitPumpManager {
     }
 
     func resumeDelivery(completion: @escaping ((any Error)?) -> Void) {
-        log.info("Suspending delivery...")
+        log.info("Resuming delivery...")
 
         bluetooth.ensureConnected { error in
             if let error = error {

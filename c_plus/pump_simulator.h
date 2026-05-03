@@ -95,6 +95,11 @@ public:
     static void info(const char* msg) { log(LogLevel::INFO, "BLE", msg); }
     static void warning(const char* msg) { log(LogLevel::WARNING, "BLE", msg); }
     static void error(const char* msg) { log(LogLevel::ERROR, "BLE", msg); }
+
+    static void debug(const String& msg) { log(LogLevel::DEBUG, "BLE", msg.c_str()); }
+    static void info(const String& msg) { log(LogLevel::INFO, "BLE", msg.c_str()); }
+    static void warning(const String& msg) { log(LogLevel::WARNING, "BLE", msg.c_str()); }
+    static void error(const String& msg) { log(LogLevel::ERROR, "BLE", msg.c_str()); }
 };
 
 LogLevel Logger::currentLevel = LogLevel::DEBUG;
@@ -132,7 +137,7 @@ public:
         reservoir(MAX_RESERVOIR), activeInsulin(0.0), batteryVoltage(3.8), batteryLevel(100),
         patchStartTime(0), totalElapsedTime(0), currentBolus(nullptr),
         bolusDeliveryProgress(0), primeProgress(0), tempBasal(nullptr), tempBasalRemaining(0),
-        isConnected(false), isSubscribed(false), sessionToken{0}, pumpTimezone(0),
+        isConnected(false), isSubscribed(false), isAuthenticated(false), sessionToken{0}, pumpTimezone(0),
         timeSyncPending(false), sequenceNumber(0), pingCounter(0), lastPingTime(0),
         connectionTimeoutMs(15000), lastActivityTime(0), patchId(0),
         lastNotifiedState(PatchState::NONE),
@@ -166,7 +171,6 @@ public:
 
         // 初始化 GATT Server
         gattServer.onWriteRequest = handleWriteRequestStatic;
-        gattServer.onSubscribe = handleSubscribeStatic;
         gattServer.onConnect = handleConnectStatic;
         gattServer.onDisconnect = handleDisconnectStatic;
         gattServer.start();
@@ -231,9 +235,20 @@ private:
     TempBasalInfo* tempBasal;
     double tempBasalRemaining;
 
+    // 操作记录
+    struct PumpRecord {
+        uint8_t type;      // 1=bolus, 2=tempBasal, 3=suspend, 4=resume
+        uint32_t timestamp;
+        double amount;
+        uint16_t duration;
+    };
+    std::vector<PumpRecord> recordBuffer;
+    static constexpr size_t MAX_RECORDS = 50;
+
     // 连接状态
     bool isConnected;
     bool isSubscribed;
+    bool isAuthenticated;
     std::vector<uint32_t> authenticatedClients;
 
     // 会话
@@ -379,6 +394,13 @@ private:
         if (isSubscribed && isConnected) {
             sendPeriodicNotification();
         }
+    }
+
+    void addRecord(uint8_t type, double amount, uint16_t duration) {
+        if (recordBuffer.size() >= MAX_RECORDS) {
+            recordBuffer.erase(recordBuffer.begin());
+        }
+        recordBuffer.push_back({type, patchStartTime + totalElapsedTime, amount, duration});
     }
 
     void updateNormalBasalDelivery() {
@@ -684,13 +706,6 @@ private:
         }
     }
 
-    static void handleSubscribeStatic(bool subscribed) {
-        extern M640GPumpSimulator* gSimulator;
-        if (gSimulator) {
-            gSimulator->handleSubscribe(subscribed);
-        }
-    }
-
     static void handleConnectStatic() {
         extern M640GPumpSimulator* gSimulator;
         if (gSimulator) {
@@ -729,20 +744,20 @@ private:
             " len=" + String(packetLen) + " seq=" + String(seqNum) + " pkg=" + String(pkgIndex));
 
         if (packetBuffer.empty()) {
-            size_t copyLen = min((size_t)packetLen, len - 1);
+            size_t copyLen = min((size_t)len, (size_t)(packetLen + 2));
             packetBuffer.assign(data, data + copyLen);
             expectedPacketLen = packetLen;
             currentCmdType = cmdType;
             currentSeqNum = seqNum;
             currentPkgIndex = pkgIndex;
 
-            if (packetBuffer.size() >= expectedPacketLen) {
-                processCompleteCommand(packetBuffer.data(), expectedPacketLen);
+            if (packetBuffer.size() >= (size_t)(expectedPacketLen + 2)) {
+                processCompleteCommand(packetBuffer.data(), expectedPacketLen + 2);
                 packetBuffer.clear();
                 expectedPacketLen = 0;
                 currentCmdType = 0;
             } else {
-                Logger::debug("等待更多数据包... (" + String(packetBuffer.size()) + "/" + String(expectedPacketLen) + ")");
+                Logger::debug("等待更多数据包... (" + String(packetBuffer.size()) + "/" + String(expectedPacketLen + 2) + ")");
             }
         } else {
             if (cmdType != currentCmdType || pkgIndex != currentPkgIndex + 1) {
@@ -754,14 +769,15 @@ private:
                 return;
             }
 
-            size_t copyLen = min((size_t)(expectedPacketLen - packetBuffer.size()), len - 4);
+            size_t remaining = (size_t)(expectedPacketLen + 2) - packetBuffer.size();
+            size_t copyLen = min(remaining, len - 4);
             packetBuffer.insert(packetBuffer.end(), data + 4, data + 4 + copyLen);
             currentPkgIndex = pkgIndex;
 
-            Logger::debug("收到分包 " + String(pkgIndex) + " (" + String(packetBuffer.size()) + "/" + String(expectedPacketLen) + ")");
+            Logger::debug("收到分包 " + String(pkgIndex) + " (" + String(packetBuffer.size()) + "/" + String(expectedPacketLen + 2) + ")");
 
-            if (packetBuffer.size() >= expectedPacketLen) {
-                processCompleteCommand(packetBuffer.data(), expectedPacketLen);
+            if (packetBuffer.size() >= (size_t)(expectedPacketLen + 2)) {
+                processCompleteCommand(packetBuffer.data(), expectedPacketLen + 2);
                 packetBuffer.clear();
                 expectedPacketLen = 0;
                 currentCmdType = 0;
@@ -785,12 +801,17 @@ private:
         Logger::info("========== BLE 客户端已连接 ==========");
         isConnected = true;
         lastActivityTime = millis();
+        connectionTracker.onConnect();
+        isSubscribed = true;
+        Logger::info("客户端已订阅通知");
+        sendStateNotification();
     }
 
     void handleBleDisconnect() {
         Logger::info("========== BLE 客户端已断开 ==========");
         isConnected = false;
         isSubscribed = false;
+        isAuthenticated = false;
         authenticatedClients.clear();
         packetBuffer.clear();
         expectedPacketLen = 0;
@@ -821,6 +842,13 @@ private:
         uint8_t seqNum = data[2];
 
         Logger::info("处理完整命令: " + String(getCommandName(cmdType)) + " (" + String(len) + " bytes)");
+
+        // AUTH_REQ 不需要认证，其他命令需要
+        if (cmdType != static_cast<uint8_t>(CommandType::AUTH_REQ) && !isAuthenticated) {
+            Logger::warning("未认证客户端尝试执行命令: " + String(getCommandName(cmdType)));
+            sendErrorResponse(static_cast<CommandType>(cmdType), BLEErrorCode::AUTH_REQUIRED);
+            return;
+        }
 
         switch (static_cast<CommandType>(cmdType)) {
             case CommandType::AUTH_REQ:
@@ -933,6 +961,7 @@ private:
         sendResponse(CommandType::AUTH_REQ, seqNum, responseData, 5);
 
         isConnected = true;
+        isAuthenticated = true;
         uint32_t token = clientToken[0] | (clientToken[1] << 8) | (clientToken[2] << 16) | (clientToken[3] << 24);
         authenticatedClients.push_back(token);
     }
@@ -1076,6 +1105,7 @@ private:
 
             currentBolus = new BolusInfo{bolusType, amount, 0.0, millis() / 1000};
             bolusDeliveryProgress = 0;
+            addRecord(1, amount, 0);
             Logger::info("大剂量已开始输送: " + String(amount) + "U");
         }
         sendResponse(CommandType::SET_BOLUS, seqNum, nullptr, 0);
@@ -1170,6 +1200,7 @@ private:
             tempBasal = new TempBasalInfo{basalType, rate, durationRaw, millis() / 1000};
             tempBasalRemaining = durationRaw;
             basalSequence++;
+            addRecord(2, rate, durationRaw);
         }
 
         uint8_t responseData[11];
@@ -1239,6 +1270,7 @@ private:
 
         setPatchState(PatchState::SUSPENDED);
         simulatorState = SimulatorState::SUSPENDED;
+        addRecord(3, 0, 0);
 
         if (currentBolus) {
             Logger::info("暂停时取消大剂量, 已输送: " + String(currentBolus->delivered) + "U");
@@ -1276,6 +1308,7 @@ private:
 
         setPatchState(PatchState::ACTIVE);
         simulatorState = SimulatorState::RUNNING;
+        addRecord(4, 0, 0);
         Logger::info("泵已恢复 -> ACTIVE");
         sendResponse(CommandType::RESUME_PUMP, seqNum, nullptr, 0);
     }
@@ -1475,23 +1508,36 @@ private:
 
     void handleGetRecordRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
         Logger::info("=== 获取记录 ===");
+        uint8_t requestType = 0;
+        uint8_t recordIndex = 0;
         if (len >= 6) {
-            uint8_t recordType = data[4];
-            uint8_t recordIndex = data[5];
-            Logger::info("记录类型: " + String(recordType) + ", 索引: " + String(recordIndex));
+            requestType = data[4];
+            recordIndex = data[5];
+            Logger::info("记录类型: " + String(requestType) + ", 索引: " + String(recordIndex));
         }
 
         uint8_t responseData[20];
         memset(responseData, 0, 20);
-        responseData[0] = 0x01;
-        responseData[1] = 0x00;
-        uint32_t timestamp = patchStartTime + totalElapsedTime;
-        responseData[2] = timestamp & 0xFF;
-        responseData[3] = (timestamp >> 8) & 0xFF;
-        responseData[4] = (timestamp >> 16) & 0xFF;
-        responseData[5] = (timestamp >> 24) & 0xFF;
-        responseData[6] = 0x0A;
-        responseData[7] = 0x00;
+
+        if (recordIndex < recordBuffer.size()) {
+            const PumpRecord& rec = recordBuffer[recordBuffer.size() - 1 - recordIndex];
+            responseData[0] = rec.type;
+            responseData[1] = 0x00;
+            responseData[2] = rec.timestamp & 0xFF;
+            responseData[3] = (rec.timestamp >> 8) & 0xFF;
+            responseData[4] = (rec.timestamp >> 16) & 0xFF;
+            responseData[5] = (rec.timestamp >> 24) & 0xFF;
+            uint16_t amountRaw = static_cast<uint16_t>(round(rec.amount / 0.05));
+            responseData[6] = amountRaw & 0xFF;
+            responseData[7] = (amountRaw >> 8) & 0xFF;
+            responseData[8] = rec.duration & 0xFF;
+            responseData[9] = (rec.duration >> 8) & 0xFF;
+            Logger::info("返回记录[" + String(recordIndex) + "]: type=" + String(rec.type) +
+                " amount=" + String(rec.amount) + " duration=" + String(rec.duration));
+        } else {
+            responseData[0] = 0x00;
+            Logger::info("无更多记录 (索引=" + String(recordIndex) + ", 总数=" + String(recordBuffer.size()) + ")");
+        }
 
         sendResponse(CommandType::GET_RECORD, seqNum, responseData, 20);
     }
@@ -1557,7 +1603,8 @@ private:
     void sendNotificationPacket(const std::vector<uint8_t>& syncData) {
         if (syncData.empty()) return;
 
-        size_t packetLen = syncData.size() + 1;
+        uint8_t totalContentLen = syncData.size() + 2; // responseCode(2)
+        size_t packetLen = totalContentLen + 5; // header(4) + crc(1) + trailing(1)
 
         if (packetLen > 256) {
             Logger::error("通知数据过长: " + String(packetLen) + " bytes");
@@ -1565,8 +1612,16 @@ private:
         }
 
         uint8_t packet[256];
-        memcpy(packet, syncData.data(), syncData.size());
-        packet[syncData.size()] = 0;
+        packet[0] = totalContentLen;
+        packet[1] = static_cast<uint8_t>(CommandType::SYNCHRONIZE);
+        packet[2] = sequenceNumber++;
+        packet[3] = 0; // pkgIndex
+        packet[4] = 0; // responseCode low
+        packet[5] = 0; // responseCode high
+        memcpy(packet + 6, syncData.data(), syncData.size());
+        uint8_t crc = crc8Calculate(packet, packetLen - 2);
+        packet[packetLen - 2] = crc;
+        packet[packetLen - 1] = 0;
 
         Logger::hexDump("NTF", "~~>", packet, packetLen);
         gattServer.sendNotification(packet, packetLen);

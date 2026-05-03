@@ -279,7 +279,7 @@ public class M640GKitPumpState: RawRepresentable {
                 DoseEntry.tempBasal(
                     absoluteUnit: tempBasalUnits ?? 0,
                     duration: tempBasalDuration ?? 0,
-                    insulinType: insulinType!,
+                    insulinType: insulinType ?? .novolog,
                     startDate: basalStateSince
                 )
             )
