@@ -102,4 +102,10 @@ extension M640GKitBasePacketProtocol {
     var hasEnoughData: Bool {
         totalData.count >= mimimumDataSize
     }
+
+    /// Pump can send response code `0x4000` (16384) on a logically complete frame; discard payload and wait for the real response (matches `python/pump_manager/ble_manager.py`).
+    mutating func resetReassemblyAfterIntermediate16384Response() {
+        totalData = Data()
+        dataSize = 0
+    }
 }

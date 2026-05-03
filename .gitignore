@@ -89,3 +89,14 @@ fastlane/test_output
 
 iOSInjectionProject/
 .DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.venv/
+venv/

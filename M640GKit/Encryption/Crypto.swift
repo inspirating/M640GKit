@@ -11,21 +11,18 @@ enum Crypto {
 
     static func genSessionToken() -> Data {
         var bytes = [UInt8](repeating: 0, count: 4)
-        let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
-
-        guard status == 0 else {
-            logger
-                .warning("Failed to generate security token - SecRandomCopyBytes error: \(status) -> Using less secure fallback")
-
-            return Data([
-                UInt8.random(in: 0 ..< 255),
-                UInt8.random(in: 0 ..< 255),
-                UInt8.random(in: 0 ..< 255),
-                UInt8.random(in: 0 ..< 255)
-            ])
+        for attempt in 1 ... 5 {
+            let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+            if status == 0 {
+                return Data(bytes)
+            }
+            logger.warning("SecRandomCopyBytes failed (status \(status), attempt \(attempt)/5)")
         }
 
-        return Data(bytes)
+        var fallback = UUID()
+        let data = withUnsafeBytes(of: &fallback) { Data($0.prefix(4)) }
+        logger.error("SecRandomCopyBytes failed repeatedly; using UUID-derived token")
+        return data
     }
 
     static func simpleDecrypt(_ input: Data) -> Data {

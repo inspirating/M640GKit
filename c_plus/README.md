@@ -39,8 +39,8 @@ c_plus/
 ## 依赖库
 
 - **Arduino ESP32 核心库**: 在 Arduino IDE 中通过 "开发板管理器" 添加 ESP32 支持
-- **NimBLE-Arduino**: 轻量级 BLE 库
-  - 在 Arduino IDE 中: 项目 -> 加载库 -> 管理库 -> 搜索 "NimBLE-Arduino" 并安装
+- **ESP32 Arduino BLE** (`BLEDevice.h` / `gatt_server.h` 当前实现): 使用开发板自带的 BLE 支持即可。
+  - 若你自行改用 **NimBLE-Arduino**, 需同步修改 `pump_manager/gatt_server.h` 中的包含与 API, README 以仓库内实际代码为准。
 
 ## 使用方法
 
@@ -59,13 +59,7 @@ c_plus/
 4. 工具 -> 开发板 -> 开发板管理器
 5. 搜索 "ESP32" 并安装
 
-### 3. 安装 NimBLE-Arduino 库
-
-1. 项目 -> 加载库 -> 管理库
-2. 搜索 "NimBLE-Arduino"
-3. 点击安装
-
-### 4. 上传程序
+### 3. 上传程序
 
 1. 用 USB 线连接 ESP32 到电脑
 2. 在 Arduino IDE 中选择:
@@ -74,7 +68,7 @@ c_plus/
 3. 打开 `M640GKit.ino` 文件
 4. 点击上传按钮 (或按 Ctrl+U)
 
-### 5. 查看日志
+### 4. 查看日志
 
 1. 工具 -> 串口监视器
 2. 设置波特率为 115200
@@ -120,15 +114,14 @@ void setup() {
 ## 注意事项
 
 1. **内存使用**: ESP32 有 520KB SRAM, 注意避免内存泄漏
-2. **BLE 稳定性**: NimBLE 比标准 BLE 库更稳定且内存占用更小
+2. **BLE 稳定性**: 若连接不稳, 可尝试降低串口日志频率、检查电源; 改用 NimBLE 时需同步改写 `gatt_server.h`。
 3. **电源**: 确保 ESP32 供电稳定, 避免 BLE 连接中断
 4. **散热**: 长时间运行注意散热
 
 ## 故障排除
 
 ### 无法编译
-- 确认已安装 ESP32 开发板支持
-- 确认已安装 NimBLE-Arduino 库
+- 确认已安装 ESP32 开发板支持（当前工程使用自带 BLE 栈, 无需单独安装 NimBLE）
 - 检查所有文件是否在正确的目录中
 
 ### BLE 无法连接

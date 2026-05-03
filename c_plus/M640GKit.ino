@@ -8,8 +8,7 @@ M640GKit ESP32 泵模拟器 - Arduino 入口文件
 
 硬件要求:
 - ESP32 开发板 (推荐 ESP32-WROOM-32)
-- Arduino ESP32 核心库
-- NimBLE-Arduino 库 (轻量级 BLE 库)
+- Arduino ESP32 核心库 (内置 BLE, 见 pump_manager/gatt_server.h)
 
 使用方法:
 1. 在 Arduino IDE 中打开此文件
