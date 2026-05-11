@@ -1,8 +1,8 @@
-import HealthKit
+﻿import HealthKit
 import LoopKit
 import SwiftUI
 
-class PatchDetailsViewModel: ObservableObject {
+class PatchDetailsViewModel: PatchLifetimeFormatting, ObservableObject {
     private let processQueue = DispatchQueue(label: "com.nightscout.M640GKit.patchDetailsViewModel")
 
     @Published var patchStateString: String = PatchState.none.description
@@ -13,6 +13,8 @@ class PatchDetailsViewModel: ObservableObject {
     @Published var battery: Double = 0
     @Published var reservoirLevel: Double = 0
     @Published var initialReservoirLevel: Double? = nil
+    @Published var activatedAt: String = ""
+    @Published var patchLifetime: String = ""
 
     let reservoirVolumeFormatter: QuantityFormatter = {
         let formatter = QuantityFormatter(for: .internationalUnit())
@@ -28,15 +30,23 @@ class PatchDetailsViewModel: ObservableObject {
         return formatter
     }()
 
+    let dateTimeFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
     let dateFormatter = {
         let formatter = DateFormatter()
         formatter.timeStyle = .medium
         return formatter
     }()
 
-    private let pumpManager: M640GKitPumpManager?
-    init(pumpManager: M640GKitPumpManager?) {
+    private let pumpManager: M640GPumpManager?
+    init(pumpManager: M640GPumpManager?) {
         self.pumpManager = pumpManager
+        super.init()
 
         guard let pumpManager = pumpManager else {
             return
@@ -84,6 +94,11 @@ extension PatchDetailsViewModel: PumpManagerStatusObserver {
             self.battery = pumpManager.state.battery
             self.reservoirLevel = pumpManager.state.reservoir
             self.initialReservoirLevel = pumpManager.state.initialReservoir
+
+            if let patchActivatedAt = pumpManager.state.patchActivatedAt {
+                self.activatedAt = self.dateTimeFormatter.string(from: patchActivatedAt)
+                self.patchLifetime = self.processPatchLifetime(patchActivatedAt, Date())
+            }
         }
     }
 }

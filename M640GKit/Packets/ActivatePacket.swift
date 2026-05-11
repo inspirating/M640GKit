@@ -1,4 +1,4 @@
-struct ActivatePacketResponse {
+﻿struct ActivatePacketResponse {
     let patchId: Data
     let time: Date
     let basalType: BasalType
@@ -8,7 +8,7 @@ struct ActivatePacketResponse {
     let basalStartTime: Date
 }
 
-class ActivatePacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class ActivatePacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = ActivatePacketResponse
 
     let commandType: UInt8 = CommandType.ACTIVATE
@@ -92,12 +92,12 @@ class ActivatePacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
     func parseResponse() -> ActivatePacketResponse {
         ActivatePacketResponse(
             patchId: totalData.subdata(in: 6 ..< 10),
-            time: Date.fromM640GKitSeconds(totalData.subdata(in: 10 ..< 14).toUInt64()),
+            time: Date.fromM640GSeconds(totalData.subdata(in: 10 ..< 14).toUInt64()),
             basalType: BasalType(rawValue: totalData[14]) ?? .NONE,
             basalValue: totalData.subdata(in: 15 ..< 17).toDouble() * 0.05,
             basalSequence: totalData.subdata(in: 17 ..< 19).toDouble(),
             basalPatchId: totalData.subdata(in: 19 ..< 21).toDouble(),
-            basalStartTime: Date.fromM640GKitSeconds(totalData.subdata(in: 21 ..< 25).toUInt64())
+            basalStartTime: Date.fromM640GSeconds(totalData.subdata(in: 21 ..< 25).toUInt64())
         )
     }
 }

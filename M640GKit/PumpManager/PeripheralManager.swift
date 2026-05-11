@@ -1,31 +1,28 @@
-import CoreBluetooth
+﻿import CoreBluetooth
 
 class PeripheralManager: NSObject {
-    private let log = M640GKitLogger(category: "PeripheralManager")
+    private let log = M640GLogger(category: "PeripheralManager")
     private let queue = DispatchQueue(label: "org.nightscout.M640GKit.message-queue")
 
     private let connectedDevice: CBPeripheral
     private let bluetoothManager: BluetoothManager
-    private let pumpManager: M640GKitPumpManager
-    private var completion: ((M640GKitConnectError?) -> Void)?
+    private let pumpManager: M640GPumpManager
+    private var completion: ((M640GConnectError?) -> Void)?
 
-    public static let SERVICE_UUID = CBUUID(string: "669A9001-0008-968F-E311-6050405558B3")
-    private static let READ_UUID = CBUUID(string: "669a9120-0008-968f-e311-6050405558b3")
     private var readCharacteristic: CBCharacteristic?
-    private static let WRITE_UUID = CBUUID(string: "669a9101-0008-968f-e311-6050405558b3")
     private var writeCharacteristic: CBCharacteristic?
 
     private var writeSequence: UInt8 = 0
-    private var currentPacket: (any M640GKitBasePacketProtocol)?
+    private var currentPacket: (any M640GBasePacketProtocol)?
 
-    private var writeQueue: AsyncStream<M640GKitWriteResult<Any>>.Continuation?
+    private var writeQueue: AsyncStream<M640GWriteResult<Any>>.Continuation?
     private var writeTimeoutTask: Task<Void, Never>?
 
     public init(
         _ peripheral: CBPeripheral,
         _ bluetoothManager: BluetoothManager,
-        _ pumpManager: M640GKitPumpManager,
-        _ completion: @escaping (M640GKitConnectError?) -> Void
+        _ pumpManager: M640GPumpManager,
+        _ completion: @escaping (M640GConnectError?) -> Void
     ) {
         connectedDevice = peripheral
         self.bluetoothManager = bluetoothManager
@@ -50,7 +47,7 @@ class PeripheralManager: NSObject {
         }
     }
 
-    func writePacket(_ packet: any M640GKitBasePacketProtocol) async -> M640GKitWriteResult<Any> {
+    func writePacket(_ packet: any M640GBasePacketProtocol) async -> M640GWriteResult<Any> {
         guard writeQueue == nil else {
             log.error("A command is already running")
             return .failure(error: .alreadyRunning)
@@ -61,7 +58,7 @@ class PeripheralManager: NSObject {
             return .failure(error: .noWriteCharacteristic)
         }
 
-        let stream = AsyncStream<M640GKitWriteResult<Any>> { continuation in
+        let stream = AsyncStream<M640GWriteResult<Any>> { continuation in
             self.writeQueue = continuation
             self.write(packet, for: writeCharacteristic)
         }
@@ -74,7 +71,7 @@ class PeripheralManager: NSObject {
         return .failure(error: .noData)
     }
 
-    private func write(_ packet: any M640GKitBasePacketProtocol, for characteristic: CBCharacteristic) {
+    private func write(_ packet: any M640GBasePacketProtocol, for characteristic: CBCharacteristic) {
         currentPacket = packet
 
         let packages = packet.encode(sequenceNumber: writeSequence)
@@ -154,7 +151,7 @@ extension PeripheralManager {
                 return
             }
 
-            parseStateUpdate(syncResponse, duringReconnect: true)
+            parseStateUpdate(syncResponse, duringReconnect: true, fullSync: true)
             await subscribe()
         }
     }
@@ -172,26 +169,26 @@ extension PeripheralManager {
         case .success:
             log.info("Connected to pump!")
 
-            pumpManager.state.isConnected = true
+            pumpManager.state.isConnected = false
             pumpManager.notifyStateDidChange()
             completion?(nil)
         }
     }
 
-    private func parseStateUpdate(_ syncResponse: SynchronizePacketResponse, duringReconnect: Bool) {
-        #if M640GKit_DEBUG_LOGS
-            do {
-                log.info("State update: \(String(data: try JSONEncoder().encode(syncResponse), encoding: .utf8) ?? "")")
-            } catch {
-                log.warning("State update: Failed to encode JSON - \(error)")
-            }
-        #endif
+    private func parseStateUpdate(_ syncResponse: SynchronizePacketResponse, duringReconnect: Bool, fullSync: Bool) {
+        // TEMP
+        do {
+            log.info("State update: \(String(data: try JSONEncoder().encode(syncResponse), encoding: .utf8) ?? "")")
+        } catch {
+            log.warning("State update: Failed to encode JSON - \(error)")
+        }
 
         StateSyncer.sync(
             syncResponse: syncResponse,
             state: pumpManager.state,
             pumpManager: pumpManager,
-            duringReconnect: duringReconnect
+            duringReconnect: duringReconnect,
+            fullSync: fullSync
         )
     }
 }
@@ -204,16 +201,16 @@ extension PeripheralManager: CBPeripheralDelegate {
             return
         }
 
-        let service = peripheral.services?.first(where: { $0.uuid == PeripheralManager.SERVICE_UUID })
+        let service = peripheral.services?.first(where: { $0.uuid == CBUUID.SERVICE_UUID })
         guard let service = service else {
-            let localizedError = "No M640GKit service found - " +
+            let localizedError = "No M640G service found - " +
                 (peripheral.services?.map(\.uuid.uuidString).joined(separator: ", ") ?? "No services discovered")
             log.error(localizedError)
             completion?(.failedToDiscoverServices(localizedError: localizedError))
             return
         }
 
-        peripheral.discoverCharacteristics([PeripheralManager.READ_UUID, PeripheralManager.WRITE_UUID], for: service)
+        peripheral.discoverCharacteristics([CBUUID.READ_UUID, CBUUID.WRITE_UUID], for: service)
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
@@ -223,9 +220,8 @@ extension PeripheralManager: CBPeripheralDelegate {
             return
         }
 
-        let service = peripheral.services!.first(where: { $0.uuid == PeripheralManager.SERVICE_UUID })!
-        readCharacteristic = service.characteristics?.first(where: { $0.uuid == PeripheralManager.READ_UUID })
-        writeCharacteristic = service.characteristics?.first(where: { $0.uuid == PeripheralManager.WRITE_UUID })
+        readCharacteristic = service.characteristics?.first(where: { $0.uuid == CBUUID.READ_UUID })
+        writeCharacteristic = service.characteristics?.first(where: { $0.uuid == CBUUID.WRITE_UUID })
 
         guard readCharacteristic != nil, writeCharacteristic != nil else {
             let localizedError = "Failed to discover read, write or config characteristic - " +
@@ -261,25 +257,19 @@ extension PeripheralManager: CBPeripheralDelegate {
             return
         }
 
-        guard var data = characteristic.value else {
+        guard let data = characteristic.value else {
             log.warning("No data in didUpdateValueFor - characteristic: \(characteristic.uuid.uuidString)")
             return
         }
 
         queue.async {
-            if characteristic.uuid.uuidString.lowercased() == PeripheralManager.READ_UUID.uuidString.lowercased() {
+            if characteristic.uuid.uuidString.lowercased() == CBUUID.READ_UUID.uuidString.lowercased() {
                 guard data[1] != 0x00 else {
                     // Ignore all ping messages from patch pomp
                     return
                 }
 
-                self.log.debug("READ -> Got data: \(data.hexEncodedString())")
-                data.append(0x00) // Little CRC hack. The notification lacks the CRC value, thus add an empty value there
-
-                var packet = NotificationPacket()
-                packet.decode(data)
-
-                self.parseStateUpdate(packet.parseResponse(), duringReconnect: false)
+                self.handleHeartbeat(data: data)
                 return
             }
 
@@ -305,9 +295,8 @@ extension PeripheralManager: CBPeripheralDelegate {
             }
 
             if packet.responseCode == 16384 {
-                self.log.debug("Intermediate response 0x4000; resetting reassembly for continuation")
-                packet.resetReassemblyAfterIntermediate16384Response()
-                self.currentPacket = packet
+                // Need to skip to packet
+                self.log.debug("Skipping this message - data: \(packet.totalData.hexEncodedString())")
                 return
             }
 
@@ -315,6 +304,9 @@ extension PeripheralManager: CBPeripheralDelegate {
             self.writeTimeoutTask = nil
 
             if packet.responseCode != 0 {
+                // Examples for invalid codes:
+                // 7 -> Invalid authorization: propably wrong session token used
+                // 8 -> Invalid state: The patch is not in state 32 (active), which is required for that command
                 self.log.error("Invalid responseCode: \(packet.responseCode)")
                 writeCallback.yield(.failure(error: .invalidResponse(code: packet.responseCode)))
             } else if packet.failed {
@@ -335,6 +327,48 @@ extension PeripheralManager: CBPeripheralDelegate {
             writeCallback.finish()
             self.writeQueue = nil
             self.currentPacket = nil
+        }
+    }
+    
+    private func handleHeartbeat(data: Data) {
+        var data = data
+
+        self.log.debug("READ -> Got data: \(data.hexEncodedString())")
+        data.append(0x00) // Little CRC hack. The notification lacks the CRC value, thus add an empty value there
+
+        var packet = NotificationPacket()
+        packet.decode(data)
+
+        guard Date.now.timeIntervalSince(self.pumpManager.state.lastSync) > .minutes(2.5) else {
+            self.parseStateUpdate(packet.parseResponse(), duringReconnect: false, fullSync: false)
+            self.log.debug("State too fresh, skipping full sync...")
+            return
+        }
+        
+        guard self.pumpManager.state.bolusState == .noBolus else {
+            self.parseStateUpdate(packet.parseResponse(), duringReconnect: false, fullSync: false)
+            self.log.warning("Skipping sync, pump is currently bolusing")
+            return
+        }
+
+        // Do full sync (only every 3min)
+        Task {
+            let response = await self.writePacket(SynchronizePacket())
+            await StateSyncer.fetchPatchTime(pumpManager: self.pumpManager)
+
+            switch response {
+            case let .failure(error):
+                self.log.error("Failed to get synchronize: \(error.localizedDescription)")
+                return
+
+            case let .success(data):
+                guard let syncResponse = data as? SynchronizePacketResponse else {
+                    self.log.error("Failed to Synchronize packet: invalid response")
+                    return
+                }
+
+                self.parseStateUpdate(syncResponse, duringReconnect: false, fullSync: true)
+            }
         }
     }
 }

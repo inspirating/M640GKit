@@ -100,3 +100,7 @@ dist/
 build/
 .venv/
 venv/
+
+
+# 把这个文件下的所有文件夹，文件名，类名里的MedtrumKit改成M640GKit
+# 把这个文件下的所有文件夹，文件名，类名里的Medtrum改成M640G

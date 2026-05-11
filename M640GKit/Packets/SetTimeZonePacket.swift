@@ -1,6 +1,6 @@
-struct SetTimeZonePacketResponse {}
+﻿struct SetTimeZonePacketResponse {}
 
-class SetTimeZonePacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class SetTimeZonePacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = SetTimeZonePacketResponse
 
     let commandType: UInt8 = CommandType.SET_TIME_ZONE
@@ -32,7 +32,7 @@ class SetTimeZonePacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
             UInt8(offsetInMinutes >> 8)
         ])
 
-        return base + date.toM640GKitSeconds()
+        return base + date.toM640GSeconds()
     }
 
     func parseResponse() -> SetTimeZonePacketResponse {

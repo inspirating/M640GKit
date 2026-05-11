@@ -1,4 +1,4 @@
-@testable import M640GKit
+﻿@testable import M640GKit
 import XCTest
 
 final class SetTempBasalPacketTests: XCTestCase {

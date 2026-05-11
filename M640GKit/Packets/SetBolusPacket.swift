@@ -1,6 +1,6 @@
-struct SetBolusResponse {}
+﻿struct SetBolusResponse {}
 
-class SetBolusPacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class SetBolusPacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = SetBolusResponse
     let commandType: UInt8 = CommandType.SET_BOLUS
     let mimimumDataSize: Int = 0

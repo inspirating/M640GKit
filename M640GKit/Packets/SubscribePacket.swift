@@ -1,6 +1,6 @@
-struct SubscribePacketResponse {}
+﻿struct SubscribePacketResponse {}
 
-class SubscribePacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class SubscribePacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = SubscribePacketResponse
 
     let commandType: UInt8 = CommandType.SUBSCRIBE

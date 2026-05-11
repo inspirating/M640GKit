@@ -1,4 +1,4 @@
-import os.log
+﻿import os.log
 
 extension OSLog {
     convenience init(category: String) {

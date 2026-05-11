@@ -1,11 +1,11 @@
-class DeactivatePatchViewModel: ObservableObject {
+﻿class DeactivatePatchViewModel: ObservableObject {
     @Published var isDeactivating = false
     @Published var deactivationError = ""
     @Published var is300u = false
 
     private let nextStep: () -> Void
-    private let pumpManager: M640GKitPumpManager?
-    init(_ pumpManager: M640GKitPumpManager?, _ nextStep: @escaping () -> Void) {
+    private let pumpManager: M640GPumpManager?
+    init(_ pumpManager: M640GPumpManager?, _ nextStep: @escaping () -> Void) {
         self.pumpManager = pumpManager
         self.nextStep = nextStep
 
@@ -20,7 +20,7 @@ class DeactivatePatchViewModel: ObservableObject {
         AuthorizeBiometrics.authenticate { success in
             guard success else {
                 DispatchQueue.main.async {
-                    self.deactivationError = LocalizedString("Authentication failure", comment: "auth failed")
+                    self.deactivationError = String(localized: "Authentication failure", comment: "auth failed")
                 }
                 return
             }
@@ -37,7 +37,7 @@ class DeactivatePatchViewModel: ObservableObject {
             AuthorizeBiometrics.authenticate { success in
                 DispatchQueue.main.async {
                     guard success else {
-                        self.deactivationError = LocalizedString("Authentication failure", comment: "auth failed")
+                        self.deactivationError = String(localized: "Authentication failure", comment: "auth failed")
                         return
                     }
 
@@ -74,7 +74,7 @@ class DeactivatePatchViewModel: ObservableObject {
             AuthorizeBiometrics.authenticate { success in
                 guard success else {
                     DispatchQueue.main.async {
-                        self.deactivationError = LocalizedString("Authentication failure", comment: "auth failed")
+                        self.deactivationError = String(localized: "Authentication failure", comment: "auth failed")
                     }
                     return
                 }

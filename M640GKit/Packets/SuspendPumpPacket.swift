@@ -1,6 +1,6 @@
-struct SuspendPumpResponse {}
+﻿struct SuspendPumpResponse {}
 
-class SuspendPumpPacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class SuspendPumpPacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = SuspendPumpResponse
     let commandType: UInt8 = CommandType.SUSPEND_PUMP
     let mimimumDataSize: Int = 0

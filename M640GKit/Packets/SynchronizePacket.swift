@@ -1,4 +1,4 @@
-class SynchronizePacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+﻿class SynchronizePacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = SynchronizePacketResponse
 
     let commandType: UInt8 = CommandType.SYNCHRONIZE

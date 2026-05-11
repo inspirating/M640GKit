@@ -1,4 +1,4 @@
-struct SetBasalProfilePacketResponse {
+﻿struct SetBasalProfilePacketResponse {
     let basalType: BasalType
     let basalValue: Double
     let basalSequence: Double
@@ -6,7 +6,7 @@ struct SetBasalProfilePacketResponse {
     let basalStartTime: Date
 }
 
-class SetBasalProfilePacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class SetBasalProfilePacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = SetBasalProfilePacketResponse
 
     let commandType: UInt8 = CommandType.SET_BASAL_PROFILE
@@ -28,7 +28,7 @@ class SetBasalProfilePacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
             basalValue: totalData.subdata(in: 7 ..< 9).toDouble() * 0.05,
             basalSequence: totalData.subdata(in: 9 ..< 11).toDouble(),
             basalPatchId: totalData.subdata(in: 11 ..< 13).toDouble(),
-            basalStartTime: Date.fromM640GKitSeconds(totalData.subdata(in: 13 ..< 17).toUInt64())
+            basalStartTime: Date.fromM640GSeconds(totalData.subdata(in: 13 ..< 17).toUInt64())
         )
     }
 }

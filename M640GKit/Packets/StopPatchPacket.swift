@@ -1,9 +1,9 @@
-struct StopPatchResponse {
+﻿struct StopPatchResponse {
     let sequence: Double
     let patchId: Double
 }
 
-class StopPatchPacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class StopPatchPacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = StopPatchResponse
     let commandType: UInt8 = CommandType.STOP_PATCH
     let mimimumDataSize: Int = 10

@@ -1,12 +1,17 @@
-import LoopKit
+﻿import LoopKit
 
 enum StateSyncer {
     static func sync(
         syncResponse: SynchronizePacketResponse,
-        state: M640GKitPumpState,
-        pumpManager: M640GKitPumpManager,
-        duringReconnect: Bool
+        state: M640GPumpState,
+        pumpManager: M640GPumpManager,
+        duringReconnect: Bool,
+        fullSync: Bool
     ) {
+        if fullSync {
+            pumpManager.state.lastSync = Date.now
+        }
+
         StateSyncer.updatePumpState(syncResponse: syncResponse, state: state)
 
         if let reservoir = syncResponse.reservoir {
@@ -22,6 +27,11 @@ enum StateSyncer {
             if state.initialReservoir == nil {
                 state.initialReservoir = state.reservoir
             }
+            
+            if fullSync {
+                // to prevent spaming the OSAID app with reservoir updates
+                pumpManager.emitReservoirLevel()
+            }
         }
 
         if let basal = syncResponse.basal {
@@ -29,7 +39,6 @@ enum StateSyncer {
             case .ABSOLUTE_TEMP,
                  .RELATIVE_TEMP:
                 state.basalState = .tempBasal
-                state.tempBasalUnits = basal.rate
 
             case .STOP,
                  .STOP_BASE_FAULT,
@@ -51,8 +60,6 @@ enum StateSyncer {
 
             default:
                 state.basalState = .active
-                state.tempBasalUnits = nil
-                state.tempBasalDuration = nil
             }
         }
 
@@ -86,8 +93,8 @@ enum StateSyncer {
         pumpManager.notifyStateDidChange()
     }
 
-    public static func timeSync(pumpManager: M640GKitPumpManager) async {
-        let logger = M640GKitLogger(category: "TimeSync")
+    public static func fetchPatchTime(pumpManager: M640GPumpManager) async {
+        let logger = M640GLogger(category: "TimeSync")
         let timeData = await pumpManager.bluetooth.write(GetTimePacket())
 
         switch timeData {
@@ -106,8 +113,8 @@ enum StateSyncer {
         }
     }
 
-    public static func syncTime(pumpManager: M640GKitPumpManager) async {
-        let logger = M640GKitLogger(category: "TimeSync")
+    public static func syncTime(pumpManager: M640GPumpManager) async {
+        let logger = M640GLogger(category: "TimeSync")
 
         let timeData = await pumpManager.bluetooth.write(SetTimePacket(date: Date.now))
         switch timeData {
@@ -126,11 +133,11 @@ enum StateSyncer {
             logger.error("Failed to sync timezone: \(error.errorDescription)")
             return
         default:
-            await StateSyncer.timeSync(pumpManager: pumpManager)
+            await StateSyncer.fetchPatchTime(pumpManager: pumpManager)
         }
     }
 
-    private static func updatePumpState(syncResponse: SynchronizePacketResponse, state: M640GKitPumpState) {
+    private static func updatePumpState(syncResponse: SynchronizePacketResponse, state: M640GPumpState) {
         state.pumpState = syncResponse.state
 
         // Send notification for specific states

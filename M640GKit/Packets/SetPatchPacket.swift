@@ -1,6 +1,6 @@
-struct SetPatchResponse {}
+﻿struct SetPatchResponse {}
 
-class SetPatchPacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class SetPatchPacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = SetPatchResponse
     let commandType: UInt8 = CommandType.SET_PATCH
     let mimimumDataSize: Int = 0

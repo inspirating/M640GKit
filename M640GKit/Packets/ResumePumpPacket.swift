@@ -1,6 +1,6 @@
-struct ResumePumpPacketResponse {}
+﻿struct ResumePumpPacketResponse {}
 
-class ResumePumpPacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class ResumePumpPacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = ResumePumpPacketResponse
 
     let commandType: UInt8 = CommandType.RESUME_PUMP

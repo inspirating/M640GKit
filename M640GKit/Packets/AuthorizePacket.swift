@@ -1,9 +1,9 @@
-struct AuthorizeResponse {
+﻿struct AuthorizeResponse {
     let deviceType: UInt8
     let swVersion: String
 }
 
-class AuthorizePacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class AuthorizePacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = AuthorizeResponse
 
     let commandType: UInt8 = CommandType.AUTH_REQ

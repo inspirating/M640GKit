@@ -1,4 +1,4 @@
-struct CancelTempBasalPacketResponse {
+﻿struct CancelTempBasalPacketResponse {
     let basalType: BasalType
     let basalValue: Double
     let basalSequence: Double
@@ -6,7 +6,7 @@ struct CancelTempBasalPacketResponse {
     let basalStartTime: Date
 }
 
-class CancelTempBasalPacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class CancelTempBasalPacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = CancelTempBasalPacketResponse
 
     let commandType: UInt8 = CommandType.CANCEL_TEMP_BASAL
@@ -22,7 +22,7 @@ class CancelTempBasalPacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
             basalValue: totalData.subdata(in: 7 ..< 9).toDouble() * 0.05,
             basalSequence: totalData.subdata(in: 9 ..< 11).toDouble(),
             basalPatchId: totalData.subdata(in: 11 ..< 13).toDouble(),
-            basalStartTime: Date.fromM640GKitSeconds(totalData.subdata(in: 13 ..< 17).toUInt64())
+            basalStartTime: Date.fromM640GSeconds(totalData.subdata(in: 13 ..< 17).toUInt64())
         )
     }
 }

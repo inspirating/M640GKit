@@ -1,11 +1,11 @@
-struct ClearAlertResponse {}
+﻿struct ClearAlertResponse {}
 
 public enum AlertType: UInt16 {
     case hourly = 4
     case daily = 5
 }
 
-class ClearAlertPacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class ClearAlertPacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = ClearAlertResponse
 
     let commandType: UInt8 = CommandType.CLEAR_ALARM

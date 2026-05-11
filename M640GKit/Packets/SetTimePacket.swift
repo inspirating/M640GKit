@@ -1,6 +1,6 @@
-struct SetTimePacketResponse {}
+﻿struct SetTimePacketResponse {}
 
-class SetTimePacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class SetTimePacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = SetTimePacketResponse
 
     let commandType: UInt8 = CommandType.SET_TIME
@@ -13,7 +13,7 @@ class SetTimePacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
 
     func getRequestBytes() -> Data {
         var output = Data([2])
-        output.append(date.toM640GKitSeconds())
+        output.append(date.toM640GSeconds())
 
         return output
     }

@@ -1,4 +1,4 @@
-protocol M640GKitBasePacketProtocol {
+﻿protocol M640GBasePacketProtocol {
     associatedtype T
 
     var commandType: UInt8 { get }
@@ -15,7 +15,7 @@ protocol M640GKitBasePacketProtocol {
     func parseResponse() -> T
 }
 
-class M640GKitBasePacket {
+class M640GBasePacket {
     var dataSize: UInt8 = 0
     var responseCode: UInt16 = 0
     var totalData = Data()
@@ -23,7 +23,7 @@ class M640GKitBasePacket {
     var failed: Bool = false
 }
 
-extension M640GKitBasePacketProtocol {
+extension M640GBasePacketProtocol {
     func encode(sequenceNumber: UInt8) -> [Data] {
         let content = getRequestBytes()
         var header = Data([
@@ -101,11 +101,5 @@ extension M640GKitBasePacketProtocol {
 
     var hasEnoughData: Bool {
         totalData.count >= mimimumDataSize
-    }
-
-    /// Pump can send response code `0x4000` (16384) on a logically complete frame; discard payload and wait for the real response (matches `python/pump_manager/ble_manager.py`).
-    mutating func resetReassemblyAfterIntermediate16384Response() {
-        totalData = Data()
-        dataSize = 0
     }
 }

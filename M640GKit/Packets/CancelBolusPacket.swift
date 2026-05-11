@@ -1,6 +1,6 @@
-struct CancelBolusPacketResponse {}
+﻿struct CancelBolusPacketResponse {}
 
-class CancelBolusPacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class CancelBolusPacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = CancelBolusPacketResponse
 
     let commandType: UInt8 = CommandType.CANCEL_BOLUS

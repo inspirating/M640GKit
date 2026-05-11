@@ -1,4 +1,4 @@
-//
+﻿//
 //  M640GKitPlugin.h
 //  M640GKitPlugin
 //

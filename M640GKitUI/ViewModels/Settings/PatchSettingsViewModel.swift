@@ -1,4 +1,4 @@
-import LoopKit
+﻿import LoopKit
 
 class PatchSettingsViewModel: ObservableObject {
     @Published var maxHourlyInsulin: Double = 0 {
@@ -38,8 +38,8 @@ class PatchSettingsViewModel: ObservableObject {
     let nextStep: (() -> Void)?
 
     private let processQueue = DispatchQueue(label: "com.nightscout.M640GKit.patchSettingsViewModel")
-    private let pumpManager: M640GKitPumpManager?
-    init(_ pumpManager: M640GKitPumpManager?, updatePatch: Bool, nextStep: (() -> Void)?) {
+    private let pumpManager: M640GPumpManager?
+    init(_ pumpManager: M640GPumpManager?, updatePatch: Bool, nextStep: (() -> Void)?) {
         self.pumpManager = pumpManager
         self.updatePatch = updatePatch
         self.nextStep = nextStep
@@ -76,7 +76,7 @@ class PatchSettingsViewModel: ObservableObject {
         AuthorizeBiometrics.authenticate { success in
             guard success else {
                 DispatchQueue.main.async {
-                    self.errorMessage = LocalizedString("Authentication failure", comment: "auth failed")
+                    self.errorMessage = String(localized: "Authentication failure", comment: "auth failed")
                 }
                 return
             }
@@ -119,7 +119,7 @@ class PatchSettingsViewModel: ObservableObject {
         }
     }
 
-    private func updateState(pumpManager: M640GKitPumpManager) {
+    private func updateState(pumpManager: M640GPumpManager) {
         pumpManager.state.maxHourlyInsulin = maxHourlyInsulin
         pumpManager.state.maxDailyInsulin = maxDailyInsulin
         pumpManager.state.alarmSetting = AlarmSettings(rawValue: UInt8(alarmSettings)) ?? .None
@@ -144,14 +144,14 @@ extension PatchSettingsViewModel: PumpManagerStatusObserver {
         didUpdate _: LoopKit.PumpManagerStatus,
         oldStatus _: LoopKit.PumpManagerStatus
     ) {
-        guard let pumpManager = pumpManager as? M640GKitPumpManager else {
+        guard let pumpManager = pumpManager as? M640GPumpManager else {
             return
         }
 
         updateState(pumpManager.state)
     }
 
-    func updateState(_ state: M640GKitPumpState) {
+    func updateState(_ state: M640GPumpState) {
         DispatchQueue.main.async {
             self.noActivePatch = state.patchId.isEmpty
             self.maxHourlyInsulin = state.maxHourlyInsulin

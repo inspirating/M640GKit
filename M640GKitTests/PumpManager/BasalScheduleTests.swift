@@ -1,4 +1,4 @@
-import LoopKit
+﻿import LoopKit
 @testable import M640GKit
 import XCTest
 

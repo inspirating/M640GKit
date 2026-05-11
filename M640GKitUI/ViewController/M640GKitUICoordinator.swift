@@ -1,10 +1,10 @@
-import Combine
+﻿import Combine
 import LoopKit
 import LoopKitUI
 import SwiftUI
 import UIKit
 
-enum M640GKitUIScreen {
+enum M640GUIScreen {
     case welcomeScreen
     case insulinTypeScreen
     case patchSettingsScreen
@@ -21,21 +21,21 @@ class M640GKitUICoordinator: UINavigationController, PumpManagerOnboarding, Comp
     UINavigationControllerDelegate
 {
     private let colorPalette: LoopUIColorPalette
-    private var pumpManager: M640GKitPumpManager?
+    private var pumpManager: M640GPumpManager?
     private var allowedInsulinTypes: [InsulinType]
     private var allowDebugFeatures: Bool
-    private let logger = M640GKitLogger(category: "M640GKitUICoordinator")
+    private let logger = M640GLogger(category: "M640GKitUICoordinator")
 
     var pumpManagerOnboardingDelegate: (any LoopKitUI.PumpManagerOnboardingDelegate)?
     var completionDelegate: (any LoopKitUI.CompletionDelegate)?
 
-    var screenStack = [M640GKitUIScreen]()
-    var currentScreen: M640GKitUIScreen {
+    var screenStack = [M640GUIScreen]()
+    var currentScreen: M640GUIScreen {
         screenStack.last!
     }
 
     init(
-        pumpManager: M640GKitPumpManager? = nil,
+        pumpManager: M640GPumpManager? = nil,
         colorPalette: LoopUIColorPalette,
         pumpManagerSettings: PumpManagerSetupSettings? = nil,
         allowDebugFeatures: Bool,
@@ -43,9 +43,9 @@ class M640GKitUICoordinator: UINavigationController, PumpManagerOnboarding, Comp
     )
     {
         if pumpManager == nil, pumpManagerSettings == nil {
-            self.pumpManager = M640GKitPumpManager(state: M640GKitPumpState(rawValue: [:]))
+            self.pumpManager = M640GPumpManager(state: M640GPumpState(rawValue: [:]))
         } else if pumpManager == nil, let pumpManagerSettings = pumpManagerSettings {
-            self.pumpManager = M640GKitPumpManager(state: M640GKitPumpState(pumpManagerSettings.basalSchedule))
+            self.pumpManager = M640GPumpManager(state: M640GPumpState(pumpManagerSettings.basalSchedule))
         } else {
             self.pumpManager = pumpManager
         }
@@ -77,7 +77,7 @@ class M640GKitUICoordinator: UINavigationController, PumpManagerOnboarding, Comp
         }
     }
 
-    func getInitialScreens() -> [M640GKitUIScreen] {
+    func getInitialScreens() -> [M640GUIScreen] {
         guard let pumpManager = self.pumpManager else {
             return [.settingsScreen]
         }
@@ -87,9 +87,6 @@ class M640GKitUICoordinator: UINavigationController, PumpManagerOnboarding, Comp
         }
 
         if pumpManager.state.pumpState.rawValue < PatchState.priming.rawValue {
-            if pumpManager.isOnboarded {
-                return [.patchPrimingScreen]
-            }
             return [.settingsScreen, .pumpBaseSettingsScreen]
         }
 
@@ -104,7 +101,7 @@ class M640GKitUICoordinator: UINavigationController, PumpManagerOnboarding, Comp
         return [.settingsScreen]
     }
 
-    private func viewControllerForScreen(_ screen: M640GKitUIScreen) -> UIViewController {
+    private func viewControllerForScreen(_ screen: M640GUIScreen) -> UIViewController {
         switch screen {
         case .welcomeScreen:
             return hostingController(rootView: OnboardingWelcomeView(nextStep: { self.navigateTo(.insulinTypeScreen) }))
@@ -233,10 +230,7 @@ class M640GKitUICoordinator: UINavigationController, PumpManagerOnboarding, Comp
                 pumpRemoval,
                 toActivatePatch
             )
-            return hostingController(rootView: M640GKitSettings(
-                viewModel: viewModel,
-                supportedInsulinTypes: allowedInsulinTypes
-            ))
+            return hostingController(rootView: M640GKitSettings(viewModel: viewModel))
         case .patchDetailsScreen:
             let viewModel = PatchDetailsViewModel(pumpManager: pumpManager)
             return hostingController(rootView: PatchDetailsView(viewModel: viewModel))
@@ -271,7 +265,7 @@ class M640GKitUICoordinator: UINavigationController, PumpManagerOnboarding, Comp
 }
 
 extension M640GKitUICoordinator {
-    func navigateTo(_ screen: M640GKitUIScreen) {
+    func navigateTo(_ screen: M640GUIScreen) {
         screenStack.append(screen)
         let viewController = viewControllerForScreen(screen)
         viewController.isModalInPresentation = false
@@ -279,7 +273,7 @@ extension M640GKitUICoordinator {
         viewController.view.layoutSubviews()
     }
 
-    func resetNavigationTo(_ screens: [M640GKitUIScreen]) {
+    func resetNavigationTo(_ screens: [M640GUIScreen]) {
         screenStack = screens
         let viewControllers = screenStack.map {
             let viewController = viewControllerForScreen($0)

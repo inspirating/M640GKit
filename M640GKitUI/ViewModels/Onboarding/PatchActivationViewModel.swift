@@ -1,11 +1,11 @@
-class PatchActivationViewModel: ObservableObject {
+﻿class PatchActivationViewModel: ObservableObject {
     @Published var isActivating: Bool = false
     @Published var activationError: String = ""
 
-    private let pumpManager: M640GKitPumpManager?
+    private let pumpManager: M640GPumpManager?
     private let nextStep: () -> Void
     let previousStep: () -> Void
-    init(_ pumpManager: M640GKitPumpManager?, _ nextStep: @escaping () -> Void, _ previousStep: @escaping () -> Void) {
+    init(_ pumpManager: M640GPumpManager?, _ nextStep: @escaping () -> Void, _ previousStep: @escaping () -> Void) {
         self.pumpManager = pumpManager
         self.nextStep = nextStep
         self.previousStep = previousStep

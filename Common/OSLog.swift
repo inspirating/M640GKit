@@ -1,7 +1,7 @@
-import Combine
+﻿import Combine
 import OSLog
 
-class M640GKitLogger {
+class M640GLogger {
     private let logger: Logger
     private let fileManager = FileManager.default
 
@@ -10,7 +10,7 @@ class M640GKitLogger {
     }
 
     public func debug(_ msg: String, file: String = #file, _ function: String = #function, _ line: Int = #line) {
-        #if M640GKit_DEBUG_LOGS
+        #if M640G_DEBUG_LOGS
             let message = "\(file.file) - \(function)#\(line): \(msg)"
             logger.debug("\(message, privacy: .public)")
             writeToFile(message, .debug)

@@ -1,4 +1,4 @@
-struct SetTempBasalResponse {
+﻿struct SetTempBasalResponse {
     let basalType: BasalType
     let basalValue: Double
     let basalSequence: Double
@@ -6,7 +6,7 @@ struct SetTempBasalResponse {
     let basalStartTime: Date
 }
 
-class SetTempBasalPacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class SetTempBasalPacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = SetTempBasalResponse
     let commandType: UInt8 = CommandType.SET_TEMP_BASAL
     let mimimumDataSize: Int = 17
@@ -38,7 +38,7 @@ class SetTempBasalPacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
             basalValue: totalData.subdata(in: 7 ..< 9).toDouble() * 0.05,
             basalSequence: totalData.subdata(in: 9 ..< 11).toDouble(),
             basalPatchId: totalData.subdata(in: 11 ..< 13).toDouble(),
-            basalStartTime: Date.fromM640GKitSeconds(totalData.subdata(in: 13 ..< 17).toUInt64())
+            basalStartTime: Date.fromM640GSeconds(totalData.subdata(in: 13 ..< 17).toUInt64())
         )
     }
 }

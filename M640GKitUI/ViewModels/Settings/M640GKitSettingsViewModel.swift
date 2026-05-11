@@ -1,4 +1,4 @@
-import HealthKit
+﻿import HealthKit
 import LoopKit
 import LoopKitUI
 import SwiftUI
@@ -12,7 +12,7 @@ enum PatchLifecycleState {
     case expiredBasalOnly
 }
 
-class M640GKitSettingsViewModel: ObservableObject, PumpManagerStatusObserver {
+class M640GKitSettingsViewModel: PatchLifetimeFormatting, ObservableObject, PumpManagerStatusObserver {
     private let processQueue = DispatchQueue(label: "com.nightscout.M640GKit.settingsViewModel")
 
     @Published var model: String = ""
@@ -24,7 +24,7 @@ class M640GKitSettingsViewModel: ObservableObject, PumpManagerStatusObserver {
     @Published var pumpTimeSyncedAt = Date.distantPast
     @Published var patchState: PatchState = .none
     @Published var patchStateString: String = PatchState.none.description
-    @Published var basalType: BasalState = .active
+    @Published var basalType: DoseType = .basal
     @Published var basalRate: Double = 0
     @Published var insulinType: InsulinType = .novolog
     @Published var lastSync = Date.distantPast
@@ -32,6 +32,7 @@ class M640GKitSettingsViewModel: ObservableObject, PumpManagerStatusObserver {
     @Published var dailyLimit = 0
     @Published var patchLifecycleProgress: Double = 0
     @Published var patchLifecycleState: PatchLifecycleState = .noPatch
+    @Published var patchLifetime: String = ""
     @Published var patchActivatedAt: Date? = nil
     @Published var patchExpiresAt: Date? = nil
     @Published var patchGracePeriodFrom: Date? = nil
@@ -43,15 +44,17 @@ class M640GKitSettingsViewModel: ObservableObject, PumpManagerStatusObserver {
     @Published var isUpdatingTempBasal = false
     @Published var showingHeartbeatWarning = false
     @Published var showingDeleteConfirmation = false
+    @Published var showingSuspendPicker = false
     @Published var hasPreviousPatch = false
     @Published var isClearingAlert = false
 
     public var pumpName: String {
-        pumpManager?.state.pumpName ?? "M640GKit Nano"
+        pumpManager?.state.pumpName ?? "M640G Nano"
     }
 
     let reservoirVolumeFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
+        formatter.roundingMode = .floor
         formatter.minimumFractionDigits = 0
         formatter.maximumFractionDigits = 0
         return formatter
@@ -94,10 +97,10 @@ class M640GKitSettingsViewModel: ObservableObject, PumpManagerStatusObserver {
     let toInsulinType: () -> Void
     let pumpActivationAction: (Bool) -> Void
     let activatePatchAction: () -> Void
-    private let log = M640GKitLogger(category: "settingsViewModel")
-    private let pumpManager: M640GKitPumpManager?
+    private let log = M640GLogger(category: "settingsViewModel")
+    private let pumpManager: M640GPumpManager?
     init(
-        _ pumpManager: M640GKitPumpManager?,
+        _ pumpManager: M640GPumpManager?,
         _ deactivatePatchAction: @escaping () -> Void,
         _ pumpActivationAction: @escaping (Bool) -> Void,
         _ toSettings: @escaping () -> Void,
@@ -116,6 +119,7 @@ class M640GKitSettingsViewModel: ObservableObject, PumpManagerStatusObserver {
         self.toPreviousPatchDetails = toPreviousPatchDetails
         self.toSettings = toSettings
         self.activatePatchAction = activatePatchAction
+        super.init()
 
         guard let pumpManager = pumpManager else {
             return
@@ -200,7 +204,7 @@ class M640GKitSettingsViewModel: ObservableObject, PumpManagerStatusObserver {
         insulinType = type
     }
 
-    func stopUsingM640GKit() {
+    func stopUsingM640G() {
         guard let pumpManager = self.pumpManager else {
             pumpRemovalAction()
             return
@@ -230,32 +234,40 @@ class M640GKitSettingsViewModel: ObservableObject, PumpManagerStatusObserver {
         pumpActivationAction(alreadyPrimed)
     }
 
+    func suspendDelivery(duration: TimeInterval) {
+        guard let pumpManager else {
+            return
+        }
+
+        pumpManager.suspendPatch(duration: duration) { error in
+            DispatchQueue.main.async {
+                self.isUpdatingSuspend = false
+            }
+
+            if let error = error {
+                self.log.error("Failed to suspend delivery: \(error)")
+            }
+        }
+    }
+
     func suspendResumeButtonPressed() {
+        if basalType != .suspend {
+            showingSuspendPicker = true
+            return
+        }
+
         guard let pumpManager = self.pumpManager else {
             return
         }
 
         isUpdatingSuspend = true
-        if basalType == .suspended {
-            pumpManager.resumeDelivery { error in
-                DispatchQueue.main.async {
-                    self.isUpdatingSuspend = false
-                }
-
-                if let error = error {
-                    self.log.error("Failed to resume delivery: \(error)")
-                }
+        pumpManager.resumeDelivery { error in
+            DispatchQueue.main.async {
+                self.isUpdatingSuspend = false
             }
 
-        } else {
-            pumpManager.suspendDelivery { error in
-                DispatchQueue.main.async {
-                    self.isUpdatingSuspend = false
-                }
-
-                if let error = error {
-                    self.log.error("Failed to suspend delivery: \(error)")
-                }
+            if let error = error {
+                self.log.error("Failed to resume delivery: \(error)")
             }
         }
     }
@@ -293,7 +305,7 @@ class M640GKitSettingsViewModel: ObservableObject, PumpManagerStatusObserver {
             return
         } else {
             // Disconnect from patch
-            pumpManager.bluetooth.disconnect()
+            pumpManager.bluetooth.disconnect(force: true)
             return
         }
     }
@@ -326,7 +338,7 @@ extension M640GKitSettingsViewModel {
         didUpdate _: LoopKit.PumpManagerStatus,
         oldStatus _: LoopKit.PumpManagerStatus
     ) {
-        guard let pumpManager = pumpManager as? M640GKitPumpManager else {
+        guard let pumpManager = pumpManager as? M640GPumpManager else {
             return
         }
 
@@ -336,7 +348,7 @@ extension M640GKitSettingsViewModel {
         }
     }
 
-    private func updateState(_ state: M640GKitPumpState) {
+    private func updateState(_ state: M640GPumpState) {
         model = state.model
         switch model {
         case "MD8301":
@@ -353,12 +365,15 @@ extension M640GKitSettingsViewModel {
         pumpTime = state.pumpTime
         pumpTimeSyncedAt = state.pumpTimeSyncedAt
         reservoirLevel = patchState != .reservoirEmpty ? state.reservoir : 0
-        basalType = state.basalState
-        basalRate = basalType == .tempBasal ? (state.tempBasalUnits ?? state.currentBaseBasalRate) : state.currentBaseBasalRate
+        basalType = state.basalDose.type
+        basalRate = state.basalDose.value
         lastSync = state.lastSync
         patchActivatedAt = state.patchActivatedAt
         patchGracePeriodFrom = state.patchGracePeriodFrom
         patchExpiresAt = state.patchExpiresAt
+        if let patchActivatedAt = state.patchActivatedAt {
+            patchLifetime = processPatchLifetime(patchActivatedAt, Date())
+        }
         hasPreviousPatch = state.previousPatch != nil
         hourlyLimit = Int(state.maxHourlyInsulin)
         dailyLimit = Int(state.maxDailyInsulin)
@@ -383,7 +398,7 @@ extension M640GKitSettingsViewModel {
         }
     }
 
-    private func getLifecycleState(state: M640GKitPumpState) -> PatchLifecycleState {
+    private func getLifecycleState(state: M640GPumpState) -> PatchLifecycleState {
         if patchLifecycleProgress < 1 {
             if let patchGracePeriodFrom = state.patchGracePeriodFrom,
                patchGracePeriodFrom.addingTimeInterval(.days(-1)) <= Date.now

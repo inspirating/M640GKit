@@ -1,8 +1,8 @@
-struct GetTimePacketResponse {
+﻿struct GetTimePacketResponse {
     let time: Date
 }
 
-class GetTimePacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class GetTimePacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = GetTimePacketResponse
 
     let commandType: UInt8 = CommandType.GET_TIME
@@ -15,7 +15,7 @@ class GetTimePacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
     func parseResponse() -> GetTimePacketResponse {
         let secondsPassed = totalData.subdata(in: 6 ..< 10).toUInt64()
         return GetTimePacketResponse(
-            time: Date.fromM640GKitSeconds(secondsPassed)
+            time: Date.fromM640GSeconds(secondsPassed)
         )
     }
 }

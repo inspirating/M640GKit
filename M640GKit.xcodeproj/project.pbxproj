@@ -1,4 +1,4 @@
-// !$*UTF8*$!
+﻿// !$*UTF8*$!
 {
 	archiveVersion = 1;
 	classes = {
@@ -11,9 +11,9 @@
 		3E0489052D74B82000E0B75A /* BasalType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E0489042D74B81D00E0B75A /* BasalType.swift */; };
 		3E0AD9B22F23FF2500958E94 /* ActivityIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E0AD9B12F23FF2100958E94 /* ActivityIndicator.swift */; };
 		3E1390102D6E534C00A146C1 /* BluetoothManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E13900F2D6E534600A146C1 /* BluetoothManager.swift */; };
-		3E1390122D6E59B500A146C1 /* M640GKitPumpState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E1390112D6E59B000A146C1 /* M640GKitPumpState.swift */; };
-		3E1390152D6E5C5E00A146C1 /* M640GKitScanResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E1390142D6E5C5200A146C1 /* M640GKitScanResult.swift */; };
-		3E1390172D6E5EA000A146C1 /* M640GKitConnectResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E1390162D6E5E9A00A146C1 /* M640GKitConnectResult.swift */; };
+		3E1390122D6E59B500A146C1 /* M640GPumpState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E1390112D6E59B000A146C1 /* M640GPumpState.swift */; };
+		3E1390152D6E5C5E00A146C1 /* M640GScanResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E1390142D6E5C5200A146C1 /* M640GScanResult.swift */; };
+		3E1390172D6E5EA000A146C1 /* M640GConnectResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E1390162D6E5E9A00A146C1 /* M640GConnectResult.swift */; };
 		3E1390192D6E5F3600A146C1 /* PeripheralManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E1390182D6E5F2B00A146C1 /* PeripheralManager.swift */; };
 		3E1532422D6F93EF0020F015 /* BasePacket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E1532412D6F93E70020F015 /* BasePacket.swift */; };
 		3E1532442D6F94E30020F015 /* AuthorizePacket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E1532432D6F94E20020F015 /* AuthorizePacket.swift */; };
@@ -21,17 +21,17 @@
 		3E1532482D6F98D20020F015 /* Crypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E1532472D6F98CF0020F015 /* Crypto.swift */; };
 		3E15324A2D6FA0080020F015 /* Data.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E1532492D6FA0060020F015 /* Data.swift */; };
 		3E15324C2D6FA4280020F015 /* Int64.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E15324B2D6FA4250020F015 /* Int64.swift */; };
-		3E15A4782DA2B6E6007F7D3C /* M640GKitReservoirView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E15A4772DA2B6E6007F7D3C /* M640GKitReservoirView.swift */; };
+		3E15A4782DA2B6E6007F7D3C /* M640GReservoirView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E15A4772DA2B6E6007F7D3C /* M640GReservoirView.swift */; };
 		3E15A47C2DA2B718007F7D3C /* IdentifiableClass.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E15A47B2DA2B718007F7D3C /* IdentifiableClass.swift */; };
 		3E15A47E2DA2B723007F7D3C /* NibLoadable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E15A47D2DA2B723007F7D3C /* NibLoadable.swift */; };
-		3E15A4802DA2B857007F7D3C /* M640GKitReservoirView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 3E15A47F2DA2B857007F7D3C /* M640GKitReservoirView.xib */; };
+		3E15A4802DA2B857007F7D3C /* M640GReservoirView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 3E15A47F2DA2B857007F7D3C /* M640GReservoirView.xib */; };
 		3E24AEC02DA1639F00C7733C /* PumpImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E24AEBF2DA1639F00C7733C /* PumpImage.swift */; };
 		3E24AEC22DA1727800C7733C /* PatchPrimingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E24AEC12DA1727800C7733C /* PatchPrimingView.swift */; };
 		3E24AEC42DA1729A00C7733C /* PatchPrimingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E24AEC32DA1729A00C7733C /* PatchPrimingViewModel.swift */; };
 		3E24AEC82DA17B4900C7733C /* PatchActivationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E24AEC72DA17B4900C7733C /* PatchActivationViewModel.swift */; };
 		3E24AECA2DA17B7F00C7733C /* PatchActivationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E24AEC92DA17B7F00C7733C /* PatchActivationView.swift */; };
 		3E26BE0B2D9069A600E595B0 /* M640GKitSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E26BE0A2D9069A600E595B0 /* M640GKitSettings.swift */; };
-		3E26BE0D2D906A0D00E595B0 /* M640GKitUI.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3E26BE0C2D906A0D00E595B0 /* M640GKitUI.xcassets */; };
+		3E26BE0D2D906A0D00E595B0 /* M640GUI.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3E26BE0C2D906A0D00E595B0 /* M640GUI.xcassets */; };
 		3E26BE0F2D906AEE00E595B0 /* M640GKitSettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E26BE0E2D906AE500E595B0 /* M640GKitSettingsViewModel.swift */; };
 		3E26BE112D906E5700E595B0 /* ReservoirView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E26BE102D906E5700E595B0 /* ReservoirView.swift */; };
 		3E3E78B52F6B2BA700DC4DF4 /* PatchDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E3E78B42F6B2BA700DC4DF4 /* PatchDetailsView.swift */; };
@@ -41,38 +41,37 @@
 		3E4566632D8371EC00FE1E0C /* ActivityViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E4566622D8371EB00FE1E0C /* ActivityViewController.swift */; };
 		3E4566652D837A4900FE1E0C /* Bundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E4566642D837A4800FE1E0C /* Bundle.swift */; };
 		3E5060142D70E5CB00376609 /* Crc8.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E5060132D70E5C900376609 /* Crc8.swift */; };
-		3E5060182D70EAF800376609 /* M640GKitWriteResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E5060172D70EAF400376609 /* M640GKitWriteResult.swift */; };
+		3E5060182D70EAF800376609 /* M640GWriteResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E5060172D70EAF400376609 /* M640GWriteResult.swift */; };
 		3E50601C2D70F69900376609 /* GetTimePacket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E50601B2D70F69800376609 /* GetTimePacket.swift */; };
 		3E50601E2D70F7A900376609 /* Date.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E50601D2D70F7A700376609 /* Date.swift */; };
 		3E5060202D70F97500376609 /* SetTimePacket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E50601F2D70F97500376609 /* SetTimePacket.swift */; };
 		3E5060222D70FDA100376609 /* SetTimeZonePacket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E5060212D70FDA000376609 /* SetTimeZonePacket.swift */; };
 		3E5060242D70FED500376609 /* SynchronizePacket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E5060232D70FED500376609 /* SynchronizePacket.swift */; };
 		3E5060262D71035900376609 /* SubscribePacket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E5060252D71035900376609 /* SubscribePacket.swift */; };
+		3E5FB2AC2FA62CAC00E6151C /* CBUUID.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E5FB2AB2FA62CA900E6151C /* CBUUID.swift */; };
 		3E6A00EE2DA03FE00085E6A4 /* PatchDeactivationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E6A00ED2DA03FE00085E6A4 /* PatchDeactivationView.swift */; };
 		3E6A00F02DA0421A0085E6A4 /* DeactivatePatchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E6A00EF2DA042140085E6A4 /* DeactivatePatchViewModel.swift */; };
-		3E6A00F22DA0428E0085E6A4 /* M640GKitDeactivatePatchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E6A00F12DA0428E0085E6A4 /* M640GKitDeactivatePatchResult.swift */; };
+		3E6A00F22DA0428E0085E6A4 /* M640GDeactivatePatchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E6A00F12DA0428E0085E6A4 /* M640GDeactivatePatchResult.swift */; };
 		3E6B082D2DF2224900A484C6 /* BasalScheduleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E6B082C2DF2224500A484C6 /* BasalScheduleTests.swift */; };
-		3E767D022D67B315004B1971 /* LocalizedString.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E767CFD2D67B192004B1971 /* LocalizedString.swift */; };
 		3E767D032D67B319004B1971 /* OSLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E767CE42D67AF35004B1971 /* OSLog.swift */; };
 		3E767D4D2D67BA71004B1971 /* LoopKitUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3E767D4C2D67BA71004B1971 /* LoopKitUI.framework */; };
 		3E767D522D67BC2E004B1971 /* M640GKitPumpManager+UI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E767CE22D67ADFA004B1971 /* M640GKitPumpManager+UI.swift */; };
-		3E767D532D67BC33004B1971 /* M640GKitHUDProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E767CFE2D67B1A9004B1971 /* M640GKitHUDProvider.swift */; };
+		3E767D532D67BC33004B1971 /* M640GHUDProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E767CFE2D67B1A9004B1971 /* M640GHUDProvider.swift */; };
 		3E767D562D67BCD6004B1971 /* M640GKitUICoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E767D552D67BCC9004B1971 /* M640GKitUICoordinator.swift */; };
 		3E77FEBA2D723AD400A15134 /* CryptoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E77FEB92D723AD200A15134 /* CryptoTests.swift */; };
-		3E77FEBC2D72F90000A15134 /* M640GKitBasePacketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E77FEBB2D72F8FC00A15134 /* M640GKitBasePacketTests.swift */; };
+		3E77FEBC2D72F90000A15134 /* M640GBasePacketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E77FEBB2D72F8FC00A15134 /* M640GBasePacketTests.swift */; };
 		3E77FEBE2D7364AC00A15134 /* ActivatePacket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E77FEBD2D7364A300A15134 /* ActivatePacket.swift */; };
 		3E77FEC22D74B39800A15134 /* AlarmSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E77FEC12D74B39300A15134 /* AlarmSettings.swift */; };
 		3E868C2D2F75BEED00ED6336 /* ClearAlertPacket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E868C2C2F75BEE800ED6336 /* ClearAlertPacket.swift */; };
 		3E92D5232DA458EA00E22577 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E92D5222DA458E500E22577 /* NotificationManager.swift */; };
-		3E9547FB2D8D963600EEF259 /* M640GKitPrimePatchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9547FA2D8D962D00EEF259 /* M640GKitPrimePatchResult.swift */; };
-		3E9547FD2D8D9CD600EEF259 /* M640GKitActivatePatchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9547FC2D8D9CCE00EEF259 /* M640GKitActivatePatchResult.swift */; };
+		3E9547FB2D8D963600EEF259 /* M640GPrimePatchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9547FA2D8D962D00EEF259 /* M640GPrimePatchResult.swift */; };
+		3E9547FD2D8D9CD600EEF259 /* M640GActivatePatchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9547FC2D8D9CCE00EEF259 /* M640GActivatePatchResult.swift */; };
 		3E98B84B2D6BB12C00DD5123 /* M640GKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B7D3A8D02C148CC4002EE003 /* M640GKit.framework */; platformFilter = ios; };
 		3E98B84C2D6BB12C00DD5123 /* M640GKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = B7D3A8D02C148CC4002EE003 /* M640GKit.framework */; platformFilter = ios; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		3E98B8512D6BB2BC00DD5123 /* TimeInterval.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E98B8502D6BB2B900DD5123 /* TimeInterval.swift */; };
 		3E9A5C962DA1460700A4102D /* PumpBaseSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9A5C952DA1460700A4102D /* PumpBaseSettingsView.swift */; };
 		3E9A5C982DA1461700A4102D /* PumpBaseSettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9A5C972DA1461600A4102D /* PumpBaseSettingsViewModel.swift */; };
-		3E9D8B0C2D88A3FA00008AF2 /* M640GKitDoseProgressReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9D8B0B2D88A3EF00008AF2 /* M640GKitDoseProgressReporter.swift */; };
-		3E9D8B0E2D88A59200008AF2 /* DoseEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9D8B0D2D88A59000008AF2 /* DoseEntry.swift */; };
+		3E9D8B0C2D88A3FA00008AF2 /* M640GDoseProgressReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9D8B0B2D88A3EF00008AF2 /* M640GDoseProgressReporter.swift */; };
 		3E9D8B102D88A5F200008AF2 /* UnfinalizedDose.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9D8B0F2D88A5EC00008AF2 /* UnfinalizedDose.swift */; };
 		3E9D8B122D88A8F600008AF2 /* NewPumpEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9D8B112D88A8F100008AF2 /* NewPumpEvent.swift */; };
 		3EA69F052D95E605002EEF9F /* InsulinTypeSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EA69F042D95E605002EEF9F /* InsulinTypeSelector.swift */; };
@@ -91,7 +90,7 @@
 		3EA87D6B2D7A402C007DD959 /* PrimePacket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EA87D6A2D7A4027007DD959 /* PrimePacket.swift */; };
 		3EA87D6D2D7A404C007DD959 /* PrimePacketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EA87D6C2D7A4046007DD959 /* PrimePacketTests.swift */; };
 		3EB1A3B12D7784410031C044 /* BasalSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EB1A3B02D77843E0031C044 /* BasalSchedule.swift */; };
-		3ED27C072DB67ED5001B7C95 /* M640GKitUpdatePatchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED27C062DB67ED5001B7C95 /* M640GKitUpdatePatchResult.swift */; };
+		3ED27C072DB67ED5001B7C95 /* M640GUpdatePatchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED27C062DB67ED5001B7C95 /* M640GUpdatePatchResult.swift */; };
 		3ED27E072D80BA130026488B /* SetBolusPacketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED27E062D80BA130026488B /* SetBolusPacketTests.swift */; };
 		3ED27E092D80BACB0026488B /* SetPatchPacket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED27E082D80BAC50026488B /* SetPatchPacket.swift */; };
 		3ED27E0B2D80BC960026488B /* SetPatchPacketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED27E0A2D80BC900026488B /* SetPatchPacketTests.swift */; };
@@ -119,9 +118,10 @@
 		3EF5B0702F79381B00504678 /* AuthorizeBiometrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EF5B06F2F79381400504678 /* AuthorizeBiometrics.swift */; };
 		3EFBC4F42DFB527400E0E295 /* DeleteDriverActionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EFBC4F32DFB526900E0E295 /* DeleteDriverActionSheet.swift */; };
 		B6E920502EAFBB390076D719 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B6E9204F2EAFBB380076D719 /* Localizable.xcstrings */; };
-		B7189AE72C15A52800703DE2 /* M640GKitPumpManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7189AE52C15A52800703DE2 /* M640GKitPumpManager.swift */; };
+		B7189AE72C15A52800703DE2 /* M640GPumpManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7189AE52C15A52800703DE2 /* M640GPumpManager.swift */; };
 		B7189AEA2C15A8CE00703DE2 /* LoopKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B7189AE92C15A8CE00703DE2 /* LoopKit.framework */; };
 		B7D3A8DB2C148CC4002EE003 /* M640GKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B7D3A8D02C148CC4002EE003 /* M640GKit.framework */; };
+		DD334CAC2F941CC90082A5B5 /* PatchLifetimeFormatting+Helper.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD334CAB2F941CC90082A5B5 /* PatchLifetimeFormatting+Helper.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -160,9 +160,9 @@
 		3E0489042D74B81D00E0B75A /* BasalType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BasalType.swift; sourceTree = "<group>"; };
 		3E0AD9B12F23FF2100958E94 /* ActivityIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityIndicator.swift; sourceTree = "<group>"; };
 		3E13900F2D6E534600A146C1 /* BluetoothManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothManager.swift; sourceTree = "<group>"; };
-		3E1390112D6E59B000A146C1 /* M640GKitPumpState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GKitPumpState.swift; sourceTree = "<group>"; };
-		3E1390142D6E5C5200A146C1 /* M640GKitScanResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GKitScanResult.swift; sourceTree = "<group>"; };
-		3E1390162D6E5E9A00A146C1 /* M640GKitConnectResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GKitConnectResult.swift; sourceTree = "<group>"; };
+		3E1390112D6E59B000A146C1 /* M640GPumpState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GPumpState.swift; sourceTree = "<group>"; };
+		3E1390142D6E5C5200A146C1 /* M640GScanResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GScanResult.swift; sourceTree = "<group>"; };
+		3E1390162D6E5E9A00A146C1 /* M640GConnectResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GConnectResult.swift; sourceTree = "<group>"; };
 		3E1390182D6E5F2B00A146C1 /* PeripheralManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeripheralManager.swift; sourceTree = "<group>"; };
 		3E1532412D6F93E70020F015 /* BasePacket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BasePacket.swift; sourceTree = "<group>"; };
 		3E1532432D6F94E20020F015 /* AuthorizePacket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthorizePacket.swift; sourceTree = "<group>"; };
@@ -170,17 +170,17 @@
 		3E1532472D6F98CF0020F015 /* Crypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Crypto.swift; sourceTree = "<group>"; };
 		3E1532492D6FA0060020F015 /* Data.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Data.swift; sourceTree = "<group>"; };
 		3E15324B2D6FA4250020F015 /* Int64.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Int64.swift; sourceTree = "<group>"; };
-		3E15A4772DA2B6E6007F7D3C /* M640GKitReservoirView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GKitReservoirView.swift; sourceTree = "<group>"; };
+		3E15A4772DA2B6E6007F7D3C /* M640GReservoirView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GReservoirView.swift; sourceTree = "<group>"; };
 		3E15A47B2DA2B718007F7D3C /* IdentifiableClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentifiableClass.swift; sourceTree = "<group>"; };
 		3E15A47D2DA2B723007F7D3C /* NibLoadable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NibLoadable.swift; sourceTree = "<group>"; };
-		3E15A47F2DA2B857007F7D3C /* M640GKitReservoirView.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = M640GKitReservoirView.xib; sourceTree = "<group>"; };
+		3E15A47F2DA2B857007F7D3C /* M640GReservoirView.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = M640GReservoirView.xib; sourceTree = "<group>"; };
 		3E24AEBF2DA1639F00C7733C /* PumpImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PumpImage.swift; sourceTree = "<group>"; };
 		3E24AEC12DA1727800C7733C /* PatchPrimingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatchPrimingView.swift; sourceTree = "<group>"; };
 		3E24AEC32DA1729A00C7733C /* PatchPrimingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatchPrimingViewModel.swift; sourceTree = "<group>"; };
 		3E24AEC72DA17B4900C7733C /* PatchActivationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatchActivationViewModel.swift; sourceTree = "<group>"; };
 		3E24AEC92DA17B7F00C7733C /* PatchActivationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatchActivationView.swift; sourceTree = "<group>"; };
 		3E26BE0A2D9069A600E595B0 /* M640GKitSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GKitSettings.swift; sourceTree = "<group>"; };
-		3E26BE0C2D906A0D00E595B0 /* M640GKitUI.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = M640GKitUI.xcassets; sourceTree = "<group>"; };
+		3E26BE0C2D906A0D00E595B0 /* M640GUI.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = M640GUI.xcassets; sourceTree = "<group>"; };
 		3E26BE0E2D906AE500E595B0 /* M640GKitSettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GKitSettingsViewModel.swift; sourceTree = "<group>"; };
 		3E26BE102D906E5700E595B0 /* ReservoirView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReservoirView.swift; sourceTree = "<group>"; };
 		3E3E78B42F6B2BA700DC4DF4 /* PatchDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatchDetailsView.swift; sourceTree = "<group>"; };
@@ -190,38 +190,37 @@
 		3E4566622D8371EB00FE1E0C /* ActivityViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityViewController.swift; sourceTree = "<group>"; };
 		3E4566642D837A4800FE1E0C /* Bundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bundle.swift; sourceTree = "<group>"; };
 		3E5060132D70E5C900376609 /* Crc8.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Crc8.swift; sourceTree = "<group>"; };
-		3E5060172D70EAF400376609 /* M640GKitWriteResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GKitWriteResult.swift; sourceTree = "<group>"; };
+		3E5060172D70EAF400376609 /* M640GWriteResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GWriteResult.swift; sourceTree = "<group>"; };
 		3E50601B2D70F69800376609 /* GetTimePacket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GetTimePacket.swift; sourceTree = "<group>"; };
 		3E50601D2D70F7A700376609 /* Date.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Date.swift; sourceTree = "<group>"; };
 		3E50601F2D70F97500376609 /* SetTimePacket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetTimePacket.swift; sourceTree = "<group>"; };
 		3E5060212D70FDA000376609 /* SetTimeZonePacket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetTimeZonePacket.swift; sourceTree = "<group>"; };
 		3E5060232D70FED500376609 /* SynchronizePacket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynchronizePacket.swift; sourceTree = "<group>"; };
 		3E5060252D71035900376609 /* SubscribePacket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscribePacket.swift; sourceTree = "<group>"; };
+		3E5FB2AB2FA62CA900E6151C /* CBUUID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBUUID.swift; sourceTree = "<group>"; };
 		3E6A00ED2DA03FE00085E6A4 /* PatchDeactivationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatchDeactivationView.swift; sourceTree = "<group>"; };
 		3E6A00EF2DA042140085E6A4 /* DeactivatePatchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeactivatePatchViewModel.swift; sourceTree = "<group>"; };
-		3E6A00F12DA0428E0085E6A4 /* M640GKitDeactivatePatchResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GKitDeactivatePatchResult.swift; sourceTree = "<group>"; };
+		3E6A00F12DA0428E0085E6A4 /* M640GDeactivatePatchResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GDeactivatePatchResult.swift; sourceTree = "<group>"; };
 		3E6B082C2DF2224500A484C6 /* BasalScheduleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BasalScheduleTests.swift; sourceTree = "<group>"; };
 		3E767CE22D67ADFA004B1971 /* M640GKitPumpManager+UI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "M640GKitPumpManager+UI.swift"; sourceTree = "<group>"; };
 		3E767CE42D67AF35004B1971 /* OSLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSLog.swift; sourceTree = "<group>"; };
-		3E767CFD2D67B192004B1971 /* LocalizedString.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizedString.swift; sourceTree = "<group>"; };
-		3E767CFE2D67B1A9004B1971 /* M640GKitHUDProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GKitHUDProvider.swift; sourceTree = "<group>"; };
+		3E767CFE2D67B1A9004B1971 /* M640GHUDProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GHUDProvider.swift; sourceTree = "<group>"; };
 		3E767D052D67B4A0004B1971 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		3E767D432D67B790004B1971 /* M640GKitPlugin.loopplugin */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = M640GKitPlugin.loopplugin; sourceTree = BUILT_PRODUCTS_DIR; };
 		3E767D4C2D67BA71004B1971 /* LoopKitUI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = LoopKitUI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		3E767D552D67BCC9004B1971 /* M640GKitUICoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GKitUICoordinator.swift; sourceTree = "<group>"; };
 		3E77FEB92D723AD200A15134 /* CryptoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoTests.swift; sourceTree = "<group>"; };
-		3E77FEBB2D72F8FC00A15134 /* M640GKitBasePacketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GKitBasePacketTests.swift; sourceTree = "<group>"; };
+		3E77FEBB2D72F8FC00A15134 /* M640GBasePacketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GBasePacketTests.swift; sourceTree = "<group>"; };
 		3E77FEBD2D7364A300A15134 /* ActivatePacket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivatePacket.swift; sourceTree = "<group>"; };
 		3E77FEC12D74B39300A15134 /* AlarmSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlarmSettings.swift; sourceTree = "<group>"; };
 		3E868C2C2F75BEE800ED6336 /* ClearAlertPacket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearAlertPacket.swift; sourceTree = "<group>"; };
 		3E92D5222DA458E500E22577 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
-		3E9547FA2D8D962D00EEF259 /* M640GKitPrimePatchResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GKitPrimePatchResult.swift; sourceTree = "<group>"; };
-		3E9547FC2D8D9CCE00EEF259 /* M640GKitActivatePatchResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GKitActivatePatchResult.swift; sourceTree = "<group>"; };
+		3E9547FA2D8D962D00EEF259 /* M640GPrimePatchResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GPrimePatchResult.swift; sourceTree = "<group>"; };
+		3E9547FC2D8D9CCE00EEF259 /* M640GActivatePatchResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GActivatePatchResult.swift; sourceTree = "<group>"; };
 		3E98B8502D6BB2B900DD5123 /* TimeInterval.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeInterval.swift; sourceTree = "<group>"; };
 		3E9A5C952DA1460700A4102D /* PumpBaseSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PumpBaseSettingsView.swift; sourceTree = "<group>"; };
 		3E9A5C972DA1461600A4102D /* PumpBaseSettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PumpBaseSettingsViewModel.swift; sourceTree = "<group>"; };
-		3E9D8B0B2D88A3EF00008AF2 /* M640GKitDoseProgressReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GKitDoseProgressReporter.swift; sourceTree = "<group>"; };
-		3E9D8B0D2D88A59000008AF2 /* DoseEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DoseEntry.swift; sourceTree = "<group>"; };
+		3E9D8B0B2D88A3EF00008AF2 /* M640GDoseProgressReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GDoseProgressReporter.swift; sourceTree = "<group>"; };
 		3E9D8B0F2D88A5EC00008AF2 /* UnfinalizedDose.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnfinalizedDose.swift; sourceTree = "<group>"; };
 		3E9D8B112D88A8F100008AF2 /* NewPumpEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewPumpEvent.swift; sourceTree = "<group>"; };
 		3EA69F042D95E605002EEF9F /* InsulinTypeSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsulinTypeSelector.swift; sourceTree = "<group>"; };
@@ -240,7 +239,7 @@
 		3EA87D6A2D7A4027007DD959 /* PrimePacket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimePacket.swift; sourceTree = "<group>"; };
 		3EA87D6C2D7A4046007DD959 /* PrimePacketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimePacketTests.swift; sourceTree = "<group>"; };
 		3EB1A3B02D77843E0031C044 /* BasalSchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BasalSchedule.swift; sourceTree = "<group>"; };
-		3ED27C062DB67ED5001B7C95 /* M640GKitUpdatePatchResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GKitUpdatePatchResult.swift; sourceTree = "<group>"; };
+		3ED27C062DB67ED5001B7C95 /* M640GUpdatePatchResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M640GUpdatePatchResult.swift; sourceTree = "<group>"; };
 		3ED27E062D80BA130026488B /* SetBolusPacketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetBolusPacketTests.swift; sourceTree = "<group>"; };
 		3ED27E082D80BAC50026488B /* SetPatchPacket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetPatchPacket.swift; sourceTree = "<group>"; };
 		3ED27E0A2D80BC900026488B /* SetPatchPacketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetPatchPacketTests.swift; sourceTree = "<group>"; };
@@ -268,11 +267,12 @@
 		3EF5B06F2F79381400504678 /* AuthorizeBiometrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthorizeBiometrics.swift; sourceTree = "<group>"; };
 		3EFBC4F32DFB526900E0E295 /* DeleteDriverActionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteDriverActionSheet.swift; sourceTree = "<group>"; };
 		B6E9204F2EAFBB380076D719 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
-		B7189AE52C15A52800703DE2 /* M640GKitPumpManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = M640GKitPumpManager.swift; sourceTree = "<group>"; };
+		B7189AE52C15A52800703DE2 /* M640GPumpManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = M640GPumpManager.swift; sourceTree = "<group>"; };
 		B7189AE92C15A8CE00703DE2 /* LoopKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = LoopKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		B7D3A8D02C148CC4002EE003 /* M640GKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = M640GKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		B7D3A8DA2C148CC4002EE003 /* M640GKitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = M640GKitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B7D3A8ED2C14F0EF002EE003 /* M640GKitPlugin.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = M640GKitPlugin.swift; sourceTree = "<group>"; };
+		DD334CAB2F941CC90082A5B5 /* PatchLifetimeFormatting+Helper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PatchLifetimeFormatting+Helper.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -307,14 +307,14 @@
 		3E1390132D6E5C4900A146C1 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				3ED27C062DB67ED5001B7C95 /* M640GKitUpdatePatchResult.swift */,
-				3E6A00F12DA0428E0085E6A4 /* M640GKitDeactivatePatchResult.swift */,
-				3E9547FC2D8D9CCE00EEF259 /* M640GKitActivatePatchResult.swift */,
-				3E9547FA2D8D962D00EEF259 /* M640GKitPrimePatchResult.swift */,
+				3ED27C062DB67ED5001B7C95 /* M640GUpdatePatchResult.swift */,
+				3E6A00F12DA0428E0085E6A4 /* M640GDeactivatePatchResult.swift */,
+				3E9547FC2D8D9CCE00EEF259 /* M640GActivatePatchResult.swift */,
+				3E9547FA2D8D962D00EEF259 /* M640GPrimePatchResult.swift */,
 				3EB1A3B02D77843E0031C044 /* BasalSchedule.swift */,
-				3E5060172D70EAF400376609 /* M640GKitWriteResult.swift */,
-				3E1390162D6E5E9A00A146C1 /* M640GKitConnectResult.swift */,
-				3E1390142D6E5C5200A146C1 /* M640GKitScanResult.swift */,
+				3E5060172D70EAF400376609 /* M640GWriteResult.swift */,
+				3E1390162D6E5E9A00A146C1 /* M640GConnectResult.swift */,
+				3E1390142D6E5C5200A146C1 /* M640GScanResult.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -351,6 +351,7 @@
 		3E24AEC52DA1733300C7733C /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				DD334CAB2F941CC90082A5B5 /* PatchLifetimeFormatting+Helper.swift */,
 				3E3E78B62F6B2C5C00DC4DF4 /* PatchDetailsViewModel.swift */,
 				3E3E7BE32F6B365100DC4DF4 /* PreviousPatchDetailsViewModel.swift */,
 				3E26BE0E2D906AE500E595B0 /* M640GKitSettingsViewModel.swift */,
@@ -387,8 +388,8 @@
 			children = (
 				3E6A00EB2DA03FCA0085E6A4 /* Onboarding */,
 				3E26BE092D90698A00E595B0 /* Settings */,
-				3E15A4772DA2B6E6007F7D3C /* M640GKitReservoirView.swift */,
-				3E15A47F2DA2B857007F7D3C /* M640GKitReservoirView.xib */,
+				3E15A4772DA2B6E6007F7D3C /* M640GReservoirView.swift */,
+				3E15A47F2DA2B857007F7D3C /* M640GReservoirView.xib */,
 				3E0AD9B12F23FF2100958E94 /* ActivityIndicator.swift */,
 				3E26BE102D906E5700E595B0 /* ReservoirView.swift */,
 				3E24AEBF2DA1639F00C7733C /* PumpImage.swift */,
@@ -441,10 +442,10 @@
 				3E45665F2D83719200FE1E0C /* ViewModels */,
 				3E767D542D67BCC3004B1971 /* ViewController */,
 				3E45665A2D83712D00FE1E0C /* Views */,
-				3E767CFE2D67B1A9004B1971 /* M640GKitHUDProvider.swift */,
+				3E767CFE2D67B1A9004B1971 /* M640GHUDProvider.swift */,
 				3E767CE22D67ADFA004B1971 /* M640GKitPumpManager+UI.swift */,
 				3EF5B06F2F79381400504678 /* AuthorizeBiometrics.swift */,
-				3E26BE0C2D906A0D00E595B0 /* M640GKitUI.xcassets */,
+				3E26BE0C2D906A0D00E595B0 /* M640GUI.xcassets */,
 			);
 			path = M640GKitUI;
 			sourceTree = "<group>";
@@ -452,6 +453,7 @@
 		3E767CE32D67AF2B004B1971 /* Common */ = {
 			isa = PBXGroup;
 			children = (
+				3E5FB2AB2FA62CA900E6151C /* CBUUID.swift */,
 				3E0406DF2EB7872C0013E362 /* Binding.swift */,
 				3E15A47D2DA2B723007F7D3C /* NibLoadable.swift */,
 				3E15A47B2DA2B718007F7D3C /* IdentifiableClass.swift */,
@@ -459,10 +461,8 @@
 				3E4566642D837A4800FE1E0C /* Bundle.swift */,
 				3E1532492D6FA0060020F015 /* Data.swift */,
 				3E50601D2D70F7A700376609 /* Date.swift */,
-				3E9D8B0D2D88A59000008AF2 /* DoseEntry.swift */,
 				3E15324B2D6FA4250020F015 /* Int64.swift */,
 				3E98B8502D6BB2B900DD5123 /* TimeInterval.swift */,
-				3E767CFD2D67B192004B1971 /* LocalizedString.swift */,
 				3E767CE42D67AF35004B1971 /* OSLog.swift */,
 				3E9D8B0F2D88A5EC00008AF2 /* UnfinalizedDose.swift */,
 			);
@@ -506,7 +506,7 @@
 				3ED27E182D80CA350026488B /* SubscribePacketTests.swift */,
 				3ED27E1A2D80CABB0026488B /* SynchronizePacketTests.swift */,
 				3EA87C3A2DAC2DB300E897ED /* SynchronizeNotificationPacketTests.swift */,
-				3E77FEBB2D72F8FC00A15134 /* M640GKitBasePacketTests.swift */,
+				3E77FEBB2D72F8FC00A15134 /* M640GBasePacketTests.swift */,
 			);
 			path = Packets;
 			sourceTree = "<group>";
@@ -535,11 +535,11 @@
 			isa = PBXGroup;
 			children = (
 				3E1390132D6E5C4900A146C1 /* Models */,
-				3E1390112D6E59B000A146C1 /* M640GKitPumpState.swift */,
-				B7189AE52C15A52800703DE2 /* M640GKitPumpManager.swift */,
+				3E1390112D6E59B000A146C1 /* M640GPumpState.swift */,
+				B7189AE52C15A52800703DE2 /* M640GPumpManager.swift */,
 				3E13900F2D6E534600A146C1 /* BluetoothManager.swift */,
 				3E1390182D6E5F2B00A146C1 /* PeripheralManager.swift */,
-				3E9D8B0B2D88A3EF00008AF2 /* M640GKitDoseProgressReporter.swift */,
+				3E9D8B0B2D88A3EF00008AF2 /* M640GDoseProgressReporter.swift */,
 				3E92D5222DA458E500E22577 /* NotificationManager.swift */,
 				3EF31CC52DF5DC5200EA6300 /* StateSyncer.swift */,
 			);
@@ -718,28 +718,30 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
-				de,
+				ar,
 				"zh-Hans",
+				cs,
+				da,
+				nl,
+				fi,
+				fr,
+				de,
+				he,
+				hu,
+				ko,
+				it,
 				ja,
 				nb,
-				es,
-				da,
-				it,
-				sv,
 				pl,
 				"pt-BR",
-				vi,
-				ru,
-				fr,
-				fi,
-				nl,
 				ro,
-				tr,
-				ar,
-				cs,
+				ru,
 				sk,
-				sl,
+				es,
+				sv,
+				tr,
 				uk,
+				vi,
 			);
 			mainGroup = B7D3A8C62C148CC4002EE003;
 			productRefGroup = B7D3A8D12C148CC4002EE003 /* Products */;
@@ -765,9 +767,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3E26BE0D2D906A0D00E595B0 /* M640GKitUI.xcassets in Resources */,
+				3E26BE0D2D906A0D00E595B0 /* M640GUI.xcassets in Resources */,
 				B6E920502EAFBB390076D719 /* Localizable.xcstrings in Resources */,
-				3E15A4802DA2B857007F7D3C /* M640GKitReservoirView.xib in Resources */,
+				3E15A4802DA2B857007F7D3C /* M640GReservoirView.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -802,22 +804,21 @@
 				3E5060202D70F97500376609 /* SetTimePacket.swift in Sources */,
 				3E9D8B122D88A8F600008AF2 /* NewPumpEvent.swift in Sources */,
 				3EF5B0702F79381B00504678 /* AuthorizeBiometrics.swift in Sources */,
-				3E9547FB2D8D963600EEF259 /* M640GKitPrimePatchResult.swift in Sources */,
+				3E9547FB2D8D963600EEF259 /* M640GPrimePatchResult.swift in Sources */,
 				3EA87D4F2D7A2930007DD959 /* CancelBolusPacket.swift in Sources */,
-				3E1390172D6E5EA000A146C1 /* M640GKitConnectResult.swift in Sources */,
+				3E1390172D6E5EA000A146C1 /* M640GConnectResult.swift in Sources */,
 				3E26BE112D906E5700E595B0 /* ReservoirView.swift in Sources */,
 				3E98B8512D6BB2BC00DD5123 /* TimeInterval.swift in Sources */,
 				3E5060142D70E5CB00376609 /* Crc8.swift in Sources */,
 				3E5060222D70FDA100376609 /* SetTimeZonePacket.swift in Sources */,
 				3E1532442D6F94E30020F015 /* AuthorizePacket.swift in Sources */,
 				3E3E78B52F6B2BA700DC4DF4 /* PatchDetailsView.swift in Sources */,
-				3E767D022D67B315004B1971 /* LocalizedString.swift in Sources */,
 				3E77FEC22D74B39800A15134 /* AlarmSettings.swift in Sources */,
 				3E767D522D67BC2E004B1971 /* M640GKitPumpManager+UI.swift in Sources */,
 				3E3E7BE42F6B365100DC4DF4 /* PreviousPatchDetailsViewModel.swift in Sources */,
 				3E92D5232DA458EA00E22577 /* NotificationManager.swift in Sources */,
 				3E6A00EE2DA03FE00085E6A4 /* PatchDeactivationView.swift in Sources */,
-				3E6A00F22DA0428E0085E6A4 /* M640GKitDeactivatePatchResult.swift in Sources */,
+				3E6A00F22DA0428E0085E6A4 /* M640GDeactivatePatchResult.swift in Sources */,
 				3E1390192D6E5F3600A146C1 /* PeripheralManager.swift in Sources */,
 				3E3E78B72F6B2C5D00DC4DF4 /* PatchDetailsViewModel.swift in Sources */,
 				3E1532422D6F93EF0020F015 /* BasePacket.swift in Sources */,
@@ -831,34 +832,35 @@
 				3E15324C2D6FA4280020F015 /* Int64.swift in Sources */,
 				3E1532462D6F95AC0020F015 /* CommandType.swift in Sources */,
 				3E767D032D67B319004B1971 /* OSLog.swift in Sources */,
-				3E1390122D6E59B500A146C1 /* M640GKitPumpState.swift in Sources */,
+				3E1390122D6E59B500A146C1 /* M640GPumpState.swift in Sources */,
 				3E3E7BE22F6B35A500DC4DF4 /* PreviousPatchDetailsView.swift in Sources */,
 				3E4566632D8371EC00FE1E0C /* ActivityViewController.swift in Sources */,
 				3E1532482D6F98D20020F015 /* Crypto.swift in Sources */,
-				B7189AE72C15A52800703DE2 /* M640GKitPumpManager.swift in Sources */,
-				3E767D532D67BC33004B1971 /* M640GKitHUDProvider.swift in Sources */,
+				B7189AE72C15A52800703DE2 /* M640GPumpManager.swift in Sources */,
+				3E767D532D67BC33004B1971 /* M640GHUDProvider.swift in Sources */,
 				3E24AEC02DA1639F00C7733C /* PumpImage.swift in Sources */,
 				3E77FEBE2D7364AC00A15134 /* ActivatePacket.swift in Sources */,
 				3EFBC4F42DFB527400E0E295 /* DeleteDriverActionSheet.swift in Sources */,
 				3EA6C4512DA2947000963AAB /* OnboardingWelcomeView.swift in Sources */,
 				3E24AEC42DA1729A00C7733C /* PatchPrimingViewModel.swift in Sources */,
+				DD334CAC2F941CC90082A5B5 /* PatchLifetimeFormatting+Helper.swift in Sources */,
 				3EA87C3D2DAC2F9C00E897ED /* NotificationPacket.swift in Sources */,
 				3E26BE0B2D9069A600E595B0 /* M640GKitSettings.swift in Sources */,
+				3E5FB2AC2FA62CAC00E6151C /* CBUUID.swift in Sources */,
 				3EA69F052D95E605002EEF9F /* InsulinTypeSelector.swift in Sources */,
 				3E15324A2D6FA0080020F015 /* Data.swift in Sources */,
 				3E9D8B102D88A5F200008AF2 /* UnfinalizedDose.swift in Sources */,
 				3E6A00F02DA0421A0085E6A4 /* DeactivatePatchViewModel.swift in Sources */,
-				3E9547FD2D8D9CD600EEF259 /* M640GKitActivatePatchResult.swift in Sources */,
+				3E9547FD2D8D9CD600EEF259 /* M640GActivatePatchResult.swift in Sources */,
 				3ED27E152D80C9010026488B /* StopPatchPacket.swift in Sources */,
-				3E9D8B0E2D88A59200008AF2 /* DoseEntry.swift in Sources */,
 				3EF31CC62DF5DC5500EA6300 /* StateSyncer.swift in Sources */,
 				3E0406E02EB7872E0013E362 /* Binding.swift in Sources */,
 				3E24AECA2DA17B7F00C7733C /* PatchActivationView.swift in Sources */,
 				3E15A47E2DA2B723007F7D3C /* NibLoadable.swift in Sources */,
-				3ED27C072DB67ED5001B7C95 /* M640GKitUpdatePatchResult.swift in Sources */,
-				3E15A4782DA2B6E6007F7D3C /* M640GKitReservoirView.swift in Sources */,
+				3ED27C072DB67ED5001B7C95 /* M640GUpdatePatchResult.swift in Sources */,
+				3E15A4782DA2B6E6007F7D3C /* M640GReservoirView.swift in Sources */,
 				3E9A5C962DA1460700A4102D /* PumpBaseSettingsView.swift in Sources */,
-				3E9D8B0C2D88A3FA00008AF2 /* M640GKitDoseProgressReporter.swift in Sources */,
+				3E9D8B0C2D88A3FA00008AF2 /* M640GDoseProgressReporter.swift in Sources */,
 				3E15A47C2DA2B718007F7D3C /* IdentifiableClass.swift in Sources */,
 				3E868C2D2F75BEED00ED6336 /* ClearAlertPacket.swift in Sources */,
 				3E24AEC82DA17B4900C7733C /* PatchActivationViewModel.swift in Sources */,
@@ -868,10 +870,10 @@
 				3ED27E0D2D80BD570026488B /* SetTempBasalPacket.swift in Sources */,
 				3ED27E1F2D80D2660026488B /* PatchState.swift in Sources */,
 				3EE2DAC52D8A076200EA2EAD /* SuspendPumpPacket.swift in Sources */,
-				3E5060182D70EAF800376609 /* M640GKitWriteResult.swift in Sources */,
+				3E5060182D70EAF800376609 /* M640GWriteResult.swift in Sources */,
 				3EA87D592D7A35D1007DD959 /* ClearAlarmType.swift in Sources */,
 				3E50601E2D70F7A900376609 /* Date.swift in Sources */,
-				3E1390152D6E5C5E00A146C1 /* M640GKitScanResult.swift in Sources */,
+				3E1390152D6E5C5E00A146C1 /* M640GScanResult.swift in Sources */,
 				3EB1A3B12D7784410031C044 /* BasalSchedule.swift in Sources */,
 				3E9A5C982DA1461700A4102D /* PumpBaseSettingsViewModel.swift in Sources */,
 				3ED27E092D80BACB0026488B /* SetPatchPacket.swift in Sources */,
@@ -898,7 +900,7 @@
 				3EEA51FD2D7E1C27000C9E1E /* ResumePumpPacketTests.swift in Sources */,
 				3EA87D4B2D7A2165007DD959 /* ActivatePacketTests.swift in Sources */,
 				3EA87D552D7A33AD007DD959 /* CancelTempBasalPacketTests.swift in Sources */,
-				3E77FEBC2D72F90000A15134 /* M640GKitBasePacketTests.swift in Sources */,
+				3E77FEBC2D72F90000A15134 /* M640GBasePacketTests.swift in Sources */,
 				3E77FEBA2D723AD400A15134 /* CryptoTests.swift in Sources */,
 				3ED27E172D80C9ED0026488B /* StopPatchPacketTests.swift in Sources */,
 				3EEA52012D7E1E10000C9E1E /* SetBasalProfilePacketTests.swift in Sources */,
@@ -1165,7 +1167,7 @@
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited) M640GKit_DEBUG_LOGS";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited) M640G_DEBUG_LOGS";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_INSTALL_OBJC_HEADER = NO;
 				SWIFT_VERSION = 5.0;

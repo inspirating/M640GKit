@@ -1,4 +1,4 @@
-struct SynchronizePacketResponse: Codable {
+﻿struct SynchronizePacketResponse: Codable {
     let state: PatchState
     var suspendTime: Date?
     var bolus: BolusData?
@@ -55,7 +55,7 @@ let MASK_UNUSED_COMMAND_CONFIRM: UInt16 = 0x2000
 let MASK_UNUSED_AUTO_STATUS: UInt16 = 0x4000
 let MASK_UNUSED_LEGACY: UInt16 = 0x8000
 
-class NotificationPacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
+class NotificationPacket: M640GBasePacket, M640GBasePacketProtocol {
     typealias T = SynchronizePacketResponse
 
     let commandType: UInt8 = CommandType.SYNCHRONIZE
@@ -103,7 +103,7 @@ class NotificationPacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
 
     private let maskHandlers: [UInt16: (Data, Int, inout SynchronizePacketResponse) -> Int] = [
         MASK_SUSPEND: { data, offset, output in
-            output.suspendTime = Date.fromM640GKitSeconds(data.subdata(in: offset ..< offset + 4).toUInt64())
+            output.suspendTime = Date.fromM640GSeconds(data.subdata(in: offset ..< offset + 4).toUInt64())
             return offset + 4
         },
         MASK_NORMAL_BOLUS: { data, offset, output in
@@ -127,7 +127,7 @@ class NotificationPacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
                 type: BasalType(rawValue: data[offset]) ?? .NONE,
                 sequence: data.subdata(in: offset + 1 ..< offset + 3).toDouble(),
                 patchId: data.subdata(in: offset + 3 ..< offset + 5).toDouble(),
-                startTime: Date.fromM640GKitSeconds(data.subdata(in: offset + 5 ..< offset + 9).toUInt64()),
+                startTime: Date.fromM640GSeconds(data.subdata(in: offset + 5 ..< offset + 9).toUInt64()),
                 rate: Double(rate) * 0.05,
                 delivery: Double(delivery) * 0.05
             )
@@ -143,7 +143,7 @@ class NotificationPacket: M640GKitBasePacket, M640GKitBasePacketProtocol {
             return offset + 2
         },
         MASK_START_TIME: { data, offset, output in
-            output.startTime = Date.fromM640GKitSeconds(data.subdata(in: offset ..< offset + 4).toUInt64())
+            output.startTime = Date.fromM640GSeconds(data.subdata(in: offset ..< offset + 4).toUInt64())
             return offset + 4
         },
         MASK_BATTERY: { data, offset, output in

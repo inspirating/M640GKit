@@ -1,4 +1,4 @@
-import LoopKit
+﻿import LoopKit
 
 class PatchPrimingViewModel: ObservableObject {
     private let processQueue = DispatchQueue(label: "com.nightscout.M640GKit.primingView")
@@ -11,9 +11,9 @@ class PatchPrimingViewModel: ObservableObject {
     private let nextStep: () -> Void
     let previousStep: () -> Void
     private let done: () -> Void
-    private let pumpManager: M640GKitPumpManager?
+    private let pumpManager: M640GPumpManager?
     init(
-        _ pumpManager: M640GKitPumpManager?,
+        _ pumpManager: M640GPumpManager?,
         _ nextStep: @escaping () -> Void,
         _ previousStep: @escaping () -> Void,
         _ done: @escaping () -> Void

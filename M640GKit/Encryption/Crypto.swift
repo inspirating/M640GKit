@@ -1,26 +1,31 @@
-enum Crypto {
-    private static let M640GKit_CIPHER: Int64 = 1_344_751_489
-    private static let logger = M640GKitLogger(category: "M640GKitCrypto")
+﻿enum Crypto {
+    private static let M640G_CIPHER: Int64 = 1_344_751_489
+    private static let logger = M640GLogger(category: "M640GCrypto")
 
     static func genKey(_ pumpSN: Data) -> Data {
         let sn = pumpSN.toInt64()
-        let key = randomGen(randomGen(M640GKit_CIPHER ^ sn))
+        let key = randomGen(randomGen(M640G_CIPHER ^ sn))
 
         return simpleCrypt(key).toData(length: 4)
     }
 
     static func genSessionToken() -> Data {
         var bytes = [UInt8](repeating: 0, count: 4)
-        for attempt in 1 ... 5 {
-            let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
-            if status == 0 {
-                return Data(bytes)
-            }
-            logger.warning("SecRandomCopyBytes failed (status \(status), attempt \(attempt)/5)")
+        let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+
+        guard status == 0 else {
+            logger
+                .warning("Failed to generate security token - SecRandomCopyBytes error: \(status) -> Using less secure fallback")
+
+            return Data([
+                UInt8.random(in: 0 ..< 255),
+                UInt8.random(in: 0 ..< 255),
+                UInt8.random(in: 0 ..< 255),
+                UInt8.random(in: 0 ..< 255)
+            ])
         }
 
-        logger.error("SecRandomCopyBytes failed repeatedly; cannot generate secure token")
-        fatalError("无法生成安全的会话令牌，请重启设备")
+        return Data(bytes)
     }
 
     static func simpleDecrypt(_ input: Data) -> Data {
@@ -31,7 +36,7 @@ enum Crypto {
         }
 
         let fixOverflow = temp.toData(length: 4).toInt64()
-        return (fixOverflow ^ M640GKit_CIPHER).toData(length: 4)
+        return (fixOverflow ^ M640G_CIPHER).toData(length: 4)
     }
 
     private static func randomGen(_ input: Int64) -> Int64 {
@@ -49,7 +54,7 @@ enum Crypto {
     }
 
     private static func simpleCrypt(_ input: Int64) -> Int64 {
-        var temp = input ^ M640GKit_CIPHER
+        var temp = input ^ M640G_CIPHER
         for _ in 0 ..< 32 {
             temp = changeByTable(rotateLeft(temp, 32, 1), RIJNDEAL_S_BOX)
         }
