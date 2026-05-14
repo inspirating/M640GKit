@@ -43,7 +43,7 @@ namespace M640GKit {
 
 // 常量定义
 static constexpr const char* PUMP_NAME = "MT";
-static constexpr uint8_t PUMP_SN[4] = {0x28, 0xD8, 0x12, 0x4A};
+static constexpr uint8_t PUMP_SN[4] = {0x98, 0x79, 0xD1, 0x65};
 static constexpr uint8_t DEVICE_TYPE = 1;
 static constexpr const char* SW_VERSION = "1.0.0";
 static constexpr uint16_t MANUFACTURER_ID = 0x6A59;
@@ -132,11 +132,11 @@ struct TempBasalInfo {
 
 class M640GPumpSimulator {
 public:
-    M640GPumpSimulator() : initialized(false), lastUpdateTime(0), updateIntervalMs(100),
+    M640GPumpSimulator() : initialized(false), lastUpdateTime(0), updateIntervalMs(100), bolusUpdateIntervalMs(100),
         patchState(PatchState::FILLED), simulatorState(SimulatorState::INITIALIZING),
         reservoir(MAX_RESERVOIR), activeInsulin(0.0), batteryVoltage(3.8), batteryLevel(100),
         patchStartTime(0), totalElapsedTime(0), currentBolus(nullptr),
-        bolusDeliveryProgress(0), primeProgress(0), tempBasal(nullptr), tempBasalRemaining(0),
+        bolusDeliveryProgress(0), lastReportedBolusProgress(0), lastBolusProgressReportTime(0), primeProgress(0), tempBasal(nullptr), tempBasalRemaining(0),
         isConnected(false), isSubscribed(false), isAuthenticated(false), sessionToken{0}, pumpTimezone(0),
         timeSyncPending(false), sequenceNumber(0), pingCounter(0), lastPingTime(0),
         connectionTimeoutMs(15000), lastActivityTime(0), patchId(0),
@@ -145,14 +145,18 @@ public:
         hourlyDelivered(0.0), dailyDelivered(0.0),
         currentBasalRate(0.6), basalSequence(0),
         expirationTimer(0), alarmSetting(0),
-        predictiveLowSuspend(0), predictiveLowSuspendRange(30) {
+        predictiveLowSuspend(0), predictiveLowSuspendRange(30), lastPrimeNotificationTime(0) {
         currentBolus = nullptr;
         tempBasal = nullptr;
     }
 
+    bool getIsConnected() const { return isConnected; }
+
     void setup() {
+        Serial.println("[PUMP] Starting setup...");
+        
         Logger::info("========================================");
-        Logger::info("  M640G 泵模拟器初始化");
+        Logger::info("  M640G pump simulator initlize");
         Logger::info("========================================");
 
         // 初始化随机数
@@ -161,37 +165,42 @@ public:
         // 生成会话令牌
         generateSessionToken();
 
-        // 设置初始时间
-        uint32_t now = millis() / 1000;
-        patchStartTime = now;
+        // 设置初始时间 (M640G时间: 从2014-01-01开始的秒数)
+        // 模拟2026年5月的时间戳
+        patchStartTime = 389145600;
         patchId = random(65535) + 1;
 
         // 创建默认基础率配置文件
         createDefaultBasalProfile();
 
         // 初始化 GATT Server
+        Serial.println("[PUMP] Setting up GATT server callbacks...");
         gattServer.onWriteRequest = handleWriteRequestStatic;
         gattServer.onConnect = handleConnectStatic;
         gattServer.onDisconnect = handleDisconnectStatic;
+        
+        Serial.println("[PUMP] Starting GATT server...");
         gattServer.start();
-        Serial.println("BLE 广播已启动");
+        Serial.println("[PUMP] GATT server started");
         
         simulatorState = SimulatorState::READY;
         initialized = true;
         lastUpdateTime = millis();
 
-        Logger::info("设备名称: MT");
-        Logger::info("序列号: 28D8124A");
-        Logger::info("设备类型: 1");
-        Logger::info("软件版本: 1.0.0");
-        Logger::info("初始状态: FILLED (等待预充)");
+        Logger::info("device name: MT");
+        Logger::info("serial number: 9879D165");
+        Logger::info("device type: 1");
+        Logger::info("software version: 1.0.0");
+        Logger::info("initial state: FILLED (precharge wait for priming)");
         Logger::info("Patch ID: " + String(patchId));
         Logger::info("========================================");
+        
+        Serial.println("[PUMP] Setup complete!");
     }
 
     void loop() {
         if (!initialized) {
-            Logger::error("模拟器未初始化, 请先调用 setup()");
+            Logger::error("pump simulator not initailized yet, please call setup() first");
             return;
         }
 
@@ -206,6 +215,7 @@ private:
     bool initialized;
     uint32_t lastUpdateTime;
     uint16_t updateIntervalMs;
+    uint16_t bolusUpdateIntervalMs;
 
     // 泵状态
     PatchState patchState;
@@ -227,6 +237,8 @@ private:
     // 大剂量
     BolusInfo* currentBolus;
     uint8_t bolusDeliveryProgress;
+    uint8_t lastReportedBolusProgress;
+    uint32_t lastBolusProgressReportTime;
     std::vector<BolusInfo> bolusHistory;
 
     uint8_t primeProgress;
@@ -276,6 +288,7 @@ private:
     uint8_t currentPkgIndex;
 
     PatchState lastNotifiedState;
+    uint32_t lastPrimeNotificationTime;
 
     double hourlyMaxInsulin;
     double dailyMaxInsulin;
@@ -394,6 +407,7 @@ private:
 
         if (isSubscribed && isConnected) {
             sendPeriodicNotification();
+            sendPrimeProgressNotification();
         }
     }
 
@@ -433,8 +447,9 @@ private:
     void updateBolusDelivery() {
         if (currentBolus == nullptr) return;
 
-        double bolusStep = currentBolus->amount / 50.0;
-        double stepDelivery = min(bolusStep, currentBolus->amount - currentBolus->delivered);
+        const double BOLUS_RATE_U_PER_S = 0.1;
+        double stepDelivery = BOLUS_RATE_U_PER_S * (bolusUpdateIntervalMs / 1000.0);
+        stepDelivery = min(stepDelivery, currentBolus->amount - currentBolus->delivered);
 
         currentBolus->delivered += stepDelivery;
         reservoir = max(0.0, reservoir - stepDelivery);
@@ -446,14 +461,27 @@ private:
             min(100.0, (currentBolus->delivered / currentBolus->amount) * 100.0)
         );
 
+        uint32_t currentTime = millis();
+        if (lastBolusProgressReportTime == 0) {
+            lastBolusProgressReportTime = currentTime;
+            lastReportedBolusProgress = bolusDeliveryProgress;
+            sendSynchronizeNotification();
+        } else if (currentTime - lastBolusProgressReportTime >= 100) {
+            lastBolusProgressReportTime = currentTime;
+            if (bolusDeliveryProgress != lastReportedBolusProgress) {
+                lastReportedBolusProgress = bolusDeliveryProgress;
+                sendSynchronizeNotification();
+            }
+        }
         if (currentBolus->delivered >= currentBolus->amount - 0.001) {
             double finalDelivered = currentBolus->amount;
             bolusHistory.push_back(*currentBolus);
             Logger::info("大剂量输送完成: " + String(finalDelivered) + "U");
+            sendStateNotification();
             delete currentBolus;
             currentBolus = nullptr;
             bolusDeliveryProgress = 0;
-            sendStateNotification();
+            lastReportedBolusProgress = 0;
         }
     }
 
@@ -479,7 +507,7 @@ private:
 
     void updatePrimeProgress() {
         if (patchState == PatchState::PRIMING) {
-            primeProgress++;
+            primeProgress += 4;
             if (primeProgress >= 240) {
                 setPatchState(PatchState::PRIMED);
                 primeProgress = 0;
@@ -518,13 +546,12 @@ private:
             lastPingTime = currentTime;
             pingCounter++;
 
-            uint8_t pingData[8] = {0x07, 0x00, sequenceNumber, 0, 0, 0, 0, 0};
+            uint8_t pingData[7] = {0x07, 0x00, sequenceNumber, 0, 0, 0, 0};
             uint8_t crc = crc8Calculate(pingData, 6);
             pingData[6] = crc;
-            pingData[7] = 0;
 
-            gattServer.sendNotificationWithCrcHack(pingData, 8);
-            Logger::debug("发送 Ping 心跳 #" + String(pingCounter));
+            gattServer.sendRawNotification(pingData, 7);
+            // Logger::debug("发送 Ping 心跳 #" + String(pingCounter));
         }
     }
 
@@ -542,6 +569,15 @@ private:
 
     void sendPeriodicNotification() {
         if (totalElapsedTime % 10 == 0) {
+            sendSynchronizeNotification();
+        }
+    }
+
+    void sendPrimeProgressNotification() {
+        if (patchState != PatchState::PRIMING) return;
+        uint32_t now = millis();
+        if (now - lastPrimeNotificationTime >= 500) {
+            lastPrimeNotificationTime = now;
             sendSynchronizeNotification();
         }
     }
@@ -744,21 +780,47 @@ private:
         Logger::info("收到命令: " + String(getCommandName(cmdType)) +
             " len=" + String(packetLen) + " seq=" + String(seqNum) + " pkg=" + String(pkgIndex));
 
-        if (packetBuffer.empty()) {
-            size_t copyLen = min((size_t)len, (size_t)(packetLen + 2));
-            packetBuffer.assign(data, data + copyLen);
-            expectedPacketLen = packetLen;
-            currentCmdType = cmdType;
-            currentSeqNum = seqNum;
-            currentPkgIndex = pkgIndex;
+        // 如果 packetBuffer 非空但收到的是新命令（pkgIndex == 0），说明上一个分包序列异常中断
+        if (!packetBuffer.empty() && pkgIndex == 0) {
+            Logger::warning("检测到新命令开始，清空上一个未完成的包缓冲区");
+            packetBuffer.clear();
+            expectedPacketLen = 0;
+            currentCmdType = 0;
+            currentSeqNum = 0;
+            currentPkgIndex = 0;
+        }
 
-            if (packetBuffer.size() >= (size_t)(expectedPacketLen + 2)) {
-                processCompleteCommand(packetBuffer.data(), expectedPacketLen + 2);
-                packetBuffer.clear();
-                expectedPacketLen = 0;
-                currentCmdType = 0;
+        if (packetBuffer.empty()) {
+            // 判断是单包还是分包：
+            // - 单包数据：pkgIndex == 0 且数据长度 >= packetLen + 1（有额外的 0 字节）
+            // - 分包数据：pkgIndex == 0 但数据长度 < packetLen + 1，或者 pkgIndex > 0
+            bool isSinglePacket = (pkgIndex == 0 && len >= packetLen + 1);
+            
+            if (isSinglePacket) {
+                // 单包数据：复制整个数据（包括额外的 0 字节）
+                size_t copyLen = min((size_t)len, (size_t)(packetLen + 1));
+                packetBuffer.assign(data, data + copyLen);
+                expectedPacketLen = packetLen;
+                
+                if (packetBuffer.size() >= (size_t)(packetLen + 1)) {
+                    processCompleteCommand(packetBuffer.data(), packetLen + 1);
+                    packetBuffer.clear();
+                    expectedPacketLen = 0;
+                    currentCmdType = 0;
+                    currentSeqNum = 0;
+                    currentPkgIndex = 0;
+                }
             } else {
-                Logger::debug("等待更多数据包... (" + String(packetBuffer.size()) + "/" + String(expectedPacketLen + 2) + ")");
+                // 分包数据的第一个包：复制 [header] + [content]，跳过 CRC
+                // 数据格式：[header(4)] + [content(15)] + [CRC(1)]
+                size_t copyLen = len - 1;  // 跳过 CRC
+                packetBuffer.assign(data, data + copyLen);
+                expectedPacketLen = packetLen;
+                currentCmdType = cmdType;
+                currentSeqNum = seqNum;
+                currentPkgIndex = pkgIndex;
+                
+                Logger::debug("等待更多数据包... (" + String(packetBuffer.size()) + "/" + String(packetLen) + ")");
             }
         } else {
             if (cmdType != currentCmdType || pkgIndex != currentPkgIndex + 1) {
@@ -767,21 +829,36 @@ private:
                 packetBuffer.clear();
                 expectedPacketLen = 0;
                 currentCmdType = 0;
+                currentSeqNum = 0;
+                currentPkgIndex = 0;
                 return;
             }
 
-            size_t remaining = (size_t)(expectedPacketLen + 2) - packetBuffer.size();
-            size_t copyLen = min(remaining, len - 4);
-            packetBuffer.insert(packetBuffer.end(), data + 4, data + 4 + copyLen);
+            // 后续分包：复制 content 部分，跳过 header(4) 和 CRC(1)
+            // 数据格式：[header(4)] + [content] + [CRC(1)]
+            size_t contentLen = len - 5;  // 跳过 header(4) 和 CRC(1)
+            
+            // 检查是否是最后一个分包
+            if (packetBuffer.size() + contentLen >= expectedPacketLen) {
+                // 最后一个分包：调整复制长度，确保只复制到 expectedPacketLen
+                contentLen = expectedPacketLen - packetBuffer.size();
+            }
+            
+            packetBuffer.insert(packetBuffer.end(), data + 4, data + 4 + contentLen);
             currentPkgIndex = pkgIndex;
 
-            Logger::debug("收到分包 " + String(pkgIndex) + " (" + String(packetBuffer.size()) + "/" + String(expectedPacketLen + 2) + ")");
+            Logger::debug("收到分包 " + String(pkgIndex) + " (" + String(packetBuffer.size()) + "/" + String(expectedPacketLen) + ")");
 
-            if (packetBuffer.size() >= (size_t)(expectedPacketLen + 2)) {
-                processCompleteCommand(packetBuffer.data(), expectedPacketLen + 2);
+            if (packetBuffer.size() >= expectedPacketLen) {
+                // 重要：Swift 计算 originalCRC 时 header 的 pkgIndex=0，
+                // 但第一个分包 header 的 pkgIndex=1，需要改回 0 才能通过 CRC 校验
+                packetBuffer[3] = 0;
+                processCompleteCommand(packetBuffer.data(), expectedPacketLen);
                 packetBuffer.clear();
                 expectedPacketLen = 0;
                 currentCmdType = 0;
+                currentSeqNum = 0;
+                currentPkgIndex = 0;
             }
         }
     }
@@ -789,16 +866,31 @@ private:
     void handleSubscribe(bool subscribed) {
         isSubscribed = subscribed;
         if (subscribed) {
+            Serial.println("");
+            Serial.println("++++++++++++++++++++++++++++++++++++++++");
+            Serial.println("+     NOTIFICATIONS SUBSCRIBED!        +");
+            Serial.println("++++++++++++++++++++++++++++++++++++++++");
+            Serial.println("");
             connectionTracker.onConnect();
             Logger::info("客户端已订阅通知");
             sendStateNotification();
         } else {
+            Serial.println("");
+            Serial.println("----------------------------------------");
+            Serial.println("-     NOTIFICATIONS UNSUBSCRIBED!      -");
+            Serial.println("----------------------------------------");
+            Serial.println("");
             connectionTracker.onDisconnect("客户端取消订阅");
             Logger::info("客户端已取消订阅");
         }
     }
 
     void handleBleConnect() {
+        Serial.println("");
+        Serial.println("****************************************");
+        Serial.println("*     PUMP SIMULATOR: CLIENT CONNECTED     *");
+        Serial.println("****************************************");
+        Serial.println("");
         Logger::info("========== BLE 客户端已连接 ==========");
         isConnected = true;
         lastActivityTime = millis();
@@ -808,6 +900,11 @@ private:
     }
 
     void handleBleDisconnect() {
+        Serial.println("");
+        Serial.println("****************************************");
+        Serial.println("*    PUMP SIMULATOR: CLIENT DISCONNECTED   *");
+        Serial.println("****************************************");
+        Serial.println("");
         Logger::info("========== BLE 客户端已断开 ==========");
         isConnected = false;
         isSubscribed = false;
@@ -832,10 +929,21 @@ private:
             return;
         }
 
+        // 尝试两种 CRC 校验方式：
+        // 1. 单包数据格式：[header] + [content] + [CRC] + [0]，CRC 在 len-2 位置
+        // 2. 分包数据格式：[header] + [content] + [CRC]，CRC 在 len-1 位置
         uint8_t expectedCrc = crc8Calculate(data, len - 2);
-        if (data[len - 2] != expectedCrc) {
-            Logger::error("CRC校验失败: 期望=0x" + String(expectedCrc, HEX) + " 收到=0x" + String(data[len - 2], HEX));
-            return;
+        if (data[len - 2] == expectedCrc) {
+            // 单包格式 CRC 校验通过
+        } else {
+            // 尝试分包格式 CRC 校验
+            expectedCrc = crc8Calculate(data, len - 1);
+            if (data[len - 1] == expectedCrc) {
+                // 分包格式 CRC 校验通过
+            } else {
+                Logger::error("CRC校验失败: 期望=0x" + String(expectedCrc, HEX) + " 收到=0x" + String(data[len - 2], HEX) + " (单包) 或 0x" + String(data[len - 1], HEX) + " (分包)");
+                return;
+            }
         }
 
         uint8_t cmdType = data[1];
@@ -1010,6 +1118,7 @@ private:
             uint8_t prefix = data[4];
             uint32_t newTime = data[5] | (data[6] << 8) | (data[7] << 16) | (data[8] << 24);
             patchStartTime = newTime;
+            totalElapsedTime = 0;
             timeSyncPending = false;
             Logger::info("时间已同步: prefix=" + String(prefix) + " time=" + String(newTime));
         }
@@ -1024,6 +1133,7 @@ private:
             pumpTimezone = tzOffset;
             uint32_t timeVal = data[6] | (data[7] << 8) | (data[8] << 16) | (data[9] << 24);
             patchStartTime = timeVal;
+            totalElapsedTime = 0;
             Logger::info("时区偏移: " + String(tzOffset) + " 分钟, 时间: " + String(timeVal));
         }
         sendResponse(CommandType::SET_TIME_ZONE, seqNum, nullptr, 0);
@@ -1105,6 +1215,8 @@ private:
 
             currentBolus = new BolusInfo{bolusType, amount, 0.0, millis() / 1000};
             bolusDeliveryProgress = 0;
+            lastReportedBolusProgress = 0;
+            lastBolusProgressReportTime = 0;
             addRecord(1, amount, 0);
             Logger::info("大剂量已开始输送: " + String(amount) + "U");
         }
@@ -1123,6 +1235,7 @@ private:
             delete currentBolus;
             currentBolus = nullptr;
             bolusDeliveryProgress = 0;
+            lastReportedBolusProgress = 0;
             sendStateNotification();
         } else {
             Logger::info("没有进行中的大剂量");
@@ -1277,6 +1390,7 @@ private:
             delete currentBolus;
             currentBolus = nullptr;
             bolusDeliveryProgress = 0;
+            lastReportedBolusProgress = 0;
         }
 
         if (tempBasal) {
@@ -1405,7 +1519,6 @@ private:
         setPatchState(PatchState::ACTIVE);
         simulatorState = SimulatorState::RUNNING;
         reservoir = MAX_RESERVOIR;
-        patchStartTime = millis() / 1000;
         totalElapsedTime = 0;
         hourlyDelivered = 0;
         dailyDelivered = 0;
@@ -1455,6 +1568,7 @@ private:
             delete currentBolus;
             currentBolus = nullptr;
             bolusDeliveryProgress = 0;
+            lastReportedBolusProgress = 0;
         }
         if (tempBasal) {
             delete tempBasal;
@@ -1612,28 +1726,37 @@ private:
     void sendNotificationPacket(const std::vector<uint8_t>& syncData) {
         if (syncData.empty()) return;
 
-        uint8_t totalContentLen = syncData.size() + 2; // responseCode(2)
-        size_t packetLen = totalContentLen + 5; // header(4) + crc(1) + trailing(1)
+        // Swift NotificationPacket 期望的格式:
+        //   [0] = state
+        //   [1..2] = fieldMask
+        //   [3..] = syncData
+        // Swift handleHeartbeat 会追加 0x00 作为假 CRC
+        // 所以这里只发送原始 syncData，不含包头和CRC
+        gattServer.sendRawNotification(syncData.data(), syncData.size());
+    }
 
-        if (packetLen > 256) {
-            Logger::error("通知数据过长: " + String(packetLen) + " bytes");
-            return;
-        }
+    void sendNotificationPacketWithHeader(const std::vector<uint8_t>& syncData, uint8_t seqNum) {
+        if (syncData.empty()) return;
+
+        // 构建完整的通知数据包（含包头和CRC），用于需要标准包格式的场景
+        uint8_t header[4] = {
+            static_cast<uint8_t>(syncData.size() + 5),
+            static_cast<uint8_t>(CommandType::SYNCHRONIZE),
+            seqNum,
+            0
+        };
 
         uint8_t packet[256];
-        packet[0] = totalContentLen;
-        packet[1] = static_cast<uint8_t>(CommandType::SYNCHRONIZE);
-        packet[2] = sequenceNumber++;
-        packet[3] = 0; // pkgIndex
-        packet[4] = 0; // responseCode low
-        packet[5] = 0; // responseCode high
+        memcpy(packet, header, 4);
+        packet[4] = 0;
+        packet[5] = 0;
         memcpy(packet + 6, syncData.data(), syncData.size());
-        uint8_t crc = crc8Calculate(packet, packetLen - 2);
-        packet[packetLen - 2] = crc;
-        packet[packetLen - 1] = 0;
 
-        Logger::hexDump("NTF", "~~>", packet, packetLen);
-        gattServer.sendNotification(packet, packetLen);
+        uint8_t crc = crc8Calculate(packet, syncData.size() + 6);
+        packet[syncData.size() + 6] = crc;
+        packet[syncData.size() + 7] = 0;
+
+        gattServer.sendRawNotification(packet, syncData.size() + 8);
     }
 };
 
