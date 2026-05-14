@@ -1,4 +1,4 @@
-﻿import CoreBluetooth
+import CoreBluetooth
 import HealthKit
 import LoopKit
 
@@ -279,8 +279,8 @@ public extension M640GPumpManager {
     }
 
     func estimatedDuration(toBolus units: Double) -> TimeInterval {
-        // 1.5 unit per minute
-        units / 1.5 * TimeInterval(minutes: 1)
+        // 6 unit per minute
+        units / 6 * TimeInterval(minutes: 1)
     }
 
     func enactBolus(

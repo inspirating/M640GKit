@@ -1,4 +1,4 @@
-﻿import LoopKit
+import LoopKit
 import SwiftUI
 
 struct M640GKitSettings: View {
@@ -74,7 +74,7 @@ struct M640GKitSettings: View {
                         Text("Time Change Detected", comment: "title for time change detected notice")
                             .font(Font.subheadline.weight(.bold))
                         Text(
-                            "The time on your pump is different from the current time. Your pump鈥檚 time controls your scheduled therapy settings. Scroll down to Pump Time row to review the time difference and configure your pump.",
+                            "The time on your pump is different from the current time. Your pump time controls your scheduled therapy settings. Scroll down to Pump Time row to review the time difference and configure your pump.",
                             comment: "description for time change detected notice"
                         )
                         .font(Font.footnote.weight(.semibold))
