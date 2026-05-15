@@ -447,8 +447,13 @@ private:
     void updateBolusDelivery() {
         if (currentBolus == nullptr) return;
 
-        const double BOLUS_RATE_U_PER_S = 0.1;
-        double stepDelivery = BOLUS_RATE_U_PER_S * (bolusUpdateIntervalMs / 1000.0);
+        double BOLUS_RATE_U_PER_Second = 0.1;
+        bool isSmallDose = currentBolus->amount <= 0.2;
+        if (isSmallDose) {
+            BOLUS_RATE_U_PER_Second = currentBolus->amount / 5.0;
+        }
+
+        double stepDelivery = BOLUS_RATE_U_PER_Second * (bolusUpdateIntervalMs / 1000.0);
         stepDelivery = min(stepDelivery, currentBolus->amount - currentBolus->delivered);
 
         currentBolus->delivered += stepDelivery;
@@ -457,22 +462,17 @@ private:
         hourlyDelivered += stepDelivery;
         dailyDelivered += stepDelivery;
 
-        // bolusDeliveryProgress = static_cast<uint8_t>(
-        //     min(100.0, (currentBolus->delivered / currentBolus->amount) * 100.0)
-        // );
+        if (isSmallDose) {
+            uint32_t currentTime = millis();
+            if (lastBolusProgressReportTime == 0) {
+                lastBolusProgressReportTime = currentTime;
+                sendSynchronizeNotification();
+            } else if (currentTime - lastBolusProgressReportTime >= 10) {
+                lastBolusProgressReportTime = currentTime;
+                sendSynchronizeNotification();
+            }
+        }
 
-        // uint32_t currentTime = millis();
-        // if (lastBolusProgressReportTime == 0) {
-        //     lastBolusProgressReportTime = currentTime;
-        //     lastReportedBolusProgress = bolusDeliveryProgress;
-        //     sendSynchronizeNotification();
-        // } else if (currentTime - lastBolusProgressReportTime >= 100) {
-        //     lastBolusProgressReportTime = currentTime;
-        //     if (bolusDeliveryProgress != lastReportedBolusProgress) {
-        //         lastReportedBolusProgress = bolusDeliveryProgress;
-        //         sendSynchronizeNotification();
-        //     }
-        // }
         if (currentBolus->delivered >= currentBolus->amount - 0.001) {
             double finalDelivered = currentBolus->amount;
             bolusHistory.push_back(*currentBolus);
@@ -507,7 +507,7 @@ private:
 
     void updatePrimeProgress() {
         if (patchState == PatchState::PRIMING) {
-            primeProgress += 4;
+            primeProgress += 10;
             if (primeProgress >= 240) {
                 setPatchState(PatchState::PRIMED);
                 primeProgress = 0;
@@ -1217,23 +1217,12 @@ private:
                 return;
             }
 
-            if (amount <= 0.1) {
-                reservoir = max(0.0, reservoir - amount);
-                activeInsulin += amount;
-                hourlyDelivered += amount;
-                dailyDelivered += amount;
-                bolusHistory.push_back(BolusInfo{bolusType, amount, amount, millis() / 1000});
-                addRecord(1, amount, 0);
-                Logger::info("小剂量直接完成: " + String(amount) + "U");
-                sendStateNotification();
-            } else {
-                currentBolus = new BolusInfo{bolusType, amount, 0.0, millis() / 1000};
-                bolusDeliveryProgress = 0;
-                lastReportedBolusProgress = 0;
-                lastBolusProgressReportTime = 0;
-                addRecord(1, amount, 0);
-                Logger::info("大剂量已开始输送: " + String(amount) + "U");
-            }
+            currentBolus = new BolusInfo{bolusType, amount, 0.0, millis() / 1000};
+            bolusDeliveryProgress = 0;
+            lastReportedBolusProgress = 0;
+            lastBolusProgressReportTime = 0;
+            addRecord(1, amount, 0);
+            Logger::info("大剂量已开始输送: " + String(amount) + "U");
         }
         sendResponse(CommandType::SET_BOLUS, seqNum, nullptr, 0);
     }
