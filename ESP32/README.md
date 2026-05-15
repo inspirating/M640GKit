@@ -137,20 +137,23 @@ void setup() {
 
 ## 已知问题与修复
 
-### 1. Delete Pump 后显示 "patch error" 而非 "新增泵" 图标
+### 1. Delete Pump 后 pump 删不掉
 
-**现象**: 点击 "Delete Pump" 后, Trio 界面左上角显示 "patch error" 图标, 而非预期的 "新增泵" 图标。
+**现象**: 点击 "Delete Pump" 后, Swift 端显示已删除, 但 ESP32 重启后 pump 又重新出现。
 
-**根因**: "Delete Pump" 流程调用 `notifyDelegateOfDeactivation` 移除 pump manager, 但 BLE 连接未断开。Swift 端 `didDisconnectPeripheral` 回调中自动调用 `ensureConnected` 尝试重连, ESP32 断开后立即重新广播, Swift 自动重连后发现 ESP32 仍处于 ACTIVE/STOPPED 状态, 但 pump manager 已被删除, 状态不一致导致 Trio 显示 "patch error"。
+**根因**: `handleStopPatchRequest` 中存在竞态条件:
+
+| 步骤 | 操作 | 结果 |
+|------|------|------|
+| 1 | `setPatchState(STOPPED)` | 设置 `patchStateDirty = true` |
+| 2 | 直接删除 NVS 中的 `patchStart`、`patchState`、`elapsedTime` | NVS 被清空 |
+| 3 | 下一次 `update()` 循环检测到 `patchStateDirty == true` | **把旧值写回 NVS!** |
+
+`patchStartTime` 和 `totalElapsedTime` 的旧值被 `update()` 中的延迟写入逻辑重新写回 NVS。ESP32 重启后, `setup()` 发现 `patchStart > 0`, 恢复为 ACTIVE 状态。
 
 **修复**: 在 `handleStopPatchRequest` 中:
-- 重置所有运行时状态 (reservoir, activeInsulin, hourlyDelivered, dailyDelivered 等)
-- 清除 NVS 持久化数据
-- 设置 `pendingBleDisconnect = true`, 在主循环 `update()` 中延迟执行:
-  - 将 `patchState` 重置为 `FILLED` (初始状态)
-  - 将 `simulatorState` 重置为 `INITIALIZING`
-  - 调用 `gattServer.disconnectAll()` 主动断开 BLE 连接
-- BLE 断开后 ESP32 重新广播, Swift 重连时看到一个全新的未激活设备
+- 直接赋值 `patchState = PatchState::STOPPED`, 不调用 `setPatchState()` (避免设置 `patchStateDirty`)
+- 清除 `patchStateDirty = false`, 防止 `update()` 延迟写入把旧值写回
 - 重置 `patchStartTime = 0` 和 `totalElapsedTime = 0`, 确保内存中的值也被清空
 
 ### 2. ESP32 重启后 "检测到时间变更"
@@ -185,6 +188,74 @@ void setup() {
 **修复**: 在 `updateBolusDelivery()` 中:
 - 小剂量 (≤0.2U) 时, 将输送速度降低为 5 秒内完成
 - 每 10ms 发送一次进度通知, 确保 Swift 端能及时更新进度条
+
+### 5. Delete Pump 后显示 "patch error" 而非 "新增泵" 图标
+
+**现象**: 点击 "Delete Pump" 后, Trio 界面左上角先短暂显示 "新增泵" 图标, 几秒后变为 "patch error" 图标。
+
+**根因**: Swift 端 "Delete Pump" 流程只调用 `notifyDelegateOfDeactivation` 移除 pump manager, **不会发送 STOP_PATCH 命令, 也不会断开 BLE 连接**。完整问题链路:
+
+```
+Delete Pump → pumpManager被删除 → BLE断开 → didDisconnectPeripheral
+→ ensureConnected → 用缓存的peripheral引用直接connect() → 重连成功
+→ didConnect → pumpManager为nil → return (但BLE连接已建立)
+→ ESP32继续发通知 → Swift无法处理 → 状态不一致 → "patch error"
+```
+
+关键点:
+1. Swift 的 `ensureConnected` 通过**缓存的 peripheral 引用**直接重连, 不需要 ESP32 在广播
+2. `onDisconnect` 回调会自动调用 `startAdvertising()` 重新广播, 使 Swift 更容易重连
+3. 重连后 `didConnect` 中 `pumpManager` 为 nil 直接 return, 但 BLE 连接已建立, ESP32 继续发送通知数据
+
+**修复 (4层防护 + 命令超时检测)**:
+
+| 层级 | 位置 | 修改 | 作用 |
+|------|------|------|------|
+| 1 | `handleBleDisconnect()` | 设置 `advertisingSuspended = true`, 暂停广播 30 秒; 添加重复调用防护 | 阻止通过扫描重连, 防止 `checkCommandTimeout` 触发重复执行 |
+| 2 | `handleBleConnect()` | 检查 `advertisingSuspended`, 为 true 则立即断开; 重置 `lastCommandTime` | 阻止通过缓存 peripheral 重连 |
+| 3 | `GATTServer::startAdvertising()` | 检查 `advertisingSuspended` 标志, 为 true 跳过广播 | 防止 `onDisconnect` 回调自动重启广播 |
+| 4 | 所有通知发送函数 | 添加 `gattServer.advertisingSuspended` 检查 | 暂停期间不发送任何通知数据 |
+| 5 | `checkCommandTimeout()` | **新增**: 30秒无命令自动断开 BLE 并重置状态 | 即使 Swift 不主动断开, ESP32 也能自行检测并断开 |
+
+**核心机制 - 命令超时检测**:
+
+由于 Swift 的 "Delete Pump" 不发送任何命令, 之前的修复依赖 `handleBleDisconnect()` 被触发, 但 Swift 根本不发 STOP_PATCH 也不断开连接, 导致那 4 层防护不会生效。
+
+新增的 `checkCommandTimeout()` 机制:
+
+```cpp
+void checkCommandTimeout() {
+    if (!isConnected || !isAuthenticated) return;
+
+    uint32_t currentTime = millis();
+    if (currentTime - lastCommandTime > COMMAND_TIMEOUT_MS) {
+        Logger::warning("命令超时, 断开连接并重置状态");
+        gattServer.disconnectAll();
+        handleBleDisconnect();
+    }
+}
+```
+
+- `lastCommandTime` 在每次收到命令时更新 (`handleWriteRequest`)
+- `COMMAND_TIMEOUT_MS = 30000` (30秒)
+- 在 `update()` 主循环中每 100ms 检查一次
+- 超时后: 断开 BLE → 触发 `handleBleDisconnect` → 暂停广播 30 秒 → 重置为 FILLED 状态
+- `handleBleDisconnect` 添加了重复调用防护, 避免 `disconnectAll()` 触发 BLE 回调导致双重执行
+
+**通知发送全面防护**:
+
+所有主动通知发送函数均添加了 `advertisingSuspended` 检查:
+
+| 函数 | 检查点 |
+|------|--------|
+| `sendStateNotification()` | 开头 |
+| `sendPingHeartbeat()` | 开头 |
+| `sendPeriodicNotification()` | 开头 |
+| `sendPrimeProgressNotification()` | 开头 |
+| `sendSynchronizeNotification()` | 开头 |
+| `update()` 外层调用 | `isSubscribed && isConnected && !gattServer.advertisingSuspended` |
+
+这样即使 BLE 连接意外保持, 只要 `advertisingSuspended` 为 true, ESP32 就不会发送任何通知数据, Swift 端不会收到意外数据, 从而正确显示 "新增泵" 图标。
 
 ## 许可证
 
