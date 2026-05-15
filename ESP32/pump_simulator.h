@@ -23,6 +23,7 @@ M640GKit ESP32 泵模拟器核心 (C++ 版本)
 #include <cstdint>
 #include <cstring>
 #include <cmath>
+#include <Preferences.h>
 
 #include "enums.h"
 #include "crc8.h"
@@ -133,7 +134,7 @@ struct TempBasalInfo {
 class M640GPumpSimulator {
 public:
     M640GPumpSimulator() : initialized(false), lastUpdateTime(0), updateIntervalMs(100), bolusUpdateIntervalMs(100),
-        patchState(PatchState::ACTIVE), simulatorState(SimulatorState::RUNNING),
+        patchState(PatchState::FILLED), simulatorState(SimulatorState::INITIALIZING),
         reservoir(MAX_RESERVOIR), activeInsulin(0.0), batteryVoltage(3.8), batteryLevel(100),
         patchStartTime(0), totalElapsedTime(0), currentBolus(nullptr),
         bolusDeliveryProgress(0), lastReportedBolusProgress(0), lastBolusProgressReportTime(0), primeProgress(0), tempBasal(nullptr), tempBasalRemaining(0),
@@ -166,8 +167,20 @@ public:
         generateSessionToken();
 
         // 设置初始时间 (M640G时间: 从2014-01-01开始的秒数)
-        // 模拟2026年5月的时间戳
-        patchStartTime = 389145600;
+        Preferences prefs;
+        prefs.begin("pump", true);
+        uint32_t savedStartTime = prefs.getUInt("patchStart", 0);
+        prefs.end();
+
+        if (savedStartTime > 0) {
+            patchStartTime = savedStartTime;
+            patchState = PatchState::ACTIVE;
+            simulatorState = SimulatorState::RUNNING;
+            Logger::info("从NVS恢复: patchStartTime=" + String(patchStartTime) + " state=ACTIVE");
+        } else {
+            patchStartTime = 0;
+            Logger::info("首次启动: 等待激活流程");
+        }
         patchId = random(65535) + 1;
 
         // 创建默认基础率配置文件
@@ -191,7 +204,7 @@ public:
         Logger::info("serial number: 9879D165");
         Logger::info("device type: 1");
         Logger::info("software version: 1.0.0");
-        Logger::info("initial state: ACTIVE (skip priming)");
+        Logger::info("initial state: " + String(getStateName(patchState)));
         Logger::info("Patch ID: " + String(patchId));
         Logger::info("========================================");
         
@@ -1124,6 +1137,10 @@ private:
             patchStartTime = newTime;
             totalElapsedTime = 0;
             timeSyncPending = false;
+            Preferences prefs;
+            prefs.begin("pump", false);
+            prefs.putUInt("patchStart", newTime);
+            prefs.end();
             Logger::info("时间已同步: prefix=" + String(prefix) + " time=" + String(newTime));
         }
         sendResponse(CommandType::SET_TIME, seqNum, nullptr, 0);
@@ -1527,6 +1544,12 @@ private:
         hourlyDelivered = 0;
         dailyDelivered = 0;
         basalSequence = 0;
+
+        Preferences actPrefs;
+        actPrefs.begin("pump", false);
+        actPrefs.putUInt("patchStart", patchStartTime);
+        actPrefs.end();
+
         Logger::info("Patch 已激活 -> ACTIVE");
 
         uint8_t responseData[25];
@@ -1567,6 +1590,11 @@ private:
         Logger::info("=== 停止 Patch ===");
         setPatchState(PatchState::STOPPED);
         simulatorState = SimulatorState::EJECTING;
+
+        Preferences prefs;
+        prefs.begin("pump", false);
+        prefs.remove("patchStart");
+        prefs.end();
 
         if (currentBolus) {
             delete currentBolus;
