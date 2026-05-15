@@ -569,7 +569,7 @@ private:
 
     void sendPeriodicNotification() {
         if (currentBolus != nullptr) return;
-        if (totalElapsedTime % 10 == 0) {
+        if (totalElapsedTime % 5 == 0) {
             sendSynchronizeNotification();
         }
     }
@@ -1217,12 +1217,23 @@ private:
                 return;
             }
 
-            currentBolus = new BolusInfo{bolusType, amount, 0.0, millis() / 1000};
-            bolusDeliveryProgress = 0;
-            lastReportedBolusProgress = 0;
-            lastBolusProgressReportTime = 0;
-            addRecord(1, amount, 0);
-            Logger::info("大剂量已开始输送: " + String(amount) + "U");
+            if (amount <= 0.1) {
+                reservoir = max(0.0, reservoir - amount);
+                activeInsulin += amount;
+                hourlyDelivered += amount;
+                dailyDelivered += amount;
+                bolusHistory.push_back(BolusInfo{bolusType, amount, amount, millis() / 1000});
+                addRecord(1, amount, 0);
+                Logger::info("小剂量直接完成: " + String(amount) + "U");
+                sendStateNotification();
+            } else {
+                currentBolus = new BolusInfo{bolusType, amount, 0.0, millis() / 1000};
+                bolusDeliveryProgress = 0;
+                lastReportedBolusProgress = 0;
+                lastBolusProgressReportTime = 0;
+                addRecord(1, amount, 0);
+                Logger::info("大剂量已开始输送: " + String(amount) + "U");
+            }
         }
         sendResponse(CommandType::SET_BOLUS, seqNum, nullptr, 0);
     }
