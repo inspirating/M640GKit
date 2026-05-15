@@ -133,7 +133,7 @@ struct TempBasalInfo {
 class M640GPumpSimulator {
 public:
     M640GPumpSimulator() : initialized(false), lastUpdateTime(0), updateIntervalMs(100), bolusUpdateIntervalMs(100),
-        patchState(PatchState::FILLED), simulatorState(SimulatorState::INITIALIZING),
+        patchState(PatchState::ACTIVE), simulatorState(SimulatorState::RUNNING),
         reservoir(MAX_RESERVOIR), activeInsulin(0.0), batteryVoltage(3.8), batteryLevel(100),
         patchStartTime(0), totalElapsedTime(0), currentBolus(nullptr),
         bolusDeliveryProgress(0), lastReportedBolusProgress(0), lastBolusProgressReportTime(0), primeProgress(0), tempBasal(nullptr), tempBasalRemaining(0),
@@ -191,7 +191,7 @@ public:
         Logger::info("serial number: 9879D165");
         Logger::info("device type: 1");
         Logger::info("software version: 1.0.0");
-        Logger::info("initial state: FILLED (precharge wait for priming)");
+        Logger::info("initial state: ACTIVE (skip priming)");
         Logger::info("Patch ID: " + String(patchId));
         Logger::info("========================================");
         
@@ -507,7 +507,7 @@ private:
 
     void updatePrimeProgress() {
         if (patchState == PatchState::PRIMING) {
-            primeProgress += 10;
+            primeProgress += 20;
             if (primeProgress >= 240) {
                 setPatchState(PatchState::PRIMED);
                 primeProgress = 0;

@@ -1,0 +1,105 @@
+问题很清楚了。ESP32 重启后 patchState 初始化为 FILLED （值=2），而 Swift 端收到 pumpState = filled 后， pumpState.rawValue < PatchState.active.rawValue(32) 为 true，所以需要重新激活。
+
+解决方案：ESP32 启动时直接初始化为 ACTIVE 状态，跳过 FILLED/PRIMING/PRIMED 流程。
+
+ESP32\pump_simulator.h
+
+pump_simulator.h
+ESP32\pump_simulator.h
+
++ 1 - 1
+
+Open Diff
+
+同时更新 setup 中的日志和 simulatorState ：
+
+ESP32\pump_simulator.h
+
+pump_simulator.h
+ESP32\pump_simulator.h
+
++ 1 - 1
+
+Open Diff
+
+现在还要检查 handleActivateRequest ，ESP32 已经是 ACTIVE 状态时收到激活请求是否还能正常处理：
+
+Search codebase for 'handleActivateRequest|ACTIVATE'
+
+ESP32\pump_simulator.h
+
+ESP32\pump_simulator.h
+
+handleActivateRequest 在 patchState == ACTIVE 时不会 return，会继续执行激活流程（重置 reservoir、elapsedTime 等），然后 setPatchState(ACTIVE) 。这没问题。
+
+但还需要确认 Swift 端重连时的流程。当 ESP32 重启后 Swift 重连，Swift 会收到 pumpState = active ，不需要重新激活：
+
+Search codebase for 'reconnect|didConnect|handleConnect'
+
+M640GKit\PumpManager\BluetoothManager.swift
+
+M640GKit\PumpManager\BluetoothManager.swift
+
+现在看 PeripheralManager 中连接建立后如何处理状态同步：
+
+Search codebase for 'handleHeartbeat|sync|pumpState'
+
+M640GKit\PumpManager\PeripheralManager.swift
+
+M640GKit\PumpManager\PeripheralManager.swift
+
+现在完全理解了流程：
+
+1. ESP32 重启 → patchState = FILLED
+2. Swift 重连 → synchronize() → 收到 pumpState = filled(2)
+3. StateSyncer.sync → state.pumpState = .filled
+4. Swift UI 检测到 pumpState.rawValue < active.rawValue(32) → 要求重新激活
+修改后 ESP32 启动就是 ACTIVE ，Swift 重连时收到 pumpState = active(32) ，不需要重新激活。
+
+但还有一个问题：ESP32 重启后 patchId 会变（ patchId = random(65535) + 1 ），Swift 端存储的 patchId 可能不匹配。看看 Swift 端是否校验 patchId ：
+
+Search codebase for 'patchId'
+
+patchId 在 StateSyncer.sync 中会更新： state.patchId = UInt64(storage.patchId).toData(length: 4) 。所以 ESP32 重启后 patchId 变了也没关系，Swift 会自动更新。
+
+但还需要确保 sessionToken 不变。ESP32 重启后 generateSessionToken() 会生成新 token：
+
+Search codebase for 'generateSessionToken|sessionToken'
+
+ESP32\pump_simulator.h
+
+看看 Swift 端认证时是否校验 sessionToken：
+
+Search codebase for 'sessionToken'
+
+Search codebase for 'sessionToken'
+
+M640GKit\PumpManager\M640GPumpManager.swift
+
+现在看 ESP32 端认证时如何处理 sessionToken：
+
+Search codebase for 'handleAuthorize|AUTHORIZE'
+
+Search codebase for 'handleAuth|authenticate|sessionToken'
+
+ESP32\pump_simulator.h
+
+ESP32 认证时校验的是 clientKey （基于 PUMP_SN 计算的），不是 sessionToken 。 sessionToken 是 Swift 端自己生成的，ESP32 端不校验。所以 ESP32 重启后认证不受影响。
+
+现在确认一下修改是否完整。ESP32 重启后的流程：
+
+1. ESP32 启动 → patchState = ACTIVE , simulatorState = RUNNING
+2. Swift 重连 → 认证 → synchronize() → 收到 pumpState = active(32)
+3. StateSyncer.sync → state.pumpState = .active
+4. Swift UI 检测到 pumpState.rawValue >= active.rawValue(32) → 不需要重新激活 ✅
+但还有一个潜在问题：ESP32 重启后 reservoir 被重置为 MAX_RESERVOIR ， activeInsulin 重置为 0。Swift 端存储的 reservoir 值会被覆盖。不过这是模拟器的固有行为，ESP32 没有持久化存储。
+
+验证最终代码：
+
+ESP32\pump_simulator.h
+
+改动完成。
+
+问题原因： ESP32 重启后 patchState 初始化为 FILLED （值=2），Swift 重连时收到 pumpState = filled ，判断 rawValue(2) < active.rawValue(32) → 要求重新激活（走 PRIMING → PRIMED → ACTIVATE 流程）。
+
+修复： ESP32 初始状态改为 ACTIVE （值=32）， simulatorState 改为 RUNNING 。重启后 Swift 重连收到 pumpState = active ，直接跳过激活流程。
