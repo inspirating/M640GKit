@@ -142,7 +142,21 @@ public:
         isRunning = false;
     }
 
+    bool advertisingSuspended = false;
+
+    void disconnectAll() {
+        if (server && server->getConnectedCount() > 0) {
+            for (int i = 0; i < server->getConnectedCount(); i++) {
+                server->disconnect(i);
+            }
+        }
+    }
+
     void startAdvertising() {
+        if (advertisingSuspended) {
+            Serial.println("[ADV] Advertising suspended, skipping...");
+            return;
+        }
         Serial.println("[ADV] Configuring BLE advertising...");
         
         BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();

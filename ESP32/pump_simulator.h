@@ -141,7 +141,7 @@ public:
         isConnected(false), isSubscribed(false), isAuthenticated(false), sessionToken{0}, pumpTimezone(0),
         timeSyncPending(false), sequenceNumber(0), pingCounter(0), lastPingTime(0),
         connectionTimeoutMs(15000), lastActivityTime(0), patchId(0),
-        lastNotifiedState(PatchState::NONE),
+        lastNotifiedState(PatchState::NONE), patchStateDirty(false), pendingBleDisconnect(false), advertisingResumeTime(0),
         hourlyMaxInsulin(DEFAULT_HOURLY_MAX), dailyMaxInsulin(DEFAULT_DAILY_MAX),
         hourlyDelivered(0.0), dailyDelivered(0.0),
         currentBasalRate(0.6), basalSequence(0),
@@ -171,10 +171,12 @@ public:
         prefs.begin("pump", true);
         uint32_t savedStartTime = prefs.getUInt("patchStart", 0);
         uint8_t savedPatchState = prefs.getUChar("patchState", 0);
+        uint32_t savedElapsedTime = prefs.getUInt("elapsedTime", 0);
         prefs.end();
 
         if (savedStartTime > 0) {
             patchStartTime = savedStartTime;
+            totalElapsedTime = savedElapsedTime;
             if (savedPatchState > 0) {
                 patchState = static_cast<PatchState>(savedPatchState);
             } else {
@@ -185,7 +187,7 @@ public:
             } else if (patchState == PatchState::SUSPENDED || patchState == PatchState::PAUSED) {
                 simulatorState = SimulatorState::SUSPENDED;
             }
-            Logger::info("从NVS恢复: patchStartTime=" + String(patchStartTime) + " state=" + String(getStateName(patchState)));
+            Logger::info("从NVS恢复: patchStartTime=" + String(patchStartTime) + " state=" + String(getStateName(patchState)) + " elapsed=" + String(totalElapsedTime));
         } else {
             patchStartTime = 0;
             Logger::info("首次启动: 等待激活流程");
@@ -310,6 +312,9 @@ private:
     uint8_t currentPkgIndex;
 
     PatchState lastNotifiedState;
+    bool patchStateDirty;
+    bool pendingBleDisconnect;
+    uint32_t advertisingResumeTime;
     uint32_t lastPrimeNotificationTime;
 
     double hourlyMaxInsulin;
@@ -413,6 +418,45 @@ private:
             totalElapsedTime += elapsedAccumulator / 1000;
             elapsedAccumulator %= 1000;
         }
+
+        if (patchStateDirty) {
+            patchStateDirty = false;
+            Preferences statePrefs;
+            statePrefs.begin("pump", false);
+            statePrefs.putUChar("patchState", static_cast<uint8_t>(patchState));
+            statePrefs.putUInt("patchStart", patchStartTime);
+            statePrefs.putUInt("elapsedTime", totalElapsedTime);
+            statePrefs.end();
+        }
+
+        if (pendingBleDisconnect) {
+            pendingBleDisconnect = false;
+            Logger::info("执行延迟BLE断开并重置为初始状态");
+            patchState = PatchState::FILLED;
+            simulatorState = SimulatorState::INITIALIZING;
+            gattServer.advertisingSuspended = true;
+            BLEDevice::stopAdvertising();
+            gattServer.disconnectAll();
+            advertisingResumeTime = millis() + 30000;
+            Logger::info("BLE广播已暂停30秒, 防止Swift自动重连");
+        }
+
+        if (gattServer.advertisingSuspended && advertisingResumeTime > 0 && millis() > advertisingResumeTime) {
+            advertisingResumeTime = 0;
+            gattServer.advertisingSuspended = false;
+            gattServer.startAdvertising();
+            Logger::info("BLE广播已恢复, 设备可被发现");
+        }
+
+        static uint32_t lastElapsedTimeSave = 0;
+        if (totalElapsedTime - lastElapsedTimeSave >= 60) {
+            lastElapsedTimeSave = totalElapsedTime;
+            Preferences elapsedPrefs;
+            elapsedPrefs.begin("pump", false);
+            elapsedPrefs.putUInt("elapsedTime", totalElapsedTime);
+            elapsedPrefs.end();
+        }
+
         updateBolusDelivery();
         updateTempBasal();
         updateNormalBasalDelivery();
@@ -544,10 +588,7 @@ private:
         patchState = newState;
         Logger::info("状态变更: " + String(getStateName(oldState)) + " -> " + String(getStateName(newState)));
 
-        Preferences statePrefs;
-        statePrefs.begin("pump", false);
-        statePrefs.putUChar("patchState", static_cast<uint8_t>(newState));
-        statePrefs.end();
+        patchStateDirty = true;
 
         sendStateNotification();
     }
@@ -924,6 +965,13 @@ private:
         Serial.println("****************************************");
         Serial.println("");
         Logger::info("========== BLE 客户端已连接 ==========");
+
+        if (gattServer.advertisingSuspended) {
+            Logger::info("广播暂停期间收到连接, 拒绝并断开");
+            gattServer.disconnectAll();
+            return;
+        }
+
         isConnected = true;
         lastActivityTime = millis();
         connectionTracker.onConnect();
@@ -946,6 +994,10 @@ private:
         expectedPacketLen = 0;
         currentCmdType = 0;
         connectionTracker.onDisconnect("BLE 断开");
+
+        gattServer.advertisingSuspended = true;
+        advertisingResumeTime = millis() + 10000;
+        Logger::info("BLE广播已暂停10秒, 防止客户端自动重连");
 
         if (currentBolus) {
             Logger::warning("BLE 断开时有大剂量在进行中");
@@ -1152,10 +1204,7 @@ private:
             patchStartTime = newTime;
             totalElapsedTime = 0;
             timeSyncPending = false;
-            Preferences prefs;
-            prefs.begin("pump", false);
-            prefs.putUInt("patchStart", newTime);
-            prefs.end();
+            patchStateDirty = true;
             Logger::info("时间已同步: prefix=" + String(prefix) + " time=" + String(newTime));
         }
         sendResponse(CommandType::SET_TIME, seqNum, nullptr, 0);
@@ -1560,10 +1609,7 @@ private:
         dailyDelivered = 0;
         basalSequence = 0;
 
-        Preferences actPrefs;
-        actPrefs.begin("pump", false);
-        actPrefs.putUInt("patchStart", patchStartTime);
-        actPrefs.end();
+        patchStateDirty = true;
 
         Logger::info("Patch 已激活 -> ACTIVE");
 
@@ -1603,13 +1649,24 @@ private:
 
     void handleStopPatchRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
         Logger::info("=== 停止 Patch ===");
-        setPatchState(PatchState::STOPPED);
+        patchState = PatchState::STOPPED;
+        patchStateDirty = false;
         simulatorState = SimulatorState::EJECTING;
+        patchStartTime = 0;
+        totalElapsedTime = 0;
+        reservoir = MAX_RESERVOIR;
+        activeInsulin = 0;
+        hourlyDelivered = 0;
+        dailyDelivered = 0;
+        basalSequence = 0;
+        primeProgress = 0;
+        lastNotifiedState = PatchState::NONE;
 
         Preferences prefs;
         prefs.begin("pump", false);
         prefs.remove("patchStart");
         prefs.remove("patchState");
+        prefs.remove("elapsedTime");
         prefs.end();
 
         if (currentBolus) {
@@ -1617,6 +1674,7 @@ private:
             currentBolus = nullptr;
             bolusDeliveryProgress = 0;
             lastReportedBolusProgress = 0;
+            lastBolusProgressReportTime = 0;
         }
         if (tempBasal) {
             delete tempBasal;
@@ -1624,7 +1682,6 @@ private:
             tempBasalRemaining = 0;
         }
 
-        basalSequence++;
         uint8_t responseData[4] = {
             basalSequence & 0xFF,
             static_cast<uint8_t>((basalSequence >> 8) & 0xFF),
@@ -1632,6 +1689,9 @@ private:
             static_cast<uint8_t>((patchId >> 8) & 0xFF)
         };
         sendResponse(CommandType::STOP_PATCH, seqNum, responseData, 4);
+
+        pendingBleDisconnect = true;
+        Logger::info("Patch 已停止, 将在主循环中断开BLE并重置状态");
     }
 
     void handleSetPatchRequest(const uint8_t* data, uint8_t len, uint8_t seqNum) {
