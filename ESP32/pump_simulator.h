@@ -457,22 +457,22 @@ private:
         hourlyDelivered += stepDelivery;
         dailyDelivered += stepDelivery;
 
-        bolusDeliveryProgress = static_cast<uint8_t>(
-            min(100.0, (currentBolus->delivered / currentBolus->amount) * 100.0)
-        );
+        // bolusDeliveryProgress = static_cast<uint8_t>(
+        //     min(100.0, (currentBolus->delivered / currentBolus->amount) * 100.0)
+        // );
 
-        uint32_t currentTime = millis();
-        if (lastBolusProgressReportTime == 0) {
-            lastBolusProgressReportTime = currentTime;
-            lastReportedBolusProgress = bolusDeliveryProgress;
-            sendSynchronizeNotification();
-        } else if (currentTime - lastBolusProgressReportTime >= 100) {
-            lastBolusProgressReportTime = currentTime;
-            if (bolusDeliveryProgress != lastReportedBolusProgress) {
-                lastReportedBolusProgress = bolusDeliveryProgress;
-                sendSynchronizeNotification();
-            }
-        }
+        // uint32_t currentTime = millis();
+        // if (lastBolusProgressReportTime == 0) {
+        //     lastBolusProgressReportTime = currentTime;
+        //     lastReportedBolusProgress = bolusDeliveryProgress;
+        //     sendSynchronizeNotification();
+        // } else if (currentTime - lastBolusProgressReportTime >= 100) {
+        //     lastBolusProgressReportTime = currentTime;
+        //     if (bolusDeliveryProgress != lastReportedBolusProgress) {
+        //         lastReportedBolusProgress = bolusDeliveryProgress;
+        //         sendSynchronizeNotification();
+        //     }
+        // }
         if (currentBolus->delivered >= currentBolus->amount - 0.001) {
             double finalDelivered = currentBolus->amount;
             bolusHistory.push_back(*currentBolus);
@@ -568,6 +568,7 @@ private:
     }
 
     void sendPeriodicNotification() {
+        if (currentBolus != nullptr) return;
         if (totalElapsedTime % 10 == 0) {
             sendSynchronizeNotification();
         }
@@ -630,9 +631,12 @@ private:
                 data.push_back(deliveredRaw & 0xFF);
                 data.push_back((deliveredRaw >> 8) & 0xFF);
             } else {
-                data.push_back(0x80);
-                data.push_back(0);
-                data.push_back(0);
+                uint8_t completedFlags = bolusHistory.empty() ? 0 : (bolusHistory.back().type & 0x7F);
+                completedFlags |= 0x80;
+                data.push_back(completedFlags);
+                uint16_t deliveredRaw = bolusHistory.empty() ? 0 : static_cast<uint16_t>(round(bolusHistory.back().delivered / 0.05));
+                data.push_back(deliveredRaw & 0xFF);
+                data.push_back((deliveredRaw >> 8) & 0xFF);
             }
         }
 
