@@ -56,7 +56,6 @@ static constexpr double DEFAULT_HOURLY_MAX = 25.0;
 static constexpr double DEFAULT_DAILY_MAX = 200.0;
 
 static constexpr uint32_t M640G_BASE_UNIX = 1388534400; // 2014-01-01T00:00:00+0000
-static constexpr uint32_t COMMAND_TIMEOUT_MS = 30000; // 30秒无命令则断开
 
 // 日志级别
 enum class LogLevel : uint8_t {
@@ -141,8 +140,8 @@ public:
         bolusDeliveryProgress(0), lastReportedBolusProgress(0), lastBolusProgressReportTime(0), primeProgress(0), tempBasal(nullptr), tempBasalRemaining(0),
         isConnected(false), isSubscribed(false), isAuthenticated(false), sessionToken{0}, pumpTimezone(0),
         timeSyncPending(false), sequenceNumber(0), pingCounter(0), lastPingTime(0),
-        connectionTimeoutMs(15000), lastActivityTime(0), lastCommandTime(0), patchId(0),
-        lastNotifiedState(PatchState::NONE), patchStateDirty(false), pendingBleDisconnect(false), advertisingResumeTime(0),
+        connectionTimeoutMs(15000), lastActivityTime(0), patchId(0),
+        lastNotifiedState(PatchState::NONE), patchStateDirty(false), pendingBleDisconnect(false), nvsClearPending(false), advertisingResumeTime(0),
         hourlyMaxInsulin(DEFAULT_HOURLY_MAX), dailyMaxInsulin(DEFAULT_DAILY_MAX),
         hourlyDelivered(0.0), dailyDelivered(0.0),
         currentBasalRate(0.6), basalSequence(0),
@@ -304,7 +303,6 @@ private:
     uint32_t lastPingTime;
     uint16_t connectionTimeoutMs;
     uint32_t lastActivityTime;
-    uint32_t lastCommandTime;
 
     // 数据包缓冲
     std::vector<uint8_t> packetBuffer;
@@ -316,6 +314,7 @@ private:
     PatchState lastNotifiedState;
     bool patchStateDirty;
     bool pendingBleDisconnect;
+    bool nvsClearPending;
     uint32_t advertisingResumeTime;
     uint32_t lastPrimeNotificationTime;
 
@@ -443,6 +442,15 @@ private:
             Logger::info("BLE广播已暂停30秒, 防止Swift自动重连");
         }
 
+        if (nvsClearPending) {
+            nvsClearPending = false;
+            Preferences clearPrefs;
+            clearPrefs.begin("pump", false);
+            clearPrefs.clear();
+            clearPrefs.end();
+            Logger::info("NVS 持久化状态已清除");
+        }
+
         if (gattServer.advertisingSuspended && advertisingResumeTime > 0 && millis() > advertisingResumeTime) {
             advertisingResumeTime = 0;
             gattServer.advertisingSuspended = false;
@@ -467,14 +475,13 @@ private:
         checkAndSendStateNotification();
         sendPingHeartbeat();
         checkConnectionTimeout();
-        checkCommandTimeout();
 
         if (random(1000) == 0) {
             batteryVoltage = max(2.8, batteryVoltage - 0.001);
             batteryLevel = max(0, batteryLevel - 1);
         }
 
-        if (isSubscribed && isConnected && !gattServer.advertisingSuspended) {
+        if (isSubscribed && isConnected) {
             sendPeriodicNotification();
             sendPrimeProgressNotification();
         }
@@ -605,7 +612,6 @@ private:
 
     void sendStateNotification() {
         if (!isSubscribed || !isConnected) return;
-        if (gattServer.advertisingSuspended) return;
         std::vector<uint8_t> syncData = buildSynchronizeData();
         sendNotificationPacket(syncData);
         Logger::debug("发送状态通知, 状态=" + String(getStateName(patchState)));
@@ -613,7 +619,6 @@ private:
 
     void sendPingHeartbeat() {
         if (!isSubscribed || !isConnected) return;
-        if (gattServer.advertisingSuspended) return;
 
         uint32_t currentTime = millis();
         if (currentTime - lastPingTime >= 5000) {
@@ -641,20 +646,8 @@ private:
         }
     }
 
-    void checkCommandTimeout() {
-        if (!isConnected || !isAuthenticated) return;
-
-        uint32_t currentTime = millis();
-        if (currentTime - lastCommandTime > COMMAND_TIMEOUT_MS) {
-            Logger::warning("命令超时(" + String(COMMAND_TIMEOUT_MS / 1000) + "秒无命令), 断开连接并重置状态");
-            gattServer.disconnectAll();
-            handleBleDisconnect();
-        }
-    }
-
     void sendPeriodicNotification() {
         if (currentBolus != nullptr) return;
-        if (gattServer.advertisingSuspended) return;
         if (totalElapsedTime % 5 == 0) {
             sendSynchronizeNotification();
         }
@@ -662,7 +655,6 @@ private:
 
     void sendPrimeProgressNotification() {
         if (patchState != PatchState::PRIMING) return;
-        if (gattServer.advertisingSuspended) return;
         uint32_t now = millis();
         if (now - lastPrimeNotificationTime >= 500) {
             lastPrimeNotificationTime = now;
@@ -671,7 +663,6 @@ private:
     }
 
     void sendSynchronizeNotification() {
-        if (gattServer.advertisingSuspended) return;
         std::vector<uint8_t> syncData = buildSynchronizeData();
         sendNotificationPacket(syncData);
     }
@@ -851,7 +842,6 @@ private:
 
     void handleWriteRequest(const uint8_t* data, size_t len) {
         lastActivityTime = millis();
-        lastCommandTime = millis();
 
         Logger::hexDump("RX", "<--", data, len);
 
@@ -994,7 +984,6 @@ private:
 
         isConnected = true;
         lastActivityTime = millis();
-        lastCommandTime = millis();
         connectionTracker.onConnect();
         // 不要在这里设置 isSubscribed = true
         // 等待客户端真正订阅通知特征后，handleSubscribe(true) 会被调用
@@ -1007,12 +996,6 @@ private:
         Serial.println("****************************************");
         Serial.println("");
         Logger::info("========== BLE 客户端已断开 ==========");
-
-        if (!isConnected && !isSubscribed && !isAuthenticated && authenticatedClients.empty()) {
-            Logger::info("已处于断开状态, 跳过重复处理");
-            return;
-        }
-
         isConnected = false;
         isSubscribed = false;
         isAuthenticated = false;
@@ -1022,16 +1005,39 @@ private:
         currentCmdType = 0;
         connectionTracker.onDisconnect("BLE 断开");
 
-        gattServer.advertisingSuspended = true;
-        advertisingResumeTime = millis() + 30000;
-        Logger::info("BLE广播已暂停30秒, 防止客户端自动重连");
-
+        // 重置泵状态为初始值，这样 iOS 重连后看到的是全新设备
+        // 与 Medtrum 真实泵行为保持一致：删除泵后重连不会显示错误状态
+        patchState = PatchState::FILLED;
+        simulatorState = SimulatorState::INITIALIZING;
+        reservoir = MAX_RESERVOIR;
+        activeInsulin = 0.0;
+        patchStartTime = 0;
+        totalElapsedTime = 0;
         if (currentBolus) {
-            Logger::warning("BLE 断开时有大剂量在进行中");
+            delete currentBolus;
+            currentBolus = nullptr;
         }
         if (tempBasal) {
-            Logger::warning("BLE 断开时有临时基础率在进行中");
+            delete tempBasal;
+            tempBasal = nullptr;
+            tempBasalRemaining = 0;
         }
+        bolusDeliveryProgress = 0;
+        lastReportedBolusProgress = 0;
+        lastBolusProgressReportTime = 0;
+        primeProgress = 0;
+        lastPrimeNotificationTime = 0;
+        hourlyDelivered = 0.0;
+        dailyDelivered = 0.0;
+        currentBasalRate = 0.6;
+        basalSequence = 0;
+        Logger::info("泵状态已重置为初始值");
+
+        nvsClearPending = true;
+
+        gattServer.advertisingSuspended = true;
+        advertisingResumeTime = millis() + 10000;
+        Logger::info("BLE广播已暂停10秒, 防止客户端自动重连");
     }
 
     void processCompleteCommand(const uint8_t* data, uint8_t len) {
