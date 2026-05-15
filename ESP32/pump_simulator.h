@@ -170,13 +170,22 @@ public:
         Preferences prefs;
         prefs.begin("pump", true);
         uint32_t savedStartTime = prefs.getUInt("patchStart", 0);
+        uint8_t savedPatchState = prefs.getUChar("patchState", 0);
         prefs.end();
 
         if (savedStartTime > 0) {
             patchStartTime = savedStartTime;
-            patchState = PatchState::ACTIVE;
-            simulatorState = SimulatorState::RUNNING;
-            Logger::info("从NVS恢复: patchStartTime=" + String(patchStartTime) + " state=ACTIVE");
+            if (savedPatchState > 0) {
+                patchState = static_cast<PatchState>(savedPatchState);
+            } else {
+                patchState = PatchState::ACTIVE;
+            }
+            if (patchState == PatchState::ACTIVE || patchState == PatchState::ACTIVE_ALT) {
+                simulatorState = SimulatorState::RUNNING;
+            } else if (patchState == PatchState::SUSPENDED || patchState == PatchState::PAUSED) {
+                simulatorState = SimulatorState::SUSPENDED;
+            }
+            Logger::info("从NVS恢复: patchStartTime=" + String(patchStartTime) + " state=" + String(getStateName(patchState)));
         } else {
             patchStartTime = 0;
             Logger::info("首次启动: 等待激活流程");
@@ -534,6 +543,12 @@ private:
         PatchState oldState = patchState;
         patchState = newState;
         Logger::info("状态变更: " + String(getStateName(oldState)) + " -> " + String(getStateName(newState)));
+
+        Preferences statePrefs;
+        statePrefs.begin("pump", false);
+        statePrefs.putUChar("patchState", static_cast<uint8_t>(newState));
+        statePrefs.end();
+
         sendStateNotification();
     }
 
@@ -1594,6 +1609,7 @@ private:
         Preferences prefs;
         prefs.begin("pump", false);
         prefs.remove("patchStart");
+        prefs.remove("patchState");
         prefs.end();
 
         if (currentBolus) {
