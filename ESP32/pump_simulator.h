@@ -438,8 +438,15 @@ private:
             gattServer.advertisingSuspended = true;
             BLEDevice::stopAdvertising();
             gattServer.disconnectAll();
-            advertisingResumeTime = millis() + 30000;
-            Logger::info("BLE广播已暂停30秒, 防止Swift自动重连");
+            advertisingResumeTime = 0;
+            Logger::info("BLE广播已永久停止, 需重启ESP32才能再次连接");
+        }
+
+        if (gattServer.advertisingSuspended && advertisingResumeTime > 0 && millis() > advertisingResumeTime) {
+            advertisingResumeTime = 0;
+            gattServer.advertisingSuspended = false;
+            gattServer.startAdvertising();
+            Logger::info("BLE广播已恢复, 设备可被发现");
         }
 
         if (nvsClearPending) {
@@ -449,13 +456,6 @@ private:
             clearPrefs.clear();
             clearPrefs.end();
             Logger::info("NVS 持久化状态已清除");
-        }
-
-        if (gattServer.advertisingSuspended && advertisingResumeTime > 0 && millis() > advertisingResumeTime) {
-            advertisingResumeTime = 0;
-            gattServer.advertisingSuspended = false;
-            gattServer.startAdvertising();
-            Logger::info("BLE广播已恢复, 设备可被发现");
         }
 
         static uint32_t lastElapsedTimeSave = 0;
@@ -1005,8 +1005,6 @@ private:
         currentCmdType = 0;
         connectionTracker.onDisconnect("BLE 断开");
 
-        // 重置泵状态为初始值，这样 iOS 重连后看到的是全新设备
-        // 与 Medtrum 真实泵行为保持一致：删除泵后重连不会显示错误状态
         patchState = PatchState::FILLED;
         simulatorState = SimulatorState::INITIALIZING;
         reservoir = MAX_RESERVOIR;
