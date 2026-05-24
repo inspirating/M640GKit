@@ -982,3 +982,44 @@ key = simpleCrypt(randomGen(randomGen(MEDTRUM_CIPHER ^ sn)))
 | Clear Alarm | 115 | 2 | 2 | alertType(2) | 空 |
 
 > **注意**: 响应最小大小（mimimumDataSize）是指 `totalData` 的最小长度，不包括 6 字节的 Header+ResponseCode。实际响应数据从偏移 6 开始。
+
+
+
+
+
+all insulin operation
+handleSetBolusRequest() L1280 检查状态/余量/限值 → 创建 currentBolus 对象，开始大剂量输注 
+handleCancelBolusRequest() L1344 删除 currentBolus → 停止大剂量 
+handleReadBolusStateRequest() L1362 返回 currentBolus 的进度数据 
+handleSetTempBasalRequest() L1387 检查状态/限值 → 创建 tempBasal 对象，开始临时基础率 
+handleCancelTempBasalRequest() L1455 删除 tempBasal → 恢复为标准基础率 
+handleSetBasalProfileRequest() L1546 更新 basalProfile 数组 → 改变基础率配置 
+handleSuspendRequest() L1485 暂停时 取消大剂量 + 取消临时基础率 
+handleResumeRequest() L1522 恢复为 ACTIVE 状态 
+handleStopPatchRequest() L1681 清空所有状态，标记 
+pendingBleDisconnect 
+handleSetPatchRequest() L1728 设置 hourlyMaxInsulin / dailyMaxInsulin 等限值
+
+
+available operation
+
+handleSetBolusRequest() L1280 检查状态/余量/限值 → 创建 currentBolus 对象，开始大剂量输注 
+handleSetTempBasalRequest() L1387 检查状态/限值 → 创建 tempBasal 对象，开始临时基础率 
+handleCancelTempBasalRequest() L1455 删除 tempBasal → 恢复为标准基础率 
+handleSetBasalProfileRequest() L1546 更新 basalProfile 数组 → 改变基础率配置 
+handleSuspendRequest() L1485 暂停时 取消大剂量 + 取消临时基础率 
+handleResumeRequest() L1522 恢复为 ACTIVE 状态 
+handleSetPatchRequest() L1728 设置 hourlyMaxInsulin / dailyMaxInsulin 等限值
+
+这些都会涉及胰岛素的操作，要求构建一个基础率的队列，按照设定的时间段内的基础率，拆分成相应时间段内平均每次0.1u的操作放入队列，然后通过gpio操作依次执行，当handleSetBasalProfileRequest时，要求重新构建基础率队列，然后依次执行。
+
+handleSetTempBasalRequest时构建一个tempbasal队列，同时停止执行默认基础率的队列，按照设定的时间段内的临时基础率，拆分成相应时间段内平均每次0.1u的操作放入队列，然后通过gpio操作依次执行。
+handleCancelTempBasalRequest时，删除tempbasal队列，恢复执行默认基础率的队列。
+
+handleSuspendRequest时，暂停执行默认基础率的队列，同时删除tempbasal队列。
+handleResumeRequest时，恢复执行默认基础率的队列。
+
+
+        updateBolusDelivery();
+        updateTempBasal();
+        updateNormalBasalDelivery(); 为何把这三个函数删除了？这三个函数里包含的有执行结果的回馈，虽然你把执行动作加入了队列，但是每执行一个动作是不是要有反馈？

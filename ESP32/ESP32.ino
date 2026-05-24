@@ -63,6 +63,11 @@ void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
 
+    // 初始化 GPIO1 作为 1Hz 输出
+    pinMode(1, OUTPUT);
+    digitalWrite(1, LOW);
+    Serial.println("GPIO1 initialized as 1Hz output");
+
     // 设置全局实例指针 (用于回调)
     gSimulator = &pumpSimulator;
 

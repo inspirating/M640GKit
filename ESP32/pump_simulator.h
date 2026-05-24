@@ -131,6 +131,15 @@ struct TempBasalInfo {
     uint32_t startTime;
 };
 
+// ========== 队列输注系统 ==========
+static constexpr double STEP_SIZE = 0.1;
+static constexpr int STEP_PIN = 1;
+
+struct InsulinAction {
+    uint32_t executeTimeMs;
+    double stepAmount;
+};
+
 class M640GPumpSimulator {
 public:
     M640GPumpSimulator() : initialized(false), lastUpdateTime(0), updateIntervalMs(100), bolusUpdateIntervalMs(100),
@@ -146,7 +155,9 @@ public:
         hourlyDelivered(0.0), dailyDelivered(0.0),
         currentBasalRate(0.6), basalSequence(0),
         expirationTimer(0), alarmSetting(0),
-        predictiveLowSuspend(0), predictiveLowSuspendRange(30), lastPrimeNotificationTime(0) {
+        predictiveLowSuspend(0), predictiveLowSuspendRange(30), lastPrimeNotificationTime(0),
+        basalQueueIdx(0), tempBasalQueueIdx(0), bolusQueueIdx(0),
+        tempBasalActive(false), basalSuspended(false), lastStepTime(0), tempBasalStartMs(0) {
         currentBolus = nullptr;
         tempBasal = nullptr;
     }
@@ -329,6 +340,18 @@ private:
     uint8_t predictiveLowSuspend;
     uint8_t predictiveLowSuspendRange;
 
+    // ========== 队列输注系统 ==========
+    std::vector<InsulinAction> basalQueue;
+    std::vector<InsulinAction> tempBasalQueue;
+    std::vector<InsulinAction> bolusQueue;
+    size_t basalQueueIdx;
+    size_t tempBasalQueueIdx;
+    size_t bolusQueueIdx;
+    bool tempBasalActive;
+    bool basalSuspended;
+    uint32_t lastStepTime;
+    uint32_t tempBasalStartMs;
+
     const char* getStateName(PatchState s) {
         switch (s) {
             case PatchState::NONE: return "NONE";
@@ -467,9 +490,7 @@ private:
             elapsedPrefs.end();
         }
 
-        updateBolusDelivery();
-        updateTempBasal();
-        updateNormalBasalDelivery();
+        processDeliveryQueues();
         updatePrimeProgress();
         resetHourlyDailyCounters();
         checkAndSendStateNotification();
@@ -494,17 +515,6 @@ private:
         recordBuffer.push_back({type, patchStartTime + totalElapsedTime, amount, duration});
     }
 
-    void updateNormalBasalDelivery() {
-        if (patchState != PatchState::ACTIVE && patchState != PatchState::ACTIVE_ALT) return;
-        if (tempBasal != nullptr) return;
-
-        double basalStepU = currentBasalRate * (updateIntervalMs / 3600000.0);
-        reservoir = max(0.0, reservoir - basalStepU);
-        activeInsulin += basalStepU;
-        hourlyDelivered += basalStepU;
-        dailyDelivered += basalStepU;
-    }
-
     void resetHourlyDailyCounters() {
         static uint32_t lastHourReset = 0;
         static uint32_t lastDayReset = 0;
@@ -517,67 +527,6 @@ private:
         if (now - lastDayReset >= 86400) {
             dailyDelivered = 0.0;
             lastDayReset = now;
-        }
-    }
-
-    void updateBolusDelivery() {
-        if (currentBolus == nullptr) return;
-
-        double BOLUS_RATE_U_PER_Second = 0.1;
-        bool isSmallDose = currentBolus->amount <= 0.2;
-        if (isSmallDose) {
-            BOLUS_RATE_U_PER_Second = currentBolus->amount / 5.0;
-        }
-
-        double stepDelivery = BOLUS_RATE_U_PER_Second * (bolusUpdateIntervalMs / 1000.0);
-        stepDelivery = min(stepDelivery, currentBolus->amount - currentBolus->delivered);
-
-        currentBolus->delivered += stepDelivery;
-        reservoir = max(0.0, reservoir - stepDelivery);
-        activeInsulin += stepDelivery;
-        hourlyDelivered += stepDelivery;
-        dailyDelivered += stepDelivery;
-
-        if (isSmallDose) {
-            uint32_t currentTime = millis();
-            if (lastBolusProgressReportTime == 0) {
-                lastBolusProgressReportTime = currentTime;
-                sendSynchronizeNotification();
-            } else if (currentTime - lastBolusProgressReportTime >= 10) {
-                lastBolusProgressReportTime = currentTime;
-                sendSynchronizeNotification();
-            }
-        }
-
-        if (currentBolus->delivered >= currentBolus->amount - 0.001) {
-            double finalDelivered = currentBolus->amount;
-            bolusHistory.push_back(*currentBolus);
-            Logger::info("大剂量输送完成: " + String(finalDelivered) + "U");
-            sendStateNotification();
-            delete currentBolus;
-            currentBolus = nullptr;
-            bolusDeliveryProgress = 0;
-            lastReportedBolusProgress = 0;
-        }
-    }
-
-    void updateTempBasal() {
-        if (tempBasal == nullptr) return;
-
-        double basalStepU = tempBasal->rate * (updateIntervalMs / 3600000.0);
-        reservoir = max(0.0, reservoir - basalStepU);
-        activeInsulin += basalStepU;
-        hourlyDelivered += basalStepU;
-        dailyDelivered += basalStepU;
-
-        tempBasalRemaining -= updateIntervalMs / 60000.0;
-
-        if (tempBasalRemaining <= 0) {
-            Logger::info("临时基础率结束");
-            delete tempBasal;
-            tempBasal = nullptr;
-            tempBasalRemaining = 0;
-            sendStateNotification();
         }
     }
 
@@ -817,6 +766,149 @@ private:
         }
 
         return data;
+    }
+
+    // ========== 队列输注系统 ==========
+
+    void buildBasalQueue() {
+        basalQueue.clear();
+        basalQueueIdx = 0;
+        size_t numSegments = basalProfile.size() / 2;
+        if (numSegments == 0) return;
+
+        uint32_t baseTime = millis();
+        uint32_t scheduleStartMs = 0;
+
+        for (size_t i = 0; i < numSegments; i++) {
+            uint16_t raw = basalProfile[i * 2] | (basalProfile[i * 2 + 1] << 8);
+            double rate = raw * 0.05;
+            if (rate <= 0) {
+                scheduleStartMs += 1800000;
+                continue;
+            }
+
+            uint32_t segmentDurationMs = 1800000;
+            double totalU = rate * 0.5;
+            uint32_t numSteps = static_cast<uint32_t>(totalU / STEP_SIZE);
+            if (numSteps == 0) numSteps = 1;
+
+            uint32_t intervalMs = segmentDurationMs / numSteps;
+            for (uint32_t s = 0; s < numSteps; s++) {
+                uint32_t offset = (s * segmentDurationMs) / numSteps;
+                InsulinAction action;
+                action.executeTimeMs = baseTime + scheduleStartMs + offset;
+                action.stepAmount = min(STEP_SIZE, totalU - s * STEP_SIZE);
+                basalQueue.push_back(action);
+            }
+            scheduleStartMs += segmentDurationMs;
+        }
+        Logger::info("基础率队列已构建: " + String(basalQueue.size()) + " steps");
+    }
+
+    void buildTempBasalQueue(double rate, uint16_t durationMinutes) {
+        tempBasalQueue.clear();
+        tempBasalQueueIdx = 0;
+
+        double totalU = rate * durationMinutes / 60.0;
+        uint32_t numSteps = static_cast<uint32_t>(totalU / STEP_SIZE);
+        if (numSteps == 0) numSteps = 1;
+
+        uint32_t totalDurationMs = durationMinutes * 60 * 1000;
+        uint32_t intervalMs = totalDurationMs / numSteps;
+        uint32_t baseTime = millis();
+
+        for (uint32_t s = 0; s < numSteps; s++) {
+            InsulinAction action;
+            action.executeTimeMs = baseTime + s * intervalMs;
+            action.stepAmount = min(STEP_SIZE, totalU - s * STEP_SIZE);
+            tempBasalQueue.push_back(action);
+        }
+        Logger::info("临时基础率队列已构建: " + String(tempBasalQueue.size()) + " steps @ " + String(rate) + "U/hr x " + String(durationMinutes) + "min");
+    }
+
+    void buildBolusQueue(double amount) {
+        bolusQueue.clear();
+        bolusQueueIdx = 0;
+
+        uint32_t numSteps = static_cast<uint32_t>(amount / STEP_SIZE);
+        if (numSteps == 0) numSteps = 1;
+
+        uint32_t baseTime = millis();
+
+        for (uint32_t s = 0; s < numSteps; s++) {
+            InsulinAction action;
+            action.executeTimeMs = baseTime + s * 1000;
+            action.stepAmount = min(STEP_SIZE, amount - s * STEP_SIZE);
+            bolusQueue.push_back(action);
+        }
+        Logger::info("大剂量队列已构建: " + String(bolusQueue.size()) + " steps = " + String(amount) + "U");
+    }
+
+    void executeQueueAction(InsulinAction& action) {
+        digitalWrite(STEP_PIN, HIGH);
+        delayMicroseconds(500);
+        digitalWrite(STEP_PIN, LOW);
+
+        double stepU = action.stepAmount;
+        reservoir = max(0.0, reservoir - stepU);
+        activeInsulin += stepU;
+        hourlyDelivered += stepU;
+        dailyDelivered += stepU;
+    }
+
+    void processDeliveryQueues() {
+        uint32_t now = millis();
+
+        if (patchState != PatchState::ACTIVE && patchState != PatchState::ACTIVE_ALT) return;
+
+        if (currentBolus != nullptr && bolusQueueIdx < bolusQueue.size()) {
+            while (bolusQueueIdx < bolusQueue.size() && now >= bolusQueue[bolusQueueIdx].executeTimeMs) {
+                executeQueueAction(bolusQueue[bolusQueueIdx]);
+                bolusQueueIdx++;
+                currentBolus->delivered += STEP_SIZE;
+                if (currentBolus->delivered >= currentBolus->amount - 0.001) {
+                    double finalDelivered = currentBolus->amount;
+                    bolusHistory.push_back(*currentBolus);
+                    Logger::info("大剂量输送完成: " + String(finalDelivered) + "U");
+                    sendStateNotification();
+                    delete currentBolus;
+                    currentBolus = nullptr;
+                    bolusDeliveryProgress = 0;
+                    lastReportedBolusProgress = 0;
+                    bolusQueue.clear();
+                    bolusQueueIdx = 0;
+                }
+            }
+            return;
+        }
+
+        if (tempBasalActive && tempBasalQueueIdx < tempBasalQueue.size()) {
+            while (tempBasalQueueIdx < tempBasalQueue.size() && now >= tempBasalQueue[tempBasalQueueIdx].executeTimeMs) {
+                executeQueueAction(tempBasalQueue[tempBasalQueueIdx]);
+                tempBasalQueueIdx++;
+                tempBasalRemaining = tempBasal->durationMinutes - (now - tempBasalStartMs) / 60000.0;
+                if (tempBasalRemaining <= 0) {
+                    Logger::info("临时基础率结束");
+                    tempBasalActive = false;
+                    tempBasalQueue.clear();
+                    tempBasalQueueIdx = 0;
+                    if (tempBasal) {
+                        delete tempBasal;
+                        tempBasal = nullptr;
+                    }
+                    tempBasalRemaining = 0;
+                    sendStateNotification();
+                }
+            }
+            return;
+        }
+
+        if (!basalSuspended && basalQueueIdx < basalQueue.size()) {
+            while (basalQueueIdx < basalQueue.size() && now >= basalQueue[basalQueueIdx].executeTimeMs) {
+                executeQueueAction(basalQueue[basalQueueIdx]);
+                basalQueueIdx++;
+            }
+        }
     }
 
     static void handleWriteRequestStatic(const uint8_t* data, size_t len) {
@@ -1334,6 +1426,7 @@ private:
             lastReportedBolusProgress = 0;
             lastBolusProgressReportTime = 0;
             addRecord(1, amount, 0);
+            buildBolusQueue(amount);
             Logger::info("大剂量已开始输送: " + String(amount) + "U");
         }
         sendResponse(CommandType::SET_BOLUS, seqNum, nullptr, 0);
@@ -1352,6 +1445,8 @@ private:
             currentBolus = nullptr;
             bolusDeliveryProgress = 0;
             lastReportedBolusProgress = 0;
+            bolusQueue.clear();
+            bolusQueueIdx = 0;
             sendStateNotification();
         } else {
             Logger::info("没有进行中的大剂量");
@@ -1430,6 +1525,9 @@ private:
             tempBasalRemaining = durationRaw;
             basalSequence++;
             addRecord(2, rate, durationRaw);
+            tempBasalActive = true;
+            tempBasalStartMs = millis();
+            buildTempBasalQueue(rate, durationRaw);
         }
 
         uint8_t responseData[11];
@@ -1458,7 +1556,11 @@ private:
             delete tempBasal;
             tempBasal = nullptr;
             tempBasalRemaining = 0;
+            tempBasalActive = false;
+            tempBasalQueue.clear();
+            tempBasalQueueIdx = 0;
             basalSequence++;
+            buildBasalQueue();
         } else {
             Logger::info("无进行中的临时基础率");
         }
@@ -1500,6 +1602,7 @@ private:
         setPatchState(PatchState::SUSPENDED);
         simulatorState = SimulatorState::SUSPENDED;
         addRecord(3, 0, 0);
+        basalSuspended = true;
 
         if (currentBolus) {
             Logger::info("暂停时取消大剂量, 已输送: " + String(currentBolus->delivered) + "U");
@@ -1507,6 +1610,8 @@ private:
             currentBolus = nullptr;
             bolusDeliveryProgress = 0;
             lastReportedBolusProgress = 0;
+            bolusQueue.clear();
+            bolusQueueIdx = 0;
         }
 
         if (tempBasal) {
@@ -1514,6 +1619,9 @@ private:
             delete tempBasal;
             tempBasal = nullptr;
             tempBasalRemaining = 0;
+            tempBasalActive = false;
+            tempBasalQueue.clear();
+            tempBasalQueueIdx = 0;
         }
 
         sendResponse(CommandType::SUSPEND_PUMP, seqNum, nullptr, 0);
@@ -1539,6 +1647,8 @@ private:
         setPatchState(PatchState::ACTIVE);
         simulatorState = SimulatorState::RUNNING;
         addRecord(4, 0, 0);
+        basalSuspended = false;
+        buildBasalQueue();
         Logger::info("泵已恢复 -> ACTIVE");
         sendResponse(CommandType::RESUME_PUMP, seqNum, nullptr, 0);
     }
@@ -1560,6 +1670,9 @@ private:
                 }
             }
             basalSequence++;
+            if (!tempBasalActive && !basalSuspended) {
+                buildBasalQueue();
+            }
         }
         uint8_t responseData[11];
         responseData[0] = static_cast<uint8_t>(BasalType::STANDARD);
@@ -1639,6 +1752,15 @@ private:
         hourlyDelivered = 0;
         dailyDelivered = 0;
         basalSequence = 0;
+        basalSuspended = false;
+        tempBasalActive = false;
+        basalQueue.clear();
+        basalQueueIdx = 0;
+        tempBasalQueue.clear();
+        tempBasalQueueIdx = 0;
+        bolusQueue.clear();
+        bolusQueueIdx = 0;
+        buildBasalQueue();
 
         patchStateDirty = true;
 
@@ -1712,6 +1834,14 @@ private:
             tempBasal = nullptr;
             tempBasalRemaining = 0;
         }
+        basalQueue.clear();
+        basalQueueIdx = 0;
+        tempBasalQueue.clear();
+        tempBasalQueueIdx = 0;
+        bolusQueue.clear();
+        bolusQueueIdx = 0;
+        basalSuspended = false;
+        tempBasalActive = false;
 
         uint8_t responseData[4] = {
             basalSequence & 0xFF,
