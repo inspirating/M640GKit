@@ -1667,15 +1667,36 @@ private:
                     uint8_t entryCount = data[5];
                     Logger::info("条目数量: " + String(entryCount));
 
-                    if (entryCount > 0 && profileLen >= 1 + 3) {
-                        size_t entryOffset = 6;
-                        uint32_t raw24 = (uint32_t)data[entryOffset] |
-                                         ((uint32_t)data[entryOffset + 1] << 8) |
-                                         ((uint32_t)data[entryOffset + 2] << 16);
-                        uint16_t firstRateRaw = (raw24 >> 12) & 0xFFF;
-                        uint16_t firstTimeRaw = raw24 & 0xFFF;
-                        currentBasalRate = firstRateRaw * 0.05;
-                        Logger::info("当前基础率(第一时段): " + String(currentBasalRate) + "U/hr, 开始时间: " + String(firstTimeRaw) + "分钟");
+                    if (entryCount > 0 && profileLen >= 1 + (size_t)entryCount * 3) {
+                        uint32_t absoluteSecs = patchStartTime + totalElapsedTime;
+                        uint32_t nowMinutes = (absoluteSecs % 86400) / 60;
+
+                        double activeRate = 0;
+                        uint16_t activeStart = 0;
+
+                        for (uint8_t i = 0; i < entryCount; i++) {
+                            size_t entryOffset = 6 + i * 3;
+                            uint32_t raw24 = (uint32_t)data[entryOffset] |
+                                             ((uint32_t)data[entryOffset + 1] << 8) |
+                                             ((uint32_t)data[entryOffset + 2] << 16);
+                            uint16_t rateRaw = (raw24 >> 12) & 0xFFF;
+                            uint16_t timeRaw = raw24 & 0xFFF;
+                            double rate = rateRaw * 0.05;
+                            Logger::info("  条目[" + String(i) + "]: " + String(rate) + "U/hr, 开始时间: " + String(timeRaw) + "分钟");
+
+                            if (timeRaw <= nowMinutes) {
+                                activeRate = rate;
+                                activeStart = timeRaw;
+                            }
+                        }
+
+                        if (activeRate > 0) {
+                            currentBasalRate = activeRate;
+                            Logger::info("当前活跃基础率: " + String(currentBasalRate) + "U/hr, 开始时间: " + String(activeStart) + "分钟 (当前时间: " + String(nowMinutes) + "分钟)");
+                        } else {
+                            currentBasalRate = 0;
+                            Logger::info("未找到当前时间匹配的基础率条目");
+                        }
                     }
                 }
             }
