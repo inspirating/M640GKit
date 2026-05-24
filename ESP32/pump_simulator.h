@@ -1663,10 +1663,20 @@ private:
                 basalProfile.assign(data + 5, data + 5 + profileLen);
                 Logger::info("配置文件数据: " + String(profileLen) + " bytes");
 
-                if (profileLen >= 2) {
-                    uint16_t firstRateRaw = data[5] | (data[6] << 8);
-                    currentBasalRate = firstRateRaw * 0.05;
-                    Logger::info("当前基础率(第一时段): " + String(currentBasalRate) + "U/hr");
+                if (profileLen >= 4) {
+                    uint8_t entryCount = data[5];
+                    Logger::info("条目数量: " + String(entryCount));
+
+                    if (entryCount > 0 && profileLen >= 1 + 3) {
+                        size_t entryOffset = 6;
+                        uint32_t raw24 = (uint32_t)data[entryOffset] |
+                                         ((uint32_t)data[entryOffset + 1] << 8) |
+                                         ((uint32_t)data[entryOffset + 2] << 16);
+                        uint16_t firstRateRaw = (raw24 >> 12) & 0xFFF;
+                        uint16_t firstTimeRaw = raw24 & 0xFFF;
+                        currentBasalRate = firstRateRaw * 0.05;
+                        Logger::info("当前基础率(第一时段): " + String(currentBasalRate) + "U/hr, 开始时间: " + String(firstTimeRaw) + "分钟");
+                    }
                 }
             }
             basalSequence++;
