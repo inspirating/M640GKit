@@ -183,13 +183,11 @@ public:
         uint32_t savedStartTime = prefs.getUInt("patchStart", 0);
         uint8_t savedPatchState = prefs.getUChar("patchState", 0);
         uint32_t savedElapsedTime = prefs.getUInt("elapsedTime", 0);
-        int16_t savedTimezone = prefs.getShort("timezone", 0);
         prefs.end();
 
         if (savedStartTime > 0) {
             patchStartTime = savedStartTime;
             totalElapsedTime = savedElapsedTime;
-            pumpTimezone = savedTimezone;
             if (savedPatchState > 0) {
                 patchState = static_cast<PatchState>(savedPatchState);
             } else {
@@ -200,7 +198,7 @@ public:
             } else if (patchState == PatchState::SUSPENDED || patchState == PatchState::PAUSED) {
                 simulatorState = SimulatorState::SUSPENDED;
             }
-            Logger::info("从NVS恢复: patchStartTime=" + String(patchStartTime) + " state=" + String(getStateName(patchState)) + " elapsed=" + String(totalElapsedTime) + " tz=" + String(pumpTimezone));
+            Logger::info("从NVS恢复: patchStartTime=" + String(patchStartTime) + " state=" + String(getStateName(patchState)) + " elapsed=" + String(totalElapsedTime));
         } else {
             patchStartTime = 0;
             Logger::info("首次启动: 等待激活流程");
@@ -241,25 +239,11 @@ public:
             return;
         }
 
-        processCommandQueue();
-
         uint32_t currentTime = millis();
         if (currentTime - lastUpdateTime >= updateIntervalMs) {
             lastUpdateTime = currentTime;
             update();
         }
-    }
-
-    void processCommandQueue() {
-        if (commandQueue.empty() || processingCommand) return;
-
-        processingCommand = true;
-        PendingCommand cmd = commandQueue.front();
-        commandQueue.erase(commandQueue.begin());
-
-        processCompleteCommand(cmd.data.data(), cmd.data.size());
-
-        processingCommand = false;
     }
 
 private:
@@ -323,14 +307,6 @@ private:
     // GATT Server
     GATTServer gattServer;
     ConnectionTracker connectionTracker;
-
-    // 命令队列 (将BLE回调中的处理延迟到loop中执行，避免阻塞BLE栈)
-    struct PendingCommand {
-        std::vector<uint8_t> data;
-        uint8_t seqNum;
-    };
-    std::vector<PendingCommand> commandQueue;
-    bool processingCommand = false;
 
     // 序列号和计时器
     uint8_t sequenceNumber;
@@ -452,10 +428,33 @@ private:
             0.6, 0.6, 0.6, 0.6, 0.7, 0.7, 0.8, 0.9
         };
         basalProfile.clear();
-        for (int i = 0; i < 48; i++) {
-            uint16_t rawValue = static_cast<uint16_t>(round(defaultRates[i] / 0.05));
-            basalProfile.push_back(rawValue & 0xFF);
-            basalProfile.push_back((rawValue >> 8) & 0xFF);
+        uint8_t entryCount = 0;
+        uint8_t tempEntries[48][3];
+        double lastRate = defaultRates[0];
+        uint16_t entryStart = 0;
+        for (int seg = 1; seg < 48; seg++) {
+            if (defaultRates[seg] != lastRate) {
+                uint16_t rawRate = static_cast<uint16_t>(round(lastRate / 0.05));
+                uint32_t raw24 = ((uint32_t)rawRate << 12) | (uint32_t)entryStart;
+                tempEntries[entryCount][0] = raw24 & 0xFF;
+                tempEntries[entryCount][1] = (raw24 >> 8) & 0xFF;
+                tempEntries[entryCount][2] = (raw24 >> 16) & 0xFF;
+                entryCount++;
+                lastRate = defaultRates[seg];
+                entryStart = seg * 30;
+            }
+        }
+        uint16_t rawRate = static_cast<uint16_t>(round(lastRate / 0.05));
+        uint32_t raw24 = ((uint32_t)rawRate << 12) | (uint32_t)entryStart;
+        tempEntries[entryCount][0] = raw24 & 0xFF;
+        tempEntries[entryCount][1] = (raw24 >> 8) & 0xFF;
+        tempEntries[entryCount][2] = (raw24 >> 16) & 0xFF;
+        entryCount++;
+        basalProfile.push_back(entryCount);
+        for (uint8_t i = 0; i < entryCount; i++) {
+            basalProfile.push_back(tempEntries[i][0]);
+            basalProfile.push_back(tempEntries[i][1]);
+            basalProfile.push_back(tempEntries[i][2]);
         }
     }
 
@@ -474,7 +473,6 @@ private:
             statePrefs.putUChar("patchState", static_cast<uint8_t>(patchState));
             statePrefs.putUInt("patchStart", patchStartTime);
             statePrefs.putUInt("elapsedTime", totalElapsedTime);
-            statePrefs.putShort("timezone", pumpTimezone);
             statePrefs.end();
         }
 
@@ -798,15 +796,48 @@ private:
     void buildBasalQueue() {
         basalQueue.clear();
         basalQueueIdx = 0;
-        size_t numSegments = basalProfile.size() / 2;
-        if (numSegments == 0) return;
+        if (basalProfile.size() < 1) return;
+
+        uint8_t entryCount = basalProfile[0];
+        if (entryCount == 0 || basalProfile.size() < 1 + (size_t)entryCount * 3) return;
+
+        struct BasalEntry {
+            double rate;
+            uint16_t startTimeMinutes;
+        };
+        BasalEntry entries[48];
+        uint8_t actualCount = 0;
+
+        for (uint8_t i = 0; i < entryCount; i++) {
+            size_t offset = 1 + i * 3;
+            uint32_t raw24 = (uint32_t)basalProfile[offset] |
+                             ((uint32_t)basalProfile[offset + 1] << 8) |
+                             ((uint32_t)basalProfile[offset + 2] << 16);
+            uint16_t rateRaw = (raw24 >> 12) & 0xFFF;
+            uint16_t timeRaw = raw24 & 0xFFF;
+            double rate = rateRaw * 0.05;
+            if (rate > 0) {
+                entries[actualCount].rate = rate;
+                entries[actualCount].startTimeMinutes = timeRaw;
+                actualCount++;
+            }
+        }
+
+        if (actualCount == 0) return;
 
         uint32_t baseTime = millis();
         uint32_t scheduleStartMs = 0;
 
-        for (size_t i = 0; i < numSegments; i++) {
-            uint16_t raw = basalProfile[i * 2] | (basalProfile[i * 2 + 1] << 8);
-            double rate = raw * 0.05;
+        for (uint16_t seg = 0; seg < 48; seg++) {
+            uint16_t segStartMin = seg * 30;
+            double rate = 0;
+            for (int8_t e = (int8_t)actualCount - 1; e >= 0; e--) {
+                if (entries[e].startTimeMinutes <= segStartMin) {
+                    rate = entries[e].rate;
+                    break;
+                }
+            }
+
             if (rate <= 0) {
                 scheduleStartMs += 1800000;
                 continue;
@@ -1003,7 +1034,7 @@ private:
                 expectedPacketLen = packetLen;
                 
                 if (packetBuffer.size() >= (size_t)(packetLen + 1)) {
-                    commandQueue.push_back({packetBuffer, seqNum});
+                    processCompleteCommand(packetBuffer.data(), packetLen + 1);
                     packetBuffer.clear();
                     expectedPacketLen = 0;
                     currentCmdType = 0;
@@ -1053,7 +1084,7 @@ private:
                 // 重要：Swift 计算 originalCRC 时 header 的 pkgIndex=0，
                 // 但第一个分包 header 的 pkgIndex=1，需要改回 0 才能通过 CRC 校验
                 packetBuffer[3] = 0;
-                commandQueue.push_back({packetBuffer, currentSeqNum});
+                processCompleteCommand(packetBuffer.data(), expectedPacketLen);
                 packetBuffer.clear();
                 expectedPacketLen = 0;
                 currentCmdType = 0;
@@ -1368,12 +1399,6 @@ private:
             patchStartTime = timeVal;
             totalElapsedTime = 0;
             Logger::info("时区偏移: " + String(tzOffset) + " 分钟, 时间: " + String(timeVal));
-            Preferences tzPrefs;
-            tzPrefs.begin("pump", false);
-            tzPrefs.putShort("timezone", tzOffset);
-            tzPrefs.putUInt("patchStart", timeVal);
-            tzPrefs.putUInt("elapsedTime", 0);
-            tzPrefs.end();
         }
         sendResponse(CommandType::SET_TIME_ZONE, seqNum, nullptr, 0);
     }
@@ -1700,10 +1725,7 @@ private:
 
                     if (entryCount > 0 && profileLen >= 1 + (size_t)entryCount * 3) {
                         uint32_t absoluteSecs = patchStartTime + totalElapsedTime;
-                        int32_t localSecs = (int32_t)(absoluteSecs % 86400) + (int32_t)pumpTimezone * 60;
-                        if (localSecs < 0) localSecs += 86400;
-                        if (localSecs >= 86400) localSecs -= 86400;
-                        uint32_t nowMinutes = (uint32_t)localSecs / 60;
+                        uint32_t nowMinutes = (absoluteSecs % 86400) / 60;
 
                         double activeRate = 0;
                         uint16_t activeStart = 0;
