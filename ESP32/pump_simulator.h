@@ -183,11 +183,13 @@ public:
         uint32_t savedStartTime = prefs.getUInt("patchStart", 0);
         uint8_t savedPatchState = prefs.getUChar("patchState", 0);
         uint32_t savedElapsedTime = prefs.getUInt("elapsedTime", 0);
+        int16_t savedTimezone = prefs.getShort("timezone", 0);
         prefs.end();
 
         if (savedStartTime > 0) {
             patchStartTime = savedStartTime;
             totalElapsedTime = savedElapsedTime;
+            pumpTimezone = savedTimezone;
             if (savedPatchState > 0) {
                 patchState = static_cast<PatchState>(savedPatchState);
             } else {
@@ -198,7 +200,7 @@ public:
             } else if (patchState == PatchState::SUSPENDED || patchState == PatchState::PAUSED) {
                 simulatorState = SimulatorState::SUSPENDED;
             }
-            Logger::info("从NVS恢复: patchStartTime=" + String(patchStartTime) + " state=" + String(getStateName(patchState)) + " elapsed=" + String(totalElapsedTime));
+            Logger::info("从NVS恢复: patchStartTime=" + String(patchStartTime) + " state=" + String(getStateName(patchState)) + " elapsed=" + String(totalElapsedTime) + " tz=" + String(pumpTimezone));
         } else {
             patchStartTime = 0;
             Logger::info("首次启动: 等待激活流程");
@@ -239,11 +241,25 @@ public:
             return;
         }
 
+        processCommandQueue();
+
         uint32_t currentTime = millis();
         if (currentTime - lastUpdateTime >= updateIntervalMs) {
             lastUpdateTime = currentTime;
             update();
         }
+    }
+
+    void processCommandQueue() {
+        if (commandQueue.empty() || processingCommand) return;
+
+        processingCommand = true;
+        PendingCommand cmd = commandQueue.front();
+        commandQueue.erase(commandQueue.begin());
+
+        processCompleteCommand(cmd.data.data(), cmd.data.size());
+
+        processingCommand = false;
     }
 
 private:
@@ -307,6 +323,14 @@ private:
     // GATT Server
     GATTServer gattServer;
     ConnectionTracker connectionTracker;
+
+    // 命令队列 (将BLE回调中的处理延迟到loop中执行，避免阻塞BLE栈)
+    struct PendingCommand {
+        std::vector<uint8_t> data;
+        uint8_t seqNum;
+    };
+    std::vector<PendingCommand> commandQueue;
+    bool processingCommand = false;
 
     // 序列号和计时器
     uint8_t sequenceNumber;
@@ -450,6 +474,7 @@ private:
             statePrefs.putUChar("patchState", static_cast<uint8_t>(patchState));
             statePrefs.putUInt("patchStart", patchStartTime);
             statePrefs.putUInt("elapsedTime", totalElapsedTime);
+            statePrefs.putShort("timezone", pumpTimezone);
             statePrefs.end();
         }
 
@@ -978,7 +1003,7 @@ private:
                 expectedPacketLen = packetLen;
                 
                 if (packetBuffer.size() >= (size_t)(packetLen + 1)) {
-                    processCompleteCommand(packetBuffer.data(), packetLen + 1);
+                    commandQueue.push_back({packetBuffer, seqNum});
                     packetBuffer.clear();
                     expectedPacketLen = 0;
                     currentCmdType = 0;
@@ -1028,7 +1053,7 @@ private:
                 // 重要：Swift 计算 originalCRC 时 header 的 pkgIndex=0，
                 // 但第一个分包 header 的 pkgIndex=1，需要改回 0 才能通过 CRC 校验
                 packetBuffer[3] = 0;
-                processCompleteCommand(packetBuffer.data(), expectedPacketLen);
+                commandQueue.push_back({packetBuffer, currentSeqNum});
                 packetBuffer.clear();
                 expectedPacketLen = 0;
                 currentCmdType = 0;
@@ -1343,6 +1368,12 @@ private:
             patchStartTime = timeVal;
             totalElapsedTime = 0;
             Logger::info("时区偏移: " + String(tzOffset) + " 分钟, 时间: " + String(timeVal));
+            Preferences tzPrefs;
+            tzPrefs.begin("pump", false);
+            tzPrefs.putShort("timezone", tzOffset);
+            tzPrefs.putUInt("patchStart", timeVal);
+            tzPrefs.putUInt("elapsedTime", 0);
+            tzPrefs.end();
         }
         sendResponse(CommandType::SET_TIME_ZONE, seqNum, nullptr, 0);
     }
@@ -1669,7 +1700,10 @@ private:
 
                     if (entryCount > 0 && profileLen >= 1 + (size_t)entryCount * 3) {
                         uint32_t absoluteSecs = patchStartTime + totalElapsedTime;
-                        uint32_t nowMinutes = (absoluteSecs % 86400) / 60;
+                        int32_t localSecs = (int32_t)(absoluteSecs % 86400) + (int32_t)pumpTimezone * 60;
+                        if (localSecs < 0) localSecs += 86400;
+                        if (localSecs >= 86400) localSecs -= 86400;
+                        uint32_t nowMinutes = (uint32_t)localSecs / 60;
 
                         double activeRate = 0;
                         uint16_t activeStart = 0;
