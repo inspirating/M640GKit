@@ -142,7 +142,7 @@ struct InsulinAction {
 
 class M640GPumpSimulator {
 public:
-    M640GPumpSimulator() : initialized(false), lastUpdateTime(0), updateIntervalMs(100), bolusUpdateIntervalMs(100),
+    M640GPumpSimulator() : initialized(false), lastUpdateTime(0), updateIntervalMs(100),
         patchState(PatchState::FILLED), simulatorState(SimulatorState::INITIALIZING),
         reservoir(MAX_RESERVOIR), activeInsulin(0.0), batteryVoltage(3.8), batteryLevel(100),
         patchStartTime(0), totalElapsedTime(0), currentBolus(nullptr),
@@ -157,7 +157,7 @@ public:
         expirationTimer(0), alarmSetting(0),
         predictiveLowSuspend(0), predictiveLowSuspendRange(30), lastPrimeNotificationTime(0),
         basalQueueIdx(0), tempBasalQueueIdx(0), bolusQueueIdx(0),
-        tempBasalActive(false), basalSuspended(false), lastStepTime(0), tempBasalStartMs(0), lastDeliveryScanTime(0) {
+        tempBasalActive(false), basalSuspended(false), tempBasalStartMs(0), lastDeliveryScanTime(0) {
         currentBolus = nullptr;
         tempBasal = nullptr;
     }
@@ -250,7 +250,6 @@ private:
     bool initialized;
     uint32_t lastUpdateTime;
     uint16_t updateIntervalMs;
-    uint16_t bolusUpdateIntervalMs;
 
     // 泵状态
     PatchState patchState;
@@ -349,7 +348,6 @@ private:
     size_t bolusQueueIdx;
     bool tempBasalActive;
     bool basalSuspended;
-    uint32_t lastStepTime;
     uint32_t tempBasalStartMs;
     uint32_t lastDeliveryScanTime;
 
