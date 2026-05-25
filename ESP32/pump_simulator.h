@@ -142,7 +142,7 @@ struct InsulinAction {
 
 class M640GPumpSimulator {
 public:
-    M640GPumpSimulator() : initialized(false), lastUpdateTime(0), updateIntervalMs(100),
+    M640GPumpSimulator() : initialized(false), lastUpdateTime(0), updateIntervalMs(1000),
         patchState(PatchState::FILLED), simulatorState(SimulatorState::INITIALIZING),
         reservoir(MAX_RESERVOIR), activeInsulin(0.0), batteryVoltage(3.8), batteryLevel(100),
         patchStartTime(0), totalElapsedTime(0), currentBolus(nullptr),

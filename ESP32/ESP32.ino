@@ -96,8 +96,12 @@ void loop() {
     static bool ledState = false;
     uint32_t now = millis();
     
-    // 如果已连接，慢闪；如果广播中，快闪
-    uint32_t interval = pumpSimulator.getIsConnected() ? 1000 : 200;
+    uint32_t interval;
+    if (ledState) {
+        interval = 200;
+    } else {
+        interval = pumpSimulator.getIsConnected() ? 5000 : 200;
+    }
     
     if (now - lastLedToggle >= interval) {
         lastLedToggle = now;
