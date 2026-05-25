@@ -132,7 +132,7 @@ struct TempBasalInfo {
 };
 
 // ========== 队列输注系统 ==========
-static constexpr double STEP_SIZE = 0.1;
+static constexpr double STEP_SIZE = 0.3;
 static constexpr int STEP_PIN = 1;
 
 struct InsulinAction {
@@ -157,7 +157,7 @@ public:
         expirationTimer(0), alarmSetting(0),
         predictiveLowSuspend(0), predictiveLowSuspendRange(30), lastPrimeNotificationTime(0),
         basalQueueIdx(0), tempBasalQueueIdx(0), bolusQueueIdx(0),
-        tempBasalActive(false), basalSuspended(false), lastStepTime(0), tempBasalStartMs(0) {
+        tempBasalActive(false), basalSuspended(false), lastStepTime(0), tempBasalStartMs(0), lastDeliveryScanTime(0) {
         currentBolus = nullptr;
         tempBasal = nullptr;
     }
@@ -351,6 +351,7 @@ private:
     bool basalSuspended;
     uint32_t lastStepTime;
     uint32_t tempBasalStartMs;
+    uint32_t lastDeliveryScanTime;
 
     const char* getStateName(PatchState s) {
         switch (s) {
@@ -882,24 +883,6 @@ private:
         Logger::info("临时基础率队列已构建: " + String(tempBasalQueue.size()) + " steps @ " + String(rate) + "U/hr x " + String(durationMinutes) + "min");
     }
 
-    void buildBolusQueue(double amount) {
-        bolusQueue.clear();
-        bolusQueueIdx = 0;
-
-        uint32_t numSteps = static_cast<uint32_t>(amount / STEP_SIZE);
-        if (numSteps == 0) numSteps = 1;
-
-        uint32_t baseTime = millis();
-
-        for (uint32_t s = 0; s < numSteps; s++) {
-            InsulinAction action;
-            action.executeTimeMs = baseTime + s * 1000;
-            action.stepAmount = min(STEP_SIZE, amount - s * STEP_SIZE);
-            bolusQueue.push_back(action);
-        }
-        Logger::info("大剂量队列已构建: " + String(bolusQueue.size()) + " steps = " + String(amount) + "U");
-    }
-
     void executeQueueAction(InsulinAction& action) {
         digitalWrite(STEP_PIN, HIGH);
         delayMicroseconds(500);
@@ -914,33 +897,16 @@ private:
 
     void processDeliveryQueues() {
         uint32_t now = millis();
-
         if (patchState != PatchState::ACTIVE && patchState != PatchState::ACTIVE_ALT) return;
 
-        if (currentBolus != nullptr && bolusQueueIdx < bolusQueue.size()) {
-            while (bolusQueueIdx < bolusQueue.size() && now >= bolusQueue[bolusQueueIdx].executeTimeMs) {
-                executeQueueAction(bolusQueue[bolusQueueIdx]);
-                bolusQueueIdx++;
-                currentBolus->delivered += STEP_SIZE;
-                if (currentBolus->delivered >= currentBolus->amount - 0.001) {
-                    double finalDelivered = currentBolus->amount;
-                    bolusHistory.push_back(*currentBolus);
-                    Logger::info("大剂量输送完成: " + String(finalDelivered) + "U");
-                    sendStateNotification();
-                    delete currentBolus;
-                    currentBolus = nullptr;
-                    bolusDeliveryProgress = 0;
-                    lastReportedBolusProgress = 0;
-                    bolusQueue.clear();
-                    bolusQueueIdx = 0;
-                }
-            }
-            return;
-        }
+        // 5分钟扫描一次；有活跃大剂量时立即执行
+        if (currentBolus == nullptr && now - lastDeliveryScanTime < 300000) return;
+        lastDeliveryScanTime = now;
 
+        // Step 1: Consume temp basal queue - move due actions to bolusQueue
         if (tempBasalActive && tempBasalQueueIdx < tempBasalQueue.size()) {
             while (tempBasalQueueIdx < tempBasalQueue.size() && now >= tempBasalQueue[tempBasalQueueIdx].executeTimeMs) {
-                executeQueueAction(tempBasalQueue[tempBasalQueueIdx]);
+                bolusQueue.push_back(tempBasalQueue[tempBasalQueueIdx]);
                 tempBasalQueueIdx++;
                 tempBasalRemaining = tempBasal->durationMinutes - (now - tempBasalStartMs) / 60000.0;
                 if (tempBasalRemaining <= 0) {
@@ -956,13 +922,64 @@ private:
                     sendStateNotification();
                 }
             }
-            return;
         }
 
+        // Step 2: Consume basal queue - move due actions to bolusQueue
         if (!basalSuspended && basalQueueIdx < basalQueue.size()) {
             while (basalQueueIdx < basalQueue.size() && now >= basalQueue[basalQueueIdx].executeTimeMs) {
-                executeQueueAction(basalQueue[basalQueueIdx]);
+                bolusQueue.push_back(basalQueue[basalQueueIdx]);
                 basalQueueIdx++;
+            }
+        }
+
+        // Step 3: Process bolusQueue - sum all, apply step compensation, execute
+        if (!bolusQueue.empty()) {
+            double sum = 0;
+            for (const auto& action : bolusQueue) {
+                sum += action.stepAmount;
+            }
+            bolusQueue.clear();
+
+            // Step compensation: round sum to nearest STEP_SIZE boundary
+            double remainder = fmod(sum, STEP_SIZE);
+            if (remainder < 0) remainder += STEP_SIZE;
+
+            double deliverAmount;
+            double carryOver;
+            if (remainder >= STEP_SIZE / 2.0) {
+                deliverAmount = sum + (STEP_SIZE - remainder);
+                carryOver = remainder - STEP_SIZE;
+            } else {
+                deliverAmount = sum - remainder;
+                carryOver = remainder;
+            }
+
+            if (deliverAmount > 0.001) {
+                InsulinAction action;
+                action.stepAmount = deliverAmount;
+                executeQueueAction(action);
+
+                if (currentBolus) {
+                    double bolusRemaining = currentBolus->amount - currentBolus->delivered;
+                    double bolusPortion = min(bolusRemaining, deliverAmount);
+                    currentBolus->delivered += bolusPortion;
+                    if (currentBolus->delivered >= currentBolus->amount - 0.001) {
+                        double finalDelivered = currentBolus->amount;
+                        bolusHistory.push_back(*currentBolus);
+                        Logger::info("大剂量输送完成: " + String(finalDelivered) + "U");
+                        sendStateNotification();
+                        delete currentBolus;
+                        currentBolus = nullptr;
+                        bolusDeliveryProgress = 0;
+                        lastReportedBolusProgress = 0;
+                    }
+                }
+            }
+
+            if (fabs(carryOver) > 0.001) {
+                InsulinAction carryAction;
+                carryAction.stepAmount = carryOver;
+                bolusQueue.push_back(carryAction);
             }
         }
     }
@@ -1482,7 +1499,12 @@ private:
             lastReportedBolusProgress = 0;
             lastBolusProgressReportTime = 0;
             addRecord(1, amount, 0);
-            buildBolusQueue(amount);
+            {
+                InsulinAction bolusAction;
+                bolusAction.stepAmount = amount;
+                bolusQueue.push_back(bolusAction);
+                Logger::info("大剂量已加入队列: " + String(amount) + "U");
+            }
             Logger::info("大剂量已开始输送: " + String(amount) + "U");
         }
         sendResponse(CommandType::SET_BOLUS, seqNum, nullptr, 0);

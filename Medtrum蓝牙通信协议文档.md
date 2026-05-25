@@ -1012,10 +1012,8 @@ handleResumeRequest() L1522 恢复为 ACTIVE 状态
 handleSetPatchRequest() L1728 设置 hourlyMaxInsulin / dailyMaxInsulin 等限值
 
 这些都会涉及胰岛素的操作，要求构建一个基础率的队列，按照设定的时间段内的基础率，拆分成相应时间段内平均每次0.1u的操作放入队列，然后通过gpio操作依次执行，当handleSetBasalProfileRequest时，要求重新构建基础率队列，然后依次执行。
-
 handleSetTempBasalRequest时构建一个tempbasal队列，同时停止执行默认基础率的队列，按照设定的时间段内的临时基础率，拆分成相应时间段内平均每次0.1u的操作放入队列，然后通过gpio操作依次执行。
 handleCancelTempBasalRequest时，删除tempbasal队列，恢复执行默认基础率的队列。
-
 handleSuspendRequest时，暂停执行默认基础率的队列，同时删除tempbasal队列。
 handleResumeRequest时，恢复执行默认基础率的队列。
 
@@ -1023,3 +1021,11 @@ handleResumeRequest时，恢复执行默认基础率的队列。
         updateBolusDelivery();
         updateTempBasal();
         updateNormalBasalDelivery(); 为何把这三个函数删除了？这三个函数里包含的有执行结果的回馈，虽然你把执行动作加入了队列，但是每执行一个动作是不是要有反馈？
+
+
+另外temp basal和basal是互斥的，temp basal有数据时，basal是不输注的，basal有数据时，是没有temp basal的，帮我确认这个逻辑
+
+
+另外帮我确认个逻辑，当temp basal是0u/h 30分钟或者其他时间，这时候没有temp basal的输入，当然由于temp basal和basal是互斥的，自然在这段时间内也是没有basal输入的，帮我确认这个逻辑
+
+操作顺序改下，每次执行这些队列时，优先执行temp basal queue和basal queue，执行逻辑如下：如果当前时间可以从basal queue或tempbasal queue里取出操作，直接取出放入bolusqueue队列同时代表这个操作已经成功，接下来执行bolus队列，把bolus队列里的所有操作取和值sum并清空bolus队列，然后以sum值重新构建bolus队列，不要按照步进拆分，但需要按照步进补偿，例如如果是一个0.9u的sum直接放进一个0.9u的操作进行执行，如果是1.0u的拆分成0.9u和0.1u同时此次执行0.9u的，完成后删除0.9u，0.1u剩下待下次执行，如果是1.1u的拆分成1.2u和-0.1u的，执行1.2u完成后删除，剩下-0.1u的
