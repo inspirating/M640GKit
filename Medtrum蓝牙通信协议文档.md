@@ -1029,3 +1029,7 @@ handleResumeRequest时，恢复执行默认基础率的队列。
 另外帮我确认个逻辑，当temp basal是0u/h 30分钟或者其他时间，这时候没有temp basal的输入，当然由于temp basal和basal是互斥的，自然在这段时间内也是没有basal输入的，帮我确认这个逻辑
 
 操作顺序改下，每次执行这些队列时，优先执行temp basal queue和basal queue，执行逻辑如下：如果当前时间可以从basal queue或tempbasal queue里取出操作，直接取出放入bolusqueue队列同时代表这个操作已经成功，接下来执行bolus队列，把bolus队列里的所有操作取和值sum并清空bolus队列，然后以sum值重新构建bolus队列，不要按照步进拆分，但需要按照步进补偿，例如如果是一个0.9u的sum直接放进一个0.9u的操作进行执行，如果是1.0u的拆分成0.9u和0.1u同时此次执行0.9u的，完成后删除0.9u，0.1u剩下待下次执行，如果是1.1u的拆分成1.2u和-0.1u的，执行1.2u完成后删除，剩下-0.1u的
+
+
+
+为什么再patch expire时？再trio里点击左上角泵按钮时跳出的是serial number页面，点击回退按钮菜刀patch expire页面？

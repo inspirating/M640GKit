@@ -157,7 +157,7 @@ public:
         expirationTimer(0), alarmSetting(0),
         predictiveLowSuspend(0), predictiveLowSuspendRange(30), lastPrimeNotificationTime(0),
         basalQueueIdx(0), tempBasalQueueIdx(0), bolusQueueIdx(0),
-        tempBasalActive(false), basalSuspended(false), tempBasalStartMs(0), lastDeliveryScanTime(0) {
+        tempBasalActive(false), basalSuspended(false), tempBasalStartMs(0), lastDeliveryScanTime(0), everActivated(false) {
         currentBolus = nullptr;
         tempBasal = nullptr;
     }
@@ -201,7 +201,18 @@ public:
             Logger::info("从NVS恢复: patchStartTime=" + String(patchStartTime) + " state=" + String(getStateName(patchState)) + " elapsed=" + String(totalElapsedTime));
         } else {
             patchStartTime = 0;
-            Logger::info("首次启动: 等待激活流程");
+            // 检查patch是否曾经被激活过（独立持久化标记，不会被handleStopPatchRequest清除）
+            Preferences metaPrefs;
+            metaPrefs.begin("pumpMeta", true);
+            uint8_t wasActivated = metaPrefs.getUChar("activated", 0);
+            metaPrefs.end();
+            if (wasActivated) {
+                patchState = PatchState::EXPIRED;
+                everActivated = true;
+                Logger::info("检测到patch曾激活过, 设置状态为EXPIRED, 避免iOS跳转到Serial Number页面");
+            } else {
+                Logger::info("首次启动: 等待激活流程");
+            }
         }
         patchId = random(65535) + 1;
 
@@ -350,6 +361,7 @@ private:
     bool basalSuspended;
     uint32_t tempBasalStartMs;
     uint32_t lastDeliveryScanTime;
+    bool everActivated;
 
     const char* getStateName(PatchState s) {
         switch (s) {
@@ -478,7 +490,12 @@ private:
         if (pendingBleDisconnect) {
             pendingBleDisconnect = false;
             Logger::info("执行延迟BLE断开并重置为初始状态");
-            patchState = PatchState::FILLED;
+            if (everActivated) {
+                patchState = PatchState::EXPIRED;
+                Logger::info("patch曾激活过, 设置状态为EXPIRED而非FILLED");
+            } else {
+                patchState = PatchState::FILLED;
+            }
             simulatorState = SimulatorState::INITIALIZING;
             gattServer.advertisingSuspended = true;
             BLEDevice::stopAdvertising();
@@ -640,7 +657,11 @@ private:
 
     std::vector<uint8_t> buildSynchronizeData() {
         std::vector<uint8_t> data;
-        data.push_back(static_cast<uint8_t>(patchState));
+        PatchState reportedState = patchState;
+        if (everActivated && static_cast<uint8_t>(reportedState) < static_cast<uint8_t>(PatchState::PRIMING)) {
+            reportedState = PatchState::EXPIRED;
+        }
+        data.push_back(static_cast<uint8_t>(reportedState));
 
         uint16_t fieldMask = 0;
         if (patchState == PatchState::SUSPENDED) {
@@ -1854,6 +1875,7 @@ private:
 
         setPatchState(PatchState::ACTIVE);
         simulatorState = SimulatorState::RUNNING;
+        everActivated = true;
         reservoir = MAX_RESERVOIR;
         totalElapsedTime = 0;
         hourlyDelivered = 0;
@@ -1872,6 +1894,12 @@ private:
         patchStateDirty = true;
 
         Logger::info("Patch 已激活 -> ACTIVE");
+
+        Preferences metaPrefs;
+        metaPrefs.begin("pumpMeta", false);
+        metaPrefs.putUChar("activated", 1);
+        metaPrefs.end();
+        Logger::info("激活标记已持久化到pumpMeta");
 
         uint8_t responseData[25];
         memset(responseData, 0, 25);
