@@ -195,13 +195,6 @@ public:
             }
             if (patchState == PatchState::ACTIVE || patchState == PatchState::ACTIVE_ALT) {
                 simulatorState = SimulatorState::RUNNING;
-
-                uint32_t now = millis() / 1000;
-                if (patchStartTime < 2000000000) {
-                    patchStartTime = now;
-                    totalElapsedTime = 0;
-                    Logger::info("重启后重置patchStartTime为当前时间: " + String(patchStartTime));
-                }
             } else if (patchState == PatchState::SUSPENDED || patchState == PatchState::PAUSED) {
                 simulatorState = SimulatorState::SUSPENDED;
             }
@@ -1196,34 +1189,6 @@ private:
         currentCmdType = 0;
         connectionTracker.onDisconnect("BLE 断开");
 
-        patchState = PatchState::FILLED;
-        simulatorState = SimulatorState::INITIALIZING;
-        reservoir = MAX_RESERVOIR;
-        activeInsulin = 0.0;
-        patchStartTime = 0;
-        totalElapsedTime = 0;
-        if (currentBolus) {
-            delete currentBolus;
-            currentBolus = nullptr;
-        }
-        if (tempBasal) {
-            delete tempBasal;
-            tempBasal = nullptr;
-            tempBasalRemaining = 0;
-        }
-        bolusDeliveryProgress = 0;
-        lastReportedBolusProgress = 0;
-        lastBolusProgressReportTime = 0;
-        primeProgress = 0;
-        lastPrimeNotificationTime = 0;
-        hourlyDelivered = 0.0;
-        dailyDelivered = 0.0;
-        currentBasalRate = 0.6;
-        basalSequence = 0;
-        Logger::info("泵状态已重置为初始值");
-
-        nvsClearPending = true;
-
         gattServer.advertisingSuspended = true;
         advertisingResumeTime = millis() + 10000;
         Logger::info("BLE广播已暂停10秒, 防止客户端自动重连");
@@ -1441,6 +1406,7 @@ private:
             uint32_t timeVal = data[6] | (data[7] << 8) | (data[8] << 16) | (data[9] << 24);
             patchStartTime = timeVal;
             totalElapsedTime = 0;
+            patchStateDirty = true;
             Logger::info("时区偏移: " + String(tzOffset) + " 分钟, 时间: " + String(timeVal));
         }
         sendResponse(CommandType::SET_TIME_ZONE, seqNum, nullptr, 0);
