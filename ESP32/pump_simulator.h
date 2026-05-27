@@ -195,6 +195,13 @@ public:
             }
             if (patchState == PatchState::ACTIVE || patchState == PatchState::ACTIVE_ALT) {
                 simulatorState = SimulatorState::RUNNING;
+
+                uint32_t now = millis() / 1000;
+                if (patchStartTime < 2000000000) {
+                    patchStartTime = now;
+                    totalElapsedTime = 0;
+                    Logger::info("重启后重置patchStartTime为当前时间: " + String(patchStartTime));
+                }
             } else if (patchState == PatchState::SUSPENDED || patchState == PatchState::PAUSED) {
                 simulatorState = SimulatorState::SUSPENDED;
             }
