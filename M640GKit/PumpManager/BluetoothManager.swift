@@ -66,7 +66,14 @@ class BluetoothManager: NSObject, CBCentralManagerDelegate {
         logger.info("Connecting to \(peripheral)")
 
         self.peripheral = peripheral
-        manager.connect(peripheral)
+
+        let options: [String: Any] = [
+            CBConnectPeripheralOptionNotifyOnDisconnectionKey: true,
+            CBConnectPeripheralOptionNotifyOnConnectionKey: true,
+            CBConnectPeripheralOptionNotifyOnNotificationKey: true
+        ]
+
+        manager.connect(peripheral, options: options)
     }
 
     func ensureConnected(_ completionAsync: @escaping (M640GConnectError?) async -> Void) {
@@ -99,6 +106,19 @@ class BluetoothManager: NSObject, CBCentralManagerDelegate {
             startTimeout(seconds: .seconds(15))
             connect(peripheral: peripheral)
             return
+        }
+
+        // Try to retrieve peripheral by saved identifier (helps after long background periods)
+        if let savedIdentifierString = UserDefaults.standard.string(forKey: "M640GLastConnectedPeripheralUUID"),
+           let savedIdentifier = UUID(uuidString: savedIdentifierString)
+        {
+            let retrievedPeripherals = manager.retrievePeripherals(withIdentifiers: [savedIdentifier])
+            if let retrievedPeripheral = retrievedPeripherals.first {
+                logger.info("Retrieved peripheral from saved identifier")
+                startTimeout(seconds: .seconds(15))
+                connect(peripheral: retrievedPeripheral)
+                return
+            }
         }
 
         let connectedDevices = manager.retrieveConnectedPeripherals(withServices: [CBUUID.SERVICE_UUID])
@@ -274,6 +294,9 @@ extension BluetoothManager {
 
     func centralManager(_: CBCentralManager, didConnect peripheral: CBPeripheral) {
         logger.info("Connected to pump: \(peripheral.name ?? "<NO_NAME>")!")
+
+        // Save peripheral identifier for later retrieval after background suspension
+        UserDefaults.standard.set(peripheral.identifier.uuidString, forKey: "M640GLastConnectedPeripheralUUID")
 
         guard let pumpManager = pumpManager else {
             logger.warning("No pumpManager...")

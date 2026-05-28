@@ -184,6 +184,21 @@ public extension M640GPumpManager {
     }
 
     func ensureCurrentPumpData(completion: ((Date?) -> Void)?) {
+        // If patch is active but we're not connected, try to reconnect even if data is "fresh"
+        if state.pumpState.rawValue >= PatchState.active.rawValue,
+           !bluetooth.isConnected,
+           state.patchActivatedAt != nil
+        {
+            log.info("Pump is active but BLE is disconnected -> attempting reconnect")
+            bluetooth.ensureConnected { error in
+                if let error = error {
+                    self.log.error("Background reconnect attempt failed: \(error.localizedDescription)")
+                } else {
+                    self.log.info("Background reconnect succeeded")
+                }
+            }
+        }
+
         guard let activatedAt = state.patchActivatedAt,
               Date.now.timeIntervalSince(state.lastSync) > .minutes(2.5) ||
               Date.now.timeIntervalSince(activatedAt) < .minutes(4)
