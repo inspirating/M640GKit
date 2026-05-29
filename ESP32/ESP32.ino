@@ -63,11 +63,15 @@ void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
 
-    // 初始化 STEP_PIN (GPIO3) 作为光耦控制输出, 低电平有效
-    // 初始状态设为 HIGH (非激活/断开), 避免上电时误触发
+    // 初始化 GPIO1 作为光耦控制输出, 低电平有效
+    pinMode(1, OUTPUT);
+    digitalWrite(1, HIGH);
+    Serial.println("GPIO1 initialized as optocoupler control (active-low, default HIGH)");
+
+    // 初始化 STEP_PIN (GPIO3) 作为 LED 输出, 低电平有效
     pinMode(STEP_PIN, OUTPUT);
     digitalWrite(STEP_PIN, HIGH);
-    Serial.println("STEP_PIN(GPIO3) initialized as optocoupler control (active-low, default HIGH)");
+    Serial.println("STEP_PIN(GPIO3) initialized as LED output (active-low, default HIGH)");
 
     // 设置全局实例指针 (用于回调)
     gSimulator = &pumpSimulator;
