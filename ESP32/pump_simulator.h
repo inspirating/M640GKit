@@ -925,29 +925,6 @@ private:
     void executeQueueAction(InsulinAction& action) {
         double stepU = action.stepAmount;
         int stepCount = static_cast<int>(round(stepU / STEP_SIZE));
-        if (stepCount < 1) stepCount = 1;
-
-        Logger::info("输注: " + String(stepU) + "U, 步进数: " + String(stepCount) + " @" + String(STEP_SIZE) + "U/step");
-
-        // === 1. 开始信号: 长按 1000ms ===
-        digitalWrite(STEP_PIN, LOW);    // 光耦导通, 模拟按键按下
-        delay(1000);                    // 保持 1000ms
-        digitalWrite(STEP_PIN, HIGH);   // 光耦断开, 模拟按键释放
-
-        // === 2. 步进脉冲: 每步 500ms ===
-        for (int i = 0; i < stepCount; i++) {
-            digitalWrite(STEP_PIN, LOW);    // 模拟按键按下
-            delay(500);                     // 保持 500ms
-            digitalWrite(STEP_PIN, HIGH);   // 模拟按键释放
-            if (i < stepCount - 1) {
-                delay(50);                  // 步间间隔 50ms, 避免连续触发
-            }
-        }
-
-        // === 3. 结束信号: 长按 1000ms ===
-        digitalWrite(STEP_PIN, LOW);    // 光耦导通, 模拟按键按下
-        delay(1000);                    // 保持 1000ms
-        digitalWrite(STEP_PIN, HIGH);   // 光耦断开, 模拟按键释放
 
         // 扣除本次输注量, 更新各项统计
         reservoir = max(0.0, reservoir - stepU);
@@ -956,6 +933,33 @@ private:
         dailyDelivered += stepU;
 
         Logger::info("输注完成, 储药器余量: " + String(reservoir) + "U");
+        
+        if (stepCount < 1) return ;
+
+        Logger::info("输注: " + String(stepU) + "U, 步进数: " + String(stepCount) + " @" + String(STEP_SIZE) + "U/step");
+
+        // === 1. 开始信号: 长按 1000ms ===
+        pinMode(STEP_PIN, OUTPUT);
+        digitalWrite(STEP_PIN, LOW);    // 光耦导通, 模拟按键按下
+        delay(1000);                    // 保持 1000ms
+        digitalWrite(STEP_PIN, HIGH);   // 光耦断开, 模拟按键释放
+        delay(500);                      // 保持 500ms
+
+        // === 2. 步进脉冲: 每步 500ms ===
+        for (int i = 0; i < stepCount; i++) {
+            digitalWrite(STEP_PIN, LOW);    // 模拟按键按下
+            delay(500);                     // 保持 500ms
+            digitalWrite(STEP_PIN, HIGH);   // 模拟按键释放
+            if (i < stepCount - 1) {
+                delay(500);                  // 步间间隔 50ms, 避免连续触发
+            }
+        }
+
+        // === 3. 结束信号: 长按 1000ms ===
+        digitalWrite(STEP_PIN, LOW);    // 光耦导通, 模拟按键按下
+        delay(1000);                    // 保持 1000ms
+        digitalWrite(STEP_PIN, HIGH);   // 光耦断开, 模拟按键释放
+
     }
 
     /**
