@@ -133,7 +133,7 @@ struct TempBasalInfo {
 
 // ========== 队列输注系统 ==========
 static constexpr double STEP_SIZE = 0.3;
-static constexpr int STEP_PIN = 1;
+static constexpr int STEP_PIN = 2;
 
 struct InsulinAction {
     uint32_t executeTimeMs;
@@ -902,18 +902,78 @@ private:
         Logger::info("临时基础率队列已构建: " + String(tempBasalQueue.size()) + " steps @ " + String(rate) + "U/hr x " + String(durationMinutes) + "min");
     }
 
+    /**
+     * 执行单次胰岛素输注动作
+     *
+     * 通过 GPIO 控制光耦 (低电平有效) 模拟按键输出, 驱动胰岛素泵机械执行。
+     *
+     * 输出时序:
+     *   1. 开始信号: 低电平 1000ms → 高电平 (模拟长按启动)
+     *   2. 步进脉冲: 每步低电平 500ms → 高电平 (模拟按键每步输出)
+     *   3. 结束信号: 低电平 1000ms → 高电平 (模拟长按结束)
+     *
+     * 步进个数 = stepU / STEP_SIZE, 每个步进对应一个 500ms 脉冲
+     *
+     * 参数:
+     *   action - 包含本次需要输注的胰岛素量 (stepAmount)
+     *
+     * 副作用:
+     *   - 更新 reservoir (储药器余量)
+     *   - 更新 activeInsulin (体内活性胰岛素)
+     *   - 更新 hourlyDelivered / dailyDelivered (统计用量)
+     */
     void executeQueueAction(InsulinAction& action) {
-        digitalWrite(STEP_PIN, HIGH);
-        delayMicroseconds(500);
-        digitalWrite(STEP_PIN, LOW);
-
         double stepU = action.stepAmount;
+        int stepCount = static_cast<int>(round(stepU / STEP_SIZE));
+        if (stepCount < 1) stepCount = 1;
+
+        Logger::info("输注: " + String(stepU) + "U, 步进数: " + String(stepCount) + " @" + String(STEP_SIZE) + "U/step");
+
+        // === 1. 开始信号: 长按 1000ms ===
+        digitalWrite(STEP_PIN, LOW);    // 光耦导通, 模拟按键按下
+        delay(1000);                    // 保持 1000ms
+        digitalWrite(STEP_PIN, HIGH);   // 光耦断开, 模拟按键释放
+
+        // === 2. 步进脉冲: 每步 500ms ===
+        for (int i = 0; i < stepCount; i++) {
+            digitalWrite(STEP_PIN, LOW);    // 模拟按键按下
+            delay(500);                     // 保持 500ms
+            digitalWrite(STEP_PIN, HIGH);   // 模拟按键释放
+            if (i < stepCount - 1) {
+                delay(50);                  // 步间间隔 50ms, 避免连续触发
+            }
+        }
+
+        // === 3. 结束信号: 长按 1000ms ===
+        digitalWrite(STEP_PIN, LOW);    // 光耦导通, 模拟按键按下
+        delay(1000);                    // 保持 1000ms
+        digitalWrite(STEP_PIN, HIGH);   // 光耦断开, 模拟按键释放
+
+        // 扣除本次输注量, 更新各项统计
         reservoir = max(0.0, reservoir - stepU);
         activeInsulin += stepU;
         hourlyDelivered += stepU;
         dailyDelivered += stepU;
+
+        Logger::info("输注完成, 储药器余量: " + String(reservoir) + "U");
     }
 
+    /**
+     * 处理输注队列 - 核心输注调度逻辑
+     *
+     * 本函数负责将基础率、临时基础率和大剂量的胰岛素请求统一调度,
+     * 并按步进电机最小步长 (STEP_SIZE) 进行重组后执行实际输注。
+     *
+     * 执行流程:
+     *   1. 将到期的临时基础率动作移入 bolusQueue
+     *   2. 将到期的基础率动作移入 bolusQueue
+     *   3. 汇总 bolusQueue 中所有动作, 按 STEP_SIZE 取整后执行 GPIO 输注
+     *   4. 处理大剂量进度追踪和完成通知
+     *
+     * 调用时机:
+     *   - 正常情况下每 5 分钟扫描一次
+     *   - 有活跃大剂量 (currentBolus != nullptr) 时立即执行
+     */
     void processDeliveryQueues() {
         uint32_t now = millis();
         if (patchState != PatchState::ACTIVE && patchState != PatchState::ACTIVE_ALT) return;
@@ -922,7 +982,9 @@ private:
         if (currentBolus == nullptr && now - lastDeliveryScanTime < 300000) return;
         lastDeliveryScanTime = now;
 
-        // Step 1: Consume temp basal queue - move due actions to bolusQueue
+        // ===== Step 1: 消费临时基础率队列 =====
+        // 将已到期 (executeTimeMs <= now) 的临时基础率动作移入 bolusQueue,
+        // 由后续统一执行。临时基础率结束时清理状态并发送通知。
         if (tempBasalActive && tempBasalQueueIdx < tempBasalQueue.size()) {
             while (tempBasalQueueIdx < tempBasalQueue.size() && now >= tempBasalQueue[tempBasalQueueIdx].executeTimeMs) {
                 bolusQueue.push_back(tempBasalQueue[tempBasalQueueIdx]);
@@ -943,7 +1005,8 @@ private:
             }
         }
 
-        // Step 2: Consume basal queue - move due actions to bolusQueue
+        // ===== Step 2: 消费基础率队列 =====
+        // 将已到期的基础率动作移入 bolusQueue, 与临时基础率和大剂量统一调度
         if (!basalSuspended && basalQueueIdx < basalQueue.size()) {
             while (basalQueueIdx < basalQueue.size() && now >= basalQueue[basalQueueIdx].executeTimeMs) {
                 bolusQueue.push_back(basalQueue[basalQueueIdx]);
@@ -951,42 +1014,54 @@ private:
             }
         }
 
-        // Step 3: Process bolusQueue - sum all, apply step compensation, execute
+        // ===== Step 3: 处理 bolusQueue - 汇总、步进补偿、执行输注 =====
+        // 将队列中所有待输注量汇总, 然后按电机最小步长 STEP_SIZE 进行取整,
+        // 最后通过 executeQueueAction() 输出 GPIO 脉冲驱动电机。
         if (!bolusQueue.empty()) {
+            // 3.1 汇总所有待输注量
             double sum = 0;
             for (const auto& action : bolusQueue) {
                 sum += action.stepAmount;
             }
             bolusQueue.clear();
 
-            // Step compensation: round sum to nearest STEP_SIZE boundary
+            // 3.2 步进补偿: 将总量取整到最近的 STEP_SIZE 边界
+            // 由于电机只能按固定步长 (如 0.3U) 动作, 不足一个步长的部分
+            // 需要累积到下一次处理, 避免输注精度丢失。
             double remainder = fmod(sum, STEP_SIZE);
             if (remainder < 0) remainder += STEP_SIZE;
 
             double deliverAmount;
             double carryOver;
             if (remainder >= STEP_SIZE / 2.0) {
+                // 余量 >= 半步: 向上取整, 多输的部分记为负 carryOver
                 deliverAmount = sum + (STEP_SIZE - remainder);
                 carryOver = remainder - STEP_SIZE;
             } else {
+                // 余量 < 半步: 向下取整, 少输的部分记为正 carryOver
                 deliverAmount = sum - remainder;
                 carryOver = remainder;
             }
 
+            // 3.3 执行实际输注 (GPIO 脉冲输出)
             if (deliverAmount > 0.001) {
                 InsulinAction action;
                 action.stepAmount = deliverAmount;
-                executeQueueAction(action);
+                executeQueueAction(action);  // <-- 此处输出 GPIO 信号驱动电机
 
+                // 3.4 大剂量进度追踪
+                // 如果当前有大剂量在执行, 更新已输送量并检查是否完成
                 if (currentBolus) {
                     double bolusRemaining = currentBolus->amount - currentBolus->delivered;
                     double bolusPortion = min(bolusRemaining, deliverAmount);
                     currentBolus->delivered += bolusPortion;
+
+                    // 大剂量已完成 (考虑浮点误差 0.001)
                     if (currentBolus->delivered >= currentBolus->amount - 0.001) {
                         double finalDelivered = currentBolus->amount;
                         bolusHistory.push_back(*currentBolus);
                         Logger::info("大剂量输送完成: " + String(finalDelivered) + "U");
-                        sendStateNotification();
+                        sendStateNotification();  // 通知 App 大剂量已完成
                         delete currentBolus;
                         currentBolus = nullptr;
                         bolusDeliveryProgress = 0;
@@ -995,6 +1070,7 @@ private:
                 }
             }
 
+            // 3.5 将步进补偿的余量 carryOver 重新放入队列, 下次累积执行
             if (fabs(carryOver) > 0.001) {
                 InsulinAction carryAction;
                 carryAction.stepAmount = carryOver;
