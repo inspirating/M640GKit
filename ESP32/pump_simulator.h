@@ -965,15 +965,15 @@ private:
             return;
         }
 
-        // 防重入: 状态机正在运行时禁止重新触发, 避免累积长时间低电平
-        if (gpioState != GpioState::IDLE && gpioState != GpioState::COMPLETED) {
-            Logger::warning("[GPIO] 状态机正在运行, 忽略重复触发, 当前状态=" + String((int)gpioState));
+        // 防重入: 只有 IDLE 状态才允许启动, COMPLETED 需先 resetGpioState
+        if (gpioState != GpioState::IDLE) {
+            Logger::warning("[GPIO] 状态机非IDLE, 忽略触发, 当前状态=" + String((int)gpioState));
             return;
         }
 
         Logger::info("startGpioDelivery");
         digitalWrite(STEP_PIN, LOW);   // 立即输出开始信号低电平
-        pinMode(STEP_PIN, OUTPUT);
+        // pinMode(STEP_PIN, OUTPUT);
         
         
         gpioState = GpioState::START_SIGNAL;
@@ -995,19 +995,30 @@ private:
      *   -> MID_DELAY (HIGH 3000ms) -> END_SIGNAL (LOW 1000ms) -> COMPLETED
      */
     void updateGpioStateMachine() {
-        // 安全兜底: IDLE 和 COMPLETED 状态下必须确保引脚为高电平
-        if (gpioState == GpioState::IDLE || gpioState == GpioState::COMPLETED) {
-
-            setGpioToHighOnce();
+        // IDLE 状态下不操作 GPIO, 仅 COMPLETED 状态需要确保引脚回到高电平
+        if (gpioState == GpioState::IDLE) {
             return;
         }
+
+        static bool completedPinSet = false;
+        if (gpioState == GpioState::COMPLETED) {
+            // 输注刚完成时确保引脚为高电平, 之后不再操作
+            if (!completedPinSet) {
+                digitalWrite(STEP_PIN, HIGH);
+                completedPinSet = true;
+            }
+            return;
+        }
+
+        // 状态机开始运行, 重置完成标志
+        completedPinSet = false;
 
         uint32_t now = millis();
 
         // 超时保护: 整次输注超过 30 秒则强制结束, 防止状态机卡死导致长期低电平
         if (now - gpioDeliveryStartMs >= 30000) {
             Logger::error("[GPIO] 输注超时 30s, 强制结束, 当前状态=" + String((int)gpioState));
-            setGpioToHighOnce();
+            digitalWrite(STEP_PIN, HIGH);
             gpioState = GpioState::COMPLETED;
             return;
         }
@@ -1016,8 +1027,8 @@ private:
 
         switch (gpioState) {
             case GpioState::START_SIGNAL:
-                // 开始信号: 先按压1s模拟按键唤醒 (LOW 1000ms)
-                if (elapsed >= 1000) {
+                // 开始信号: 先按压2s模拟按键唤醒 (LOW 1000ms)
+                if (elapsed >= 2000) {
                     digitalWrite(STEP_PIN, HIGH);
                     gpioState = GpioState::START_DELAY;
                     gpioStateStartMs = now;
@@ -1027,7 +1038,7 @@ private:
 
             case GpioState::START_DELAY:
                 // 抬起后的间隔: HIGH 500ms
-                if (elapsed >= 500) {
+                if (elapsed >= 1000) {
                     digitalWrite(STEP_PIN, LOW);
                     gpioState = GpioState::PULSE_ACTIVE;
                     gpioStateStartMs = now;
@@ -1040,7 +1051,7 @@ private:
 
             case GpioState::PULSE_ACTIVE:
                 // 步进脉冲: LOW 500ms (模拟按键输入一步)
-                if (elapsed >= 500) {
+                if (elapsed >= 1000) {
                     digitalWrite(STEP_PIN, HIGH);
                     gpioState = GpioState::PULSE_DELAY;
                     gpioStateStartMs = now;
@@ -1098,30 +1109,18 @@ private:
         return gpioState == GpioState::IDLE;
     }
 
-    void setGpioToHighOnce() {
-        int pinState = digitalRead(STEP_PIN);
-
-        if (pinState == HIGH) {
-            Serial.println("当前为高电平");
-        } else {
-            Serial.println("当前为低电平");
-            digitalWrite(STEP_PIN, HIGH);
-        }
-    }
-
     void resetGpioState() {
         gpioState = GpioState::IDLE;
         gpioStateStartMs = 0;
         gpioDeliveryStartMs = 0;
         gpioRemainingSteps = 0;
         gpioCurrentStep = 0;
-        digitalWrite(STEP_PIN, HIGH);
     }
 
     void executeQueueAction(InsulinAction& action) {
         // GPIO 忙时跳过, 由正在运行的状态机处理当前输注
-        if (gpioState != GpioState::IDLE && gpioState != GpioState::COMPLETED) {
-            Logger::warning("[GPIO] 状态机正在运行, executeQueueAction 跳过, 待输注量=" + String(action.stepAmount) + "U");
+        if (gpioState != GpioState::IDLE) {
+            Logger::warning("[GPIO] 状态机非IDLE, executeQueueAction 跳过, 待输注量=" + String(action.stepAmount) + "U");
             return;
         }
 
@@ -1291,6 +1290,7 @@ private:
                 lastReportedBolusProgress = 0;
                 bolusQueue.clear();
                 bolusQueueIdx = 0;
+                resetGpioState();
             }
         }
     }
