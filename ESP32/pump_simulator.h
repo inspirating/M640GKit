@@ -1046,7 +1046,7 @@ private:
                 break;
 
             case GpioState::PULSE_ACTIVE:
-                if (elapsed >= 500) {
+                if (elapsed >= 1000) {
                     digitalWrite(STEP_PIN, HIGH);
                     pinMode(STEP_PIN, OUTPUT);
                     gpioCurrentStep++;
@@ -1056,7 +1056,7 @@ private:
                 break;
 
             case GpioState::PULSE_DELAY:
-                if (elapsed >= 100) {
+                if (elapsed >= 1000) {
                     if (gpioCurrentStep < gpioRemainingSteps) {
                         digitalWrite(STEP_PIN, LOW);
                         gpioState = GpioState::PULSE_ACTIVE;
