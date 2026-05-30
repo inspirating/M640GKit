@@ -132,7 +132,7 @@ struct TempBasalInfo {
 };
 
 // ========== 队列输注系统 ==========
-static constexpr double STEP_SIZE = 0.3;
+static constexpr double STEP_SIZE = 0.5;
 static constexpr int STEP_PIN = 6;
 
 struct InsulinAction {
@@ -374,8 +374,8 @@ private:
         START_DELAY,
         PULSE_ACTIVE,
         PULSE_DELAY,
+        MID_DELAY,        // 步进结束后等待3s, 再执行真正的输入按压
         END_SIGNAL,
-        END_DELAY,
         COMPLETED
     };
     GpioState gpioState;
@@ -991,12 +991,12 @@ private:
      * 时序:
      *   START_SIGNAL (LOW 1000ms) -> START_DELAY (HIGH 500ms)
      *   -> PULSE_ACTIVE (LOW 500ms) -> PULSE_DELAY (HIGH 500ms) [重复 stepCount 次]
-     *   -> END_SIGNAL (LOW 1000ms) -> COMPLETED
+     *   -> MID_DELAY (HIGH 3000ms) -> END_SIGNAL (LOW 1000ms) -> COMPLETED
      */
     void updateGpioStateMachine() {
         // 安全兜底: IDLE 和 COMPLETED 状态下必须确保引脚为高电平
         if (gpioState == GpioState::IDLE || gpioState == GpioState::COMPLETED) {
-            // digitalWrite(STEP_PIN, HIGH);
+            digitalWrite(STEP_PIN, HIGH);
             return;
         }
 
@@ -1014,17 +1014,17 @@ private:
 
         switch (gpioState) {
             case GpioState::START_SIGNAL:
-                // 开始信号: LOW 1000ms (已在 startGpioDelivery 中设置 LOW)
+                // 开始信号: 先按压1s模拟按键唤醒 (LOW 1000ms)
                 if (elapsed >= 1000) {
                     digitalWrite(STEP_PIN, HIGH);
                     gpioState = GpioState::START_DELAY;
                     gpioStateStartMs = now;
-                    Logger::info("[GPIO] Start delay: HIGH");
+                    Logger::info("[GPIO] Start release: HIGH");
                 }
                 break;
 
             case GpioState::START_DELAY:
-                // 开始信号后的间隔: HIGH 500ms
+                // 抬起后的间隔: HIGH 500ms
                 if (elapsed >= 500) {
                     digitalWrite(STEP_PIN, LOW);
                     gpioState = GpioState::PULSE_ACTIVE;
@@ -1035,7 +1035,7 @@ private:
                 break;
 
             case GpioState::PULSE_ACTIVE:
-                // 步进脉冲: LOW 500ms (已在进入时设置 LOW)
+                // 步进脉冲: LOW 500ms (模拟按键输入一步)
                 if (elapsed >= 500) {
                     digitalWrite(STEP_PIN, HIGH);
                     gpioState = GpioState::PULSE_DELAY;
@@ -1053,16 +1053,27 @@ private:
                         gpioStateStartMs = now;
                         Logger::info("[GPIO] Step " + String(gpioCurrentStep) + "/" + String(gpioRemainingSteps) + ": LOW");
                     } else {
-                        digitalWrite(STEP_PIN, LOW);
-                        gpioState = GpioState::END_SIGNAL;
+                        // 所有步进已输出完毕, 进入等待3s阶段
+                        digitalWrite(STEP_PIN, HIGH);
+                        gpioState = GpioState::MID_DELAY;
                         gpioStateStartMs = now;
-                        Logger::info("[GPIO] End signal: LOW");
+                        Logger::info("[GPIO] Steps done, wait 3s before final press: HIGH");
                     }
                 }
                 break;
 
+            case GpioState::MID_DELAY:
+                // 等待3s: HIGH 3000ms, 让用户准备好接收真正的输入
+                if (elapsed >= 3000) {
+                    digitalWrite(STEP_PIN, LOW);
+                    gpioState = GpioState::END_SIGNAL;
+                    gpioStateStartMs = now;
+                    Logger::info("[GPIO] Final press: LOW");
+                }
+                break;
+
             case GpioState::END_SIGNAL:
-                // 结束信号: LOW 1000ms (已在进入时设置 LOW)
+                // 结束信号: 再按压1s模拟真正的输入 (LOW 1000ms)
                 if (elapsed >= 1000) {
                     digitalWrite(STEP_PIN, HIGH);
                     gpioState = GpioState::COMPLETED;
@@ -1246,6 +1257,25 @@ private:
                 InsulinAction carryAction;
                 carryAction.stepAmount = carryOver;
                 bolusQueue.push_back(carryAction);
+            }
+        }
+
+        // 3.6 大剂量完成检查: GPIO 已完成但剩余量不足一个步长时, 直接完成大剂量
+        // 步进电机只能按 STEP_SIZE 整数倍输注, 当剩余量 < STEP_SIZE 时无法继续,
+        // 继续等待只会导致 carryOver 死循环, 进度条卡死不结束。
+        if (currentBolus && isGpioDeliveryComplete()) {
+            double bolusRemaining = currentBolus->amount - currentBolus->delivered;
+            if (bolusRemaining < STEP_SIZE) {
+                Logger::info("大剂量剩余 " + String(bolusRemaining) + "U 不足一个步长(" + String(STEP_SIZE) + "U), 标记完成");
+                currentBolus->delivered = currentBolus->amount;
+                bolusHistory.push_back(*currentBolus);
+                sendStateNotification();
+                delete currentBolus;
+                currentBolus = nullptr;
+                bolusDeliveryProgress = 0;
+                lastReportedBolusProgress = 0;
+                bolusQueue.clear();
+                bolusQueueIdx = 0;
             }
         }
     }
