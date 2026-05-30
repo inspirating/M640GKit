@@ -1006,6 +1006,7 @@ private:
         if (gpioState == GpioState::COMPLETED) {
             if (!completedPinSet) {
                 digitalWrite(STEP_PIN, HIGH);
+                pinMode(STEP_PIN, INPUT);
                 completedPinSet = true;
             }
             return;
@@ -1018,6 +1019,7 @@ private:
         if (now - gpioDeliveryStartMs >= 30000) {
             Logger::error("[GPIO] 输注超时 30s, 强制结束, 当前状态=" + String((int)gpioState));
             digitalWrite(STEP_PIN, HIGH);
+            pinMode(STEP_PIN, INPUT);
             gpioState = GpioState::COMPLETED;
             return;
         }
@@ -1029,27 +1031,17 @@ private:
                 // 开始信号: 先按压2s模拟按键唤醒 (LOW 1000ms)
                 if (elapsed >= 2000) {
                     digitalWrite(STEP_PIN, HIGH);
-                    gpioState = GpioState::START_DELAY;
+                    gpioState = GpioState::PULSE_DELAY;
                     gpioStateStartMs = now;
+                    gpioCurrentStep = 0;
                     Logger::info("[GPIO] Start release: HIGH");
-                }
-                break;
-                    
-            case GpioState::START_DELAY:
-                // 抬起后的间隔: HIGH 500ms
-                if (elapsed >= 1000) {
-                    digitalWrite(STEP_PIN, LOW);
-                    gpioState = GpioState::PULSE_ACTIVE;
-                    gpioStateStartMs = now;
-                    gpioCurrentStep = 1;
-                    Logger::info("[GPIO] Step 1/" + String(gpioRemainingSteps) + ": LOW");
 
-                    // resetGpioState();
+                    // pinMode(STEP_PIN, INPUT);
                 }
                 break;
 
             case GpioState::PULSE_ACTIVE:
-                if (elapsed >= 1000) {
+                if (elapsed >= 500) {
                     digitalWrite(STEP_PIN, HIGH);
                     gpioCurrentStep++;
                     gpioState = GpioState::PULSE_DELAY;
@@ -1058,14 +1050,17 @@ private:
                 break;
 
             case GpioState::PULSE_DELAY:
-                if (elapsed >= 1000) {
+                if (elapsed >= 1) {
                     if (gpioCurrentStep < gpioRemainingSteps) {
+                        
                         digitalWrite(STEP_PIN, LOW);
+                        pinMode(STEP_PIN, OUTPUT);
                         gpioState = GpioState::PULSE_ACTIVE;
                         gpioStateStartMs = now;
                         Logger::info("[GPIO] Step " + String(gpioCurrentStep) + "/" + String(gpioRemainingSteps) + ": LOW");
                     } else {
-                        digitalWrite(STEP_PIN, HIGH);
+                        digitalWrite(STEP_PIN, LOW);
+                        pinMode(STEP_PIN, OUTPUT);
                         gpioState = GpioState::CONFIRM_PRESS;
                         gpioStateStartMs = now;
                         Logger::info("[GPIO] Steps done, confirm now: HIGH");
@@ -1085,6 +1080,7 @@ private:
             case GpioState::CONFIRM_DELAY:
                 if (elapsed >= static_cast<uint32_t>(gpioTotalSteps * 500)) {
                     digitalWrite(STEP_PIN, LOW);
+                    pinMode(STEP_PIN, OUTPUT);
                     gpioState = GpioState::END_SIGNAL;
                     gpioStateStartMs = now;
                     Logger::info("[GPIO] Wait " + String(gpioTotalSteps * 500 / 1000) + "s done, final press: LOW");
@@ -1114,6 +1110,7 @@ private:
 
     void resetGpioState() {
         gpioState = GpioState::IDLE;
+        pinMode(STEP_PIN, INPUT);
         gpioStateStartMs = 0;
         gpioDeliveryStartMs = 0;
         gpioRemainingSteps = 0;
