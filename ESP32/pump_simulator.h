@@ -973,8 +973,7 @@ private:
         }
 
         Logger::info("startGpioDelivery");
-
-        digitalWrite(STEP_PIN, HIGH);
+        
         pinMode(STEP_PIN, OUTPUT);
         digitalWrite(STEP_PIN, LOW);   // 立即输出开始信号低电平
         // 
@@ -1032,23 +1031,19 @@ private:
 
         switch (gpioState) {
             case GpioState::START_SIGNAL:
-                // 开始信号: 先按压1s模拟按键唤醒 (LOW 1000ms)
+                // 开始信号: 先按压1s模拟按键唤醒 (LOW 1000ms 满)
                 if (elapsed >= 1000) {
-                    digitalWrite(STEP_PIN, HIGH);
-                    pinMode(STEP_PIN, OUTPUT);
+                    digitalWrite(STEP_PIN, HIGH); // 强推高电平释放
                     gpioState = GpioState::PULSE_DELAY;
                     gpioStateStartMs = now;
                     gpioCurrentStep = 0;
                     Logger::info("[GPIO] Start release: HIGH");
-
-                    // pinMode(STEP_PIN, INPUT);
                 }
                 break;
 
             case GpioState::PULSE_ACTIVE:
-                if (elapsed >= 1000) {
-                    digitalWrite(STEP_PIN, HIGH);
-                    pinMode(STEP_PIN, OUTPUT);
+                if (elapsed >= 500) {
+                    digitalWrite(STEP_PIN, HIGH); // 强推高电平释放
                     gpioCurrentStep++;
                     gpioState = GpioState::PULSE_DELAY;
                     gpioStateStartMs = now;
@@ -1056,17 +1051,19 @@ private:
                 break;
 
             case GpioState::PULSE_DELAY:
-                if (elapsed >= 1000) {
+                if (elapsed >= 500) {
                     if (gpioCurrentStep < gpioRemainingSteps) {
-                        digitalWrite(STEP_PIN, LOW);
+                        digitalWrite(STEP_PIN, LOW); // 强推低电平有效
                         gpioState = GpioState::PULSE_ACTIVE;
                         gpioStateStartMs = now;
                         Logger::info("[GPIO] Step " + String(gpioCurrentStep) + "/" + String(gpioRemainingSteps) + ": LOW");
                     } else {
-                        digitalWrite(STEP_PIN, LOW);
+                        // 如果你想在发送确认信号前，让高电平再多保持一会儿，可以不在这里立马 digitalWrite LOW。
+                        // 现在的逻辑是直接拉低，进入确认：
+                        digitalWrite(STEP_PIN, LOW); 
                         gpioState = GpioState::CONFIRM_PRESS;
                         gpioStateStartMs = now;
-                        Logger::info("[GPIO] Steps done, confirm now: HIGH");
+                        Logger::info("[GPIO] Steps done, confirm now: LOW");
                     }
                 }
                 break;
@@ -1074,7 +1071,6 @@ private:
             case GpioState::CONFIRM_PRESS:
                 if (elapsed >= 1000) {
                     digitalWrite(STEP_PIN, HIGH);
-                    pinMode(STEP_PIN, OUTPUT);
                     gpioState = GpioState::CONFIRM_DELAY;
                     gpioStateStartMs = now;
                     Logger::info("[GPIO] Confirm release: HIGH");
@@ -1093,7 +1089,6 @@ private:
             case GpioState::END_SIGNAL:
                 if (elapsed >= 1000) {
                     digitalWrite(STEP_PIN, HIGH);
-                    pinMode(STEP_PIN, OUTPUT);
                     gpioState = GpioState::COMPLETED;
                     Logger::info("[GPIO] Delivery completed");
                 }
