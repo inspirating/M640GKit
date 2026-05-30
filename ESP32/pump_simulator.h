@@ -245,21 +245,99 @@ public:
         Serial.println("[PUMP] Setup complete!");
     }
 
+    // void loop() {
+    //     if (!initialized) {
+    //         Logger::error("pump simulator not initailized yet, please call setup() first");
+    //         return;
+    //     }
+
+    //     // GPIO 状态机必须在每个循环周期都运行, 实现毫秒级精度的非阻塞输注
+    //     updateGpioStateMachine();
+
+    //     uint32_t currentTime = millis();
+    //     if (currentTime - lastUpdateTime >= updateIntervalMs) {
+    //         lastUpdateTime = currentTime;
+    //         update();
+    //     }
+    // }
+
+    // // 极性假设：如果这样不行，把所有的 LOW 换成 HIGH，HIGH 换成 LOW 再试一次！
+    // void loop() {
+    //     delay(5000); // 每 5 秒尝试一次，给你时间观察
+
+    //     Serial.println(">>> 1. 短按唤醒屏幕...");
+    //     digitalWrite(STEP_PIN, LOW); // 按下
+    //     delay(200);                  
+    //     digitalWrite(STEP_PIN, HIGH); // 松开
+        
+    //     delay(1000); // 等待屏幕完全亮起，给泵一点反应时间
+
+    //     Serial.println(">>> 2. 长按尝试触发声响大剂量...");
+    //     digitalWrite(STEP_PIN, LOW); // 按下
+    //     delay(2000);                 // 狠按 2 秒！保证触发
+    //     digitalWrite(STEP_PIN, HIGH); // 松开
+        
+    //     Serial.println(">>> 触发结束，观察泵是否进入了大剂量页面？");
+        
+    //     // 死循环卡住，防止重复发干扰观察
+    //     while(1) {
+    //         delay(1000);
+    //     }
+    // }
+
+    // 假设 STEP_PIN 已经在 setup() 里 pinMode(STEP_PIN, OUTPUT) 并且 digitalWrite(STEP_PIN, HIGH) 了
     void loop() {
-        if (!initialized) {
-            Logger::error("pump simulator not initailized yet, please call setup() first");
-            return;
+        // 给你 5 秒钟准备观察
+        delay(5000); 
+        Serial.println("====== 开始模拟完整声响大剂量输注 ======");
+
+        // 第一步：唤醒屏幕 (短按)
+        Serial.println(">>> 1. 唤醒屏幕...");
+        digitalWrite(STEP_PIN, LOW);
+        delay(200);
+        digitalWrite(STEP_PIN, HIGH);
+        delay(1000); // 必须等屏幕完全亮起
+
+        // 第二步：触发进入声响大剂量模式 (长按)
+        Serial.println(">>> 2. 触发进入声响大剂量...");
+        digitalWrite(STEP_PIN, LOW);
+        delay(2000); // 长按 2 秒
+        digitalWrite(STEP_PIN, HIGH);
+        delay(1500); // 等待泵“滴”一声，并且界面完全切换过去
+
+        // 第三步：连续输入步数（假设输入 3 步）
+        int steps = 3;
+        Serial.println(">>> 3. 开始输入步数: " + String(steps) + " 步");
+        for (int i = 1; i <= steps; i++) {
+            Serial.println("    -> 按下第 " + String(i) + " 步");
+            digitalWrite(STEP_PIN, LOW);
+            delay(400);  // 短按 0.4 秒
+            digitalWrite(STEP_PIN, HIGH);
+            delay(600);  // 抬起 0.6 秒（留足时间给泵发声反馈，这一步极易翻车）
         }
+        delay(1500); // 输入完毕后，等一下再确认
 
-        // GPIO 状态机必须在每个循环周期都运行, 实现毫秒级精度的非阻塞输注
-        updateGpioStateMachine();
+        // 第四步：第一次长按确认（泵会回放步数声音）
+        Serial.println(">>> 4. 确认输入的步数...");
+        digitalWrite(STEP_PIN, LOW);
+        delay(2000);
+        digitalWrite(STEP_PIN, HIGH);
+        delay(3000); // 【关键】泵会“滴滴滴”把刚才的 3 步响一遍给你听，必须等它响完！
 
-        uint32_t currentTime = millis();
-        if (currentTime - lastUpdateTime >= updateIntervalMs) {
-            lastUpdateTime = currentTime;
-            update();
+        // 第五步：第二次长按确认（真正开始推药）
+        Serial.println(">>> 5. 最终确认执行输注...");
+        digitalWrite(STEP_PIN, LOW);
+        delay(2000);
+        digitalWrite(STEP_PIN, HIGH);
+
+        Serial.println("====== 指令发送完毕，观察泵是否开始推推杆 ======");
+
+        // 死循环卡住，任务完成就不要再发了
+        while(1) {
+            delay(1000);
         }
     }
+
 
 private:
     bool initialized;
@@ -371,7 +449,8 @@ private:
     enum class GpioState : uint8_t {
         IDLE = 0,
         START_SIGNAL,       // 按压1s唤醒
-        START_DELAY,        PULSE_ACTIVE,
+        START_DELAY,        
+        PULSE_ACTIVE,
         PULSE_DELAY,        // 抬起间隔500ms
         CONFIRM_PRESS,      // 按压1s确认
         CONFIRM_DELAY,      // 等待(0.5*步数)s, 让泵处理输入
@@ -958,37 +1037,28 @@ private:
      * 启动非阻塞 GPIO 输注
      * 将输注参数保存到状态机变量, 由 updateGpioStateMachine() 在 loop() 中驱动执行
      */
-    void startGpioDelivery(double stepU, int stepCount) {
-        Logger::info("[DEBUG] startGpioDelivery: stepU=" + String(stepU) + "U, stepCount=" + String(stepCount));
-        
-        if (stepCount < 1) {
-            Logger::info("[DEBUG] stepCount < 1, skipping GPIO output");
-            return;
-        }
+void startGpioDelivery(double stepU, int stepCount) {
+    Logger::info("[DEBUG] startGpioDelivery: stepU=" + String(stepU) + "U, stepCount=" + String(stepCount));
+    if (stepCount < 1) return;
 
-        // 防重入: 只有 IDLE 状态才允许启动, COMPLETED 需先 resetGpioState
-        if (gpioState != GpioState::IDLE) {
-            Logger::warning("[GPIO] 状态机非IDLE, 忽略触发, 当前状态=" + String((int)gpioState));
-            return;
-        }
-
-        Logger::info("startGpioDelivery");
-        
-        pinMode(STEP_PIN, OUTPUT);
-        digitalWrite(STEP_PIN, LOW);   // 立即输出开始信号低电平
-        // 
-        
-        
-        gpioState = GpioState::START_SIGNAL;
-        gpioStateStartMs = millis();
-        gpioDeliveryStartMs = gpioStateStartMs;
-        gpioRemainingSteps = stepCount;
-        // gpioRemainingSteps = 1;
-        gpioCurrentStep = 0;
-        gpioTotalSteps = stepCount;
-        
-        Logger::info("GPIO 输注启动: " + String(stepU) + "U, " + String(stepCount) + " steps");
+    if (gpioState != GpioState::IDLE) {
+        Logger::warning("[GPIO] 状态机非IDLE, 忽略触发");
+        return;
     }
+
+    pinMode(STEP_PIN, OUTPUT);
+    digitalWrite(STEP_PIN, LOW); // 开始长按唤醒信号
+    
+    // 【修复】：务必手动切换状态机的初始状态
+    gpioState = GpioState::START_SIGNAL; 
+    
+    gpioStateStartMs = millis();
+    gpioDeliveryStartMs = gpioStateStartMs;
+    gpioRemainingSteps = stepCount;
+    gpioCurrentStep = 0;
+    gpioTotalSteps = stepCount;
+    Logger::info("GPIO 输注启动: " + String(stepU) + "U, " + String(stepCount) + " steps");
+}
 
     /**
      * 非阻塞 GPIO 输注状态机
@@ -1009,20 +1079,18 @@ private:
         if (gpioState == GpioState::COMPLETED) {
             if (!completedPinSet) {
                 digitalWrite(STEP_PIN, HIGH);
-                pinMode(STEP_PIN, INPUT_PULLUP);
                 completedPinSet = true;
             }
             return;
         }
-
         completedPinSet = false;
 
         uint32_t now = millis();
-
-        if (now - gpioDeliveryStartMs >= 30000) {
-            Logger::error("[GPIO] 输注超时 30s, 强制结束, 当前状态=" + String((int)gpioState));
+        
+        // 美敦力大剂量如果步数多，30秒可能不够，建议放大到 60s 超时保护
+        if (now - gpioDeliveryStartMs >= 60000) { 
+            Logger::error("[GPIO] 输注超时, 强制结束");
             digitalWrite(STEP_PIN, HIGH);
-            pinMode(STEP_PIN, INPUT_PULLUP);
             gpioState = GpioState::COMPLETED;
             return;
         }
@@ -1031,66 +1099,80 @@ private:
 
         switch (gpioState) {
             case GpioState::START_SIGNAL:
-                // 开始信号: 先按压1s模拟按键唤醒 (LOW 1000ms 满)
+                // 唤醒：低电平维持 1000ms 满
                 if (elapsed >= 1000) {
-                    digitalWrite(STEP_PIN, HIGH); // 强推高电平释放
-                    gpioState = GpioState::PULSE_DELAY;
+                    digitalWrite(STEP_PIN, HIGH); // 抬起按键
+                    gpioState = GpioState::START_DELAY; // 【修复】：进入抬起等待状态
                     gpioStateStartMs = now;
-                    gpioCurrentStep = 0;
-                    Logger::info("[GPIO] Start release: HIGH");
+                    Logger::info("[GPIO] 唤醒按键释放: HIGH");
+                }
+                break;
+
+            case GpioState::START_DELAY:
+                // 唤醒后的等待：高电平维持 500ms，让泵准备好接收脉冲
+                if (elapsed >= 500) {
+                    digitalWrite(STEP_PIN, LOW); // 准备好后，按下第一步脉冲
+                    gpioState = GpioState::PULSE_ACTIVE;
+                    gpioStateStartMs = now;
+                    Logger::info("[GPIO] Step 0/" + String(gpioRemainingSteps) + ": LOW (开始步进)");
                 }
                 break;
 
             case GpioState::PULSE_ACTIVE:
+                // 步进脉冲按下：低电平维持 500ms
                 if (elapsed >= 500) {
-                    digitalWrite(STEP_PIN, HIGH); // 强推高电平释放
+                    digitalWrite(STEP_PIN, HIGH); // 抬起按键
                     gpioCurrentStep++;
                     gpioState = GpioState::PULSE_DELAY;
                     gpioStateStartMs = now;
+                    Logger::info("[GPIO] Step 释放: HIGH");
                 }
                 break;
 
             case GpioState::PULSE_DELAY:
+                // 步进脉冲抬起：高电平维持 500ms
                 if (elapsed >= 500) {
                     if (gpioCurrentStep < gpioRemainingSteps) {
-                        digitalWrite(STEP_PIN, LOW); // 强推低电平有效
+                        digitalWrite(STEP_PIN, LOW); // 下一次短按
                         gpioState = GpioState::PULSE_ACTIVE;
                         gpioStateStartMs = now;
                         Logger::info("[GPIO] Step " + String(gpioCurrentStep) + "/" + String(gpioRemainingSteps) + ": LOW");
                     } else {
-                        // 如果你想在发送确认信号前，让高电平再多保持一会儿，可以不在这里立马 digitalWrite LOW。
-                        // 现在的逻辑是直接拉低，进入确认：
+                        // 步数够了，立刻长按 1 秒进行确认
                         digitalWrite(STEP_PIN, LOW); 
                         gpioState = GpioState::CONFIRM_PRESS;
                         gpioStateStartMs = now;
-                        Logger::info("[GPIO] Steps done, confirm now: LOW");
+                        Logger::info("[GPIO] 步数完成，开始长按确认: LOW");
                     }
                 }
                 break;
 
             case GpioState::CONFIRM_PRESS:
+                // 确认长按：低电平维持 1000ms
                 if (elapsed >= 1000) {
-                    digitalWrite(STEP_PIN, HIGH);
+                    digitalWrite(STEP_PIN, HIGH); // 抬起
                     gpioState = GpioState::CONFIRM_DELAY;
                     gpioStateStartMs = now;
-                    Logger::info("[GPIO] Confirm release: HIGH");
+                    Logger::info("[GPIO] 确认按键释放: HIGH");
                 }
                 break;
 
             case GpioState::CONFIRM_DELAY:
+                // 等待泵处理：高电平维持 (步数 * 500ms)
                 if (elapsed >= static_cast<uint32_t>(gpioTotalSteps * 500)) {
-                    digitalWrite(STEP_PIN, LOW);
+                    digitalWrite(STEP_PIN, LOW); // 最后的真正执行长按
                     gpioState = GpioState::END_SIGNAL;
                     gpioStateStartMs = now;
-                    Logger::info("[GPIO] Wait " + String(gpioTotalSteps * 500 / 1000) + "s done, final press: LOW");
+                    Logger::info("[GPIO] 泵处理等待结束，开始最终长按输入: LOW");
                 }
                 break;
 
             case GpioState::END_SIGNAL:
+                // 最终输入长按：低电平维持 1000ms
                 if (elapsed >= 1000) {
-                    digitalWrite(STEP_PIN, HIGH);
+                    digitalWrite(STEP_PIN, HIGH); // 彻底释放
                     gpioState = GpioState::COMPLETED;
-                    Logger::info("[GPIO] Delivery completed");
+                    Logger::info("[GPIO] 大剂量输注信号发射完毕");
                 }
                 break;
 
