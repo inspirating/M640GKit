@@ -971,6 +971,7 @@ private:
             return;
         }
 
+        Logger::info("startGpioDelivery");
         digitalWrite(STEP_PIN, LOW);   // 立即输出开始信号低电平
         pinMode(STEP_PIN, OUTPUT);
         
@@ -996,16 +997,17 @@ private:
     void updateGpioStateMachine() {
         // 安全兜底: IDLE 和 COMPLETED 状态下必须确保引脚为高电平
         if (gpioState == GpioState::IDLE || gpioState == GpioState::COMPLETED) {
-            digitalWrite(STEP_PIN, HIGH);
+
+            setGpioToHighOnce();
             return;
         }
 
         uint32_t now = millis();
 
-        // 超时保护: 整次输注超过 60 秒则强制结束, 防止状态机卡死导致长期低电平
-        if (now - gpioDeliveryStartMs >= 60000) {
-            Logger::error("[GPIO] 输注超时 60s, 强制结束, 当前状态=" + String((int)gpioState));
-            digitalWrite(STEP_PIN, HIGH);
+        // 超时保护: 整次输注超过 30 秒则强制结束, 防止状态机卡死导致长期低电平
+        if (now - gpioDeliveryStartMs >= 30000) {
+            Logger::error("[GPIO] 输注超时 30s, 强制结束, 当前状态=" + String((int)gpioState));
+            setGpioToHighOnce();
             gpioState = GpioState::COMPLETED;
             return;
         }
@@ -1031,6 +1033,8 @@ private:
                     gpioStateStartMs = now;
                     gpioCurrentStep = 1;
                     Logger::info("[GPIO] Step 1/" + String(gpioRemainingSteps) + ": LOW");
+
+                    // resetGpioState();
                 }
                 break;
 
@@ -1092,6 +1096,17 @@ private:
 
     bool isGpioIdle() const {
         return gpioState == GpioState::IDLE;
+    }
+
+    void setGpioToHighOnce() {
+        int pinState = digitalRead(STEP_PIN);
+
+        if (pinState == HIGH) {
+            Serial.println("当前为高电平");
+        } else {
+            Serial.println("当前为低电平");
+            digitalWrite(STEP_PIN, HIGH);
+        }
     }
 
     void resetGpioState() {
