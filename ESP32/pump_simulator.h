@@ -133,7 +133,7 @@ struct TempBasalInfo {
 
 // ========== 队列输注系统 ==========
 static constexpr double STEP_SIZE = 0.3;
-static constexpr int STEP_PIN = 2;
+static constexpr int STEP_PIN = 6;
 
 struct InsulinAction {
     uint32_t executeTimeMs;
@@ -158,7 +158,7 @@ public:
         predictiveLowSuspend(0), predictiveLowSuspendRange(30), lastPrimeNotificationTime(0),
         basalQueueIdx(0), tempBasalQueueIdx(0), bolusQueueIdx(0),
         tempBasalActive(false), basalSuspended(false), tempBasalStartMs(0), lastDeliveryScanTime(0), everActivated(false),
-        gpioState(GpioState::IDLE), gpioStateStartMs(0), gpioRemainingSteps(0), gpioCurrentStep(0) {
+        gpioState(GpioState::IDLE), gpioStateStartMs(0), gpioDeliveryStartMs(0), gpioRemainingSteps(0), gpioCurrentStep(0) {
         currentBolus = nullptr;
         tempBasal = nullptr;
     }
@@ -250,6 +250,9 @@ public:
             Logger::error("pump simulator not initailized yet, please call setup() first");
             return;
         }
+
+        // GPIO 状态机必须在每个循环周期都运行, 实现毫秒级精度的非阻塞输注
+        updateGpioStateMachine();
 
         uint32_t currentTime = millis();
         if (currentTime - lastUpdateTime >= updateIntervalMs) {
@@ -377,6 +380,7 @@ private:
     };
     GpioState gpioState;
     uint32_t gpioStateStartMs;
+    uint32_t gpioDeliveryStartMs;   // 整次输注开始的绝对时间, 用于超时保护
     int gpioRemainingSteps;
     int gpioCurrentStep;
 
@@ -547,7 +551,6 @@ private:
         }
 
         processDeliveryQueues();
-        updateGpioStateMachine();
         updatePrimeProgress();
         resetHourlyDailyCounters();
         checkAndSendStateNotification();
@@ -962,11 +965,19 @@ private:
             return;
         }
 
-        pinMode(STEP_PIN, OUTPUT);
+        // 防重入: 状态机正在运行时禁止重新触发, 避免累积长时间低电平
+        if (gpioState != GpioState::IDLE && gpioState != GpioState::COMPLETED) {
+            Logger::warning("[GPIO] 状态机正在运行, 忽略重复触发, 当前状态=" + String((int)gpioState));
+            return;
+        }
+
         digitalWrite(STEP_PIN, LOW);   // 立即输出开始信号低电平
+        pinMode(STEP_PIN, OUTPUT);
+        
         
         gpioState = GpioState::START_SIGNAL;
         gpioStateStartMs = millis();
+        gpioDeliveryStartMs = gpioStateStartMs;
         gpioRemainingSteps = stepCount;
         gpioCurrentStep = 0;
         
@@ -983,11 +994,22 @@ private:
      *   -> END_SIGNAL (LOW 1000ms) -> COMPLETED
      */
     void updateGpioStateMachine() {
+        // 安全兜底: IDLE 和 COMPLETED 状态下必须确保引脚为高电平
         if (gpioState == GpioState::IDLE || gpioState == GpioState::COMPLETED) {
+            // digitalWrite(STEP_PIN, HIGH);
             return;
         }
 
         uint32_t now = millis();
+
+        // 超时保护: 整次输注超过 60 秒则强制结束, 防止状态机卡死导致长期低电平
+        if (now - gpioDeliveryStartMs >= 60000) {
+            Logger::error("[GPIO] 输注超时 60s, 强制结束, 当前状态=" + String((int)gpioState));
+            digitalWrite(STEP_PIN, HIGH);
+            gpioState = GpioState::COMPLETED;
+            return;
+        }
+
         uint32_t elapsed = now - gpioStateStartMs;
 
         switch (gpioState) {
@@ -1064,12 +1086,19 @@ private:
     void resetGpioState() {
         gpioState = GpioState::IDLE;
         gpioStateStartMs = 0;
+        gpioDeliveryStartMs = 0;
         gpioRemainingSteps = 0;
         gpioCurrentStep = 0;
         digitalWrite(STEP_PIN, HIGH);
     }
 
     void executeQueueAction(InsulinAction& action) {
+        // GPIO 忙时跳过, 由正在运行的状态机处理当前输注
+        if (gpioState != GpioState::IDLE && gpioState != GpioState::COMPLETED) {
+            Logger::warning("[GPIO] 状态机正在运行, executeQueueAction 跳过, 待输注量=" + String(action.stepAmount) + "U");
+            return;
+        }
+
         double stepU = action.stepAmount;
         int stepCount = static_cast<int>(round(stepU / STEP_SIZE));
 

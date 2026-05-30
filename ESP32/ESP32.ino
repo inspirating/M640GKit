@@ -66,8 +66,10 @@ void setup() {
     // 初始化 GPIO2 (STEP_PIN) 作为光耦控制输出, 低电平有效
     // GPIO2 是 ESP32-C3 的 Strapping 引脚, 启动时内部有弱下拉,
     // 必须在 setup() 中尽早设为 OUTPUT 并拉高, 防止启动期间误触发光耦
-    pinMode(STEP_PIN, OUTPUT);
+    // 注意: 必须先 digitalWrite(HIGH) 再 pinMode(OUTPUT),
+    //       否则 pinMode 时输出寄存器默认 LOW, 会先输出短暂低电平
     digitalWrite(STEP_PIN, HIGH);
+    pinMode(STEP_PIN, OUTPUT);
     Serial.println("GPIO2(STEP_PIN) initialized as optocoupler control (active-low, default HIGH)");
 
     // 设置全局实例指针 (用于回调)
