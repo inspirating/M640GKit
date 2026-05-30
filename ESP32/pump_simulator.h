@@ -926,6 +926,8 @@ private:
         double stepU = action.stepAmount;
         int stepCount = static_cast<int>(round(stepU / STEP_SIZE));
 
+        Logger::info("[DEBUG] executeQueueAction called, stepU=" + String(stepU) + "U, stepCount=" + String(stepCount));
+
         // 扣除本次输注量, 更新各项统计
         reservoir = max(0.0, reservoir - stepU);
         activeInsulin += stepU;
@@ -934,11 +936,15 @@ private:
 
         Logger::info("输注完成, 储药器余量: " + String(reservoir) + "U");
         
-        if (stepCount < 1) return ;
+        if (stepCount < 1) {
+            Logger::info("[DEBUG] stepCount < 1, skipping GPIO output");
+            return ;
+        }
 
-        Logger::info("输注: " + String(stepU) + "U, 步进数: " + String(stepCount) + " @" + String(STEP_SIZE) + "U/step");
+        Logger::info("[DEBUG] Starting GPIO output: stepU=" + String(stepU) + "U, stepCount=" + String(stepCount) + " @" + String(STEP_SIZE) + "U/step");
 
         // === 1. 开始信号: 长按 1000ms ===
+        Logger::info("[DEBUG] GPIO start signal: LOW 1000ms");
         pinMode(STEP_PIN, OUTPUT);
         digitalWrite(STEP_PIN, LOW);    // 光耦导通, 模拟按键按下
         delay(1000);                    // 保持 1000ms
@@ -946,7 +952,9 @@ private:
         delay(500);                      // 保持 500ms
 
         // === 2. 步进脉冲: 每步 500ms ===
+        Logger::info("[DEBUG] GPIO step pulses: " + String(stepCount) + " steps");
         for (int i = 0; i < stepCount; i++) {
+            Logger::info("[DEBUG] Step " + String(i+1) + "/" + String(stepCount) + ": LOW 500ms");
             digitalWrite(STEP_PIN, LOW);    // 模拟按键按下
             delay(500);                     // 保持 500ms
             digitalWrite(STEP_PIN, HIGH);   // 模拟按键释放
@@ -956,9 +964,11 @@ private:
         }
 
         // === 3. 结束信号: 长按 1000ms ===
+        Logger::info("[DEBUG] GPIO end signal: LOW 1000ms");
         digitalWrite(STEP_PIN, LOW);    // 光耦导通, 模拟按键按下
         delay(1000);                    // 保持 1000ms
         digitalWrite(STEP_PIN, HIGH);   // 光耦断开, 模拟按键释放
+        Logger::info("[DEBUG] GPIO output completed");
 
     }
 
@@ -980,10 +990,20 @@ private:
      */
     void processDeliveryQueues() {
         uint32_t now = millis();
-        if (patchState != PatchState::ACTIVE && patchState != PatchState::ACTIVE_ALT) return;
+        Logger::info("[DEBUG] processDeliveryQueues called, patchState=" + String(getStateName(patchState)) + 
+                     ", currentBolus=" + String(currentBolus ? "yes" : "null") + 
+                     ", bolusQueue.size=" + String(bolusQueue.size()));
+
+        if (patchState != PatchState::ACTIVE && patchState != PatchState::ACTIVE_ALT) {
+            Logger::info("[DEBUG] patchState not ACTIVE, skipping delivery");
+            return;
+        }
 
         // 5分钟扫描一次；有活跃大剂量时立即执行
-        if (currentBolus == nullptr && now - lastDeliveryScanTime < 300000) return;
+        if (currentBolus == nullptr && now - lastDeliveryScanTime < 300000) {
+            Logger::info("[DEBUG] Skipping delivery: no active bolus and 5min not elapsed");
+            return;
+        }
         lastDeliveryScanTime = now;
 
         // ===== Step 1: 消费临时基础率队列 =====
@@ -1028,6 +1048,7 @@ private:
                 sum += action.stepAmount;
             }
             bolusQueue.clear();
+            Logger::info("[DEBUG] bolusQueue sum=" + String(sum) + "U");
 
             // 3.2 步进补偿: 将总量取整到最近的 STEP_SIZE 边界
             // 由于电机只能按固定步长 (如 0.3U) 动作, 不足一个步长的部分
@@ -1046,9 +1067,11 @@ private:
                 deliverAmount = sum - remainder;
                 carryOver = remainder;
             }
+            Logger::info("[DEBUG] deliverAmount=" + String(deliverAmount) + "U, carryOver=" + String(carryOver) + "U");
 
             // 3.3 执行实际输注 (GPIO 脉冲输出)
             if (deliverAmount > 0.001) {
+                Logger::info("[DEBUG] Calling executeQueueAction with deliverAmount=" + String(deliverAmount) + "U");
                 InsulinAction action;
                 action.stepAmount = deliverAmount;
                 executeQueueAction(action);  // <-- 此处输出 GPIO 信号驱动电机
