@@ -287,52 +287,54 @@ public:
 
     // 假设 STEP_PIN 已经在 setup() 里 pinMode(STEP_PIN, OUTPUT) 并且 digitalWrite(STEP_PIN, HIGH) 了
     void loop() {
-        // 给你 5 秒钟准备观察
         delay(5000); 
         Serial.println("====== 开始模拟完整声响大剂量输注 ======");
 
-        // 第一步：唤醒屏幕 (短按)
+        // 1. 唤醒屏幕 (使用之前成功的参数)
         Serial.println(">>> 1. 唤醒屏幕...");
         digitalWrite(STEP_PIN, LOW);
         delay(200);
         digitalWrite(STEP_PIN, HIGH);
-        delay(1000); // 必须等屏幕完全亮起
+        delay(1500); 
 
-        // 第二步：触发进入声响大剂量模式 (长按)
-        Serial.println(">>> 2. 触发进入声响大剂量...");
+        // 2. 触发进入声响大剂量模式 
+        Serial.println(">>> 2. 触发...");
         digitalWrite(STEP_PIN, LOW);
-        delay(2000); // 长按 2 秒
+        delay(2000); 
         digitalWrite(STEP_PIN, HIGH);
-        delay(1500); // 等待泵“滴”一声，并且界面完全切换过去
+        delay(1500); // 【回退到 1.5s】千万不能太长，否则泵会直接退出模式！
 
-        // 第三步：连续输入步数（假设输入 3 步）
-        int steps = 3;
-        Serial.println(">>> 3. 开始输入步数: " + String(steps) + " 步");
+        // 3. 连续输入 3 步
+        int steps = 10;
+        Serial.println(">>> 3. 输入 3 步...");
         for (int i = 1; i <= steps; i++) {
-            Serial.println("    -> 按下第 " + String(i) + " 步");
             digitalWrite(STEP_PIN, LOW);
-            delay(400);  // 短按 0.4 秒
+            delay(400);  // 按下 0.4s
             digitalWrite(STEP_PIN, HIGH);
-            delay(600);  // 抬起 0.6 秒（留足时间给泵发声反馈，这一步极易翻车）
+            // 【精准微调】0.8s 刚好够泵响完一声，又不会触发无操作超时退出
+            delay(800);  
         }
-        delay(1500); // 输入完毕后，等一下再确认
+        
+        // 输入完毕后，等待泵准备确认
+        delay(1500); 
 
-        // 第四步：第一次长按确认（泵会回放步数声音）
-        Serial.println(">>> 4. 确认输入的步数...");
+        // 4. 第一次长按确认
+        Serial.println(">>> 4. 确认步数...");
         digitalWrite(STEP_PIN, LOW);
         delay(2000);
         digitalWrite(STEP_PIN, HIGH);
-        delay(3000); // 【关键】泵会“滴滴滴”把刚才的 3 步响一遍给你听，必须等它响完！
+        
+        // 听泵回放 3 声提示音 (3步大约需要 3.5s)
+        delay(3500*3.3); 
 
-        // 第五步：第二次长按确认（真正开始推药）
-        Serial.println(">>> 5. 最终确认执行输注...");
+        // 5. 第二次长按确认执行
+        Serial.println(">>> 5. 最终确认执行...");
         digitalWrite(STEP_PIN, LOW);
         delay(2000);
         digitalWrite(STEP_PIN, HIGH);
 
-        Serial.println("====== 指令发送完毕，观察泵是否开始推推杆 ======");
+        Serial.println("====== 指令发送完毕 ======");
 
-        // 死循环卡住，任务完成就不要再发了
         while(1) {
             delay(1000);
         }
