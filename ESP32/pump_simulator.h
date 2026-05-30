@@ -157,7 +157,8 @@ public:
         expirationTimer(0), alarmSetting(0),
         predictiveLowSuspend(0), predictiveLowSuspendRange(30), lastPrimeNotificationTime(0),
         basalQueueIdx(0), tempBasalQueueIdx(0), bolusQueueIdx(0),
-        tempBasalActive(false), basalSuspended(false), tempBasalStartMs(0), lastDeliveryScanTime(0), everActivated(false) {
+        tempBasalActive(false), basalSuspended(false), tempBasalStartMs(0), lastDeliveryScanTime(0), everActivated(false),
+        gpioState(GpioState::IDLE), gpioStateStartMs(0), gpioRemainingSteps(0), gpioCurrentStep(0) {
         currentBolus = nullptr;
         tempBasal = nullptr;
     }
@@ -363,6 +364,22 @@ private:
     uint32_t lastDeliveryScanTime;
     bool everActivated;
 
+    // ========== 非阻塞 GPIO 输注状态机 ==========
+    enum class GpioState : uint8_t {
+        IDLE = 0,
+        START_SIGNAL,
+        START_DELAY,
+        PULSE_ACTIVE,
+        PULSE_DELAY,
+        END_SIGNAL,
+        END_DELAY,
+        COMPLETED
+    };
+    GpioState gpioState;
+    uint32_t gpioStateStartMs;
+    int gpioRemainingSteps;
+    int gpioCurrentStep;
+
     const char* getStateName(PatchState s) {
         switch (s) {
             case PatchState::NONE: return "NONE";
@@ -530,6 +547,7 @@ private:
         }
 
         processDeliveryQueues();
+        updateGpioStateMachine();
         updatePrimeProgress();
         resetHourlyDailyCounters();
         checkAndSendStateNotification();
@@ -635,7 +653,17 @@ private:
     }
 
     void sendPeriodicNotification() {
-        if (currentBolus != nullptr) return;
+        if (currentBolus != nullptr) {
+            // 大剂量期间每 2 秒发送一次状态通知, 让 Trio 更新进度
+            static uint32_t lastBolusNotificationTime = 0;
+            uint32_t now = millis();
+            if (now - lastBolusNotificationTime >= 2000) {
+                lastBolusNotificationTime = now;
+                sendSynchronizeNotification();
+                Logger::info("[BOLUS] 进度通知: 已输送 " + String(currentBolus->delivered) + " / " + String(currentBolus->amount) + "U");
+            }
+            return;
+        }
         if (totalElapsedTime % 5 == 0) {
             sendSynchronizeNotification();
         }
@@ -922,6 +950,125 @@ private:
      *   - 更新 activeInsulin (体内活性胰岛素)
      *   - 更新 hourlyDelivered / dailyDelivered (统计用量)
      */
+    /**
+     * 启动非阻塞 GPIO 输注
+     * 将输注参数保存到状态机变量, 由 updateGpioStateMachine() 在 loop() 中驱动执行
+     */
+    void startGpioDelivery(double stepU, int stepCount) {
+        Logger::info("[DEBUG] startGpioDelivery: stepU=" + String(stepU) + "U, stepCount=" + String(stepCount));
+        
+        if (stepCount < 1) {
+            Logger::info("[DEBUG] stepCount < 1, skipping GPIO output");
+            return;
+        }
+
+        pinMode(STEP_PIN, OUTPUT);
+        digitalWrite(STEP_PIN, LOW);   // 立即输出开始信号低电平
+        
+        gpioState = GpioState::START_SIGNAL;
+        gpioStateStartMs = millis();
+        gpioRemainingSteps = stepCount;
+        gpioCurrentStep = 0;
+        
+        Logger::info("GPIO 输注启动: " + String(stepU) + "U, " + String(stepCount) + " steps");
+    }
+
+    /**
+     * 非阻塞 GPIO 输注状态机
+     * 在 loop() 的每次 update() 中被调用, 不阻塞主循环
+     * 
+     * 时序:
+     *   START_SIGNAL (LOW 1000ms) -> START_DELAY (HIGH 500ms)
+     *   -> PULSE_ACTIVE (LOW 500ms) -> PULSE_DELAY (HIGH 500ms) [重复 stepCount 次]
+     *   -> END_SIGNAL (LOW 1000ms) -> COMPLETED
+     */
+    void updateGpioStateMachine() {
+        if (gpioState == GpioState::IDLE || gpioState == GpioState::COMPLETED) {
+            return;
+        }
+
+        uint32_t now = millis();
+        uint32_t elapsed = now - gpioStateStartMs;
+
+        switch (gpioState) {
+            case GpioState::START_SIGNAL:
+                // 开始信号: LOW 1000ms (已在 startGpioDelivery 中设置 LOW)
+                if (elapsed >= 1000) {
+                    digitalWrite(STEP_PIN, HIGH);
+                    gpioState = GpioState::START_DELAY;
+                    gpioStateStartMs = now;
+                    Logger::info("[GPIO] Start delay: HIGH");
+                }
+                break;
+
+            case GpioState::START_DELAY:
+                // 开始信号后的间隔: HIGH 500ms
+                if (elapsed >= 500) {
+                    digitalWrite(STEP_PIN, LOW);
+                    gpioState = GpioState::PULSE_ACTIVE;
+                    gpioStateStartMs = now;
+                    gpioCurrentStep = 1;
+                    Logger::info("[GPIO] Step 1/" + String(gpioRemainingSteps) + ": LOW");
+                }
+                break;
+
+            case GpioState::PULSE_ACTIVE:
+                // 步进脉冲: LOW 500ms (已在进入时设置 LOW)
+                if (elapsed >= 500) {
+                    digitalWrite(STEP_PIN, HIGH);
+                    gpioState = GpioState::PULSE_DELAY;
+                    gpioStateStartMs = now;
+                }
+                break;
+
+            case GpioState::PULSE_DELAY:
+                // 步间间隔: HIGH 500ms
+                if (elapsed >= 500) {
+                    if (gpioCurrentStep < gpioRemainingSteps) {
+                        gpioCurrentStep++;
+                        digitalWrite(STEP_PIN, LOW);
+                        gpioState = GpioState::PULSE_ACTIVE;
+                        gpioStateStartMs = now;
+                        Logger::info("[GPIO] Step " + String(gpioCurrentStep) + "/" + String(gpioRemainingSteps) + ": LOW");
+                    } else {
+                        digitalWrite(STEP_PIN, LOW);
+                        gpioState = GpioState::END_SIGNAL;
+                        gpioStateStartMs = now;
+                        Logger::info("[GPIO] End signal: LOW");
+                    }
+                }
+                break;
+
+            case GpioState::END_SIGNAL:
+                // 结束信号: LOW 1000ms (已在进入时设置 LOW)
+                if (elapsed >= 1000) {
+                    digitalWrite(STEP_PIN, HIGH);
+                    gpioState = GpioState::COMPLETED;
+                    Logger::info("[GPIO] Delivery completed");
+                }
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    bool isGpioDeliveryComplete() const {
+        return gpioState == GpioState::COMPLETED;
+    }
+
+    bool isGpioIdle() const {
+        return gpioState == GpioState::IDLE;
+    }
+
+    void resetGpioState() {
+        gpioState = GpioState::IDLE;
+        gpioStateStartMs = 0;
+        gpioRemainingSteps = 0;
+        gpioCurrentStep = 0;
+        digitalWrite(STEP_PIN, HIGH);
+    }
+
     void executeQueueAction(InsulinAction& action) {
         double stepU = action.stepAmount;
         int stepCount = static_cast<int>(round(stepU / STEP_SIZE));
@@ -936,40 +1083,8 @@ private:
 
         Logger::info("输注完成, 储药器余量: " + String(reservoir) + "U");
         
-        if (stepCount < 1) {
-            Logger::info("[DEBUG] stepCount < 1, skipping GPIO output");
-            return ;
-        }
-
-        Logger::info("[DEBUG] Starting GPIO output: stepU=" + String(stepU) + "U, stepCount=" + String(stepCount) + " @" + String(STEP_SIZE) + "U/step");
-
-        // === 1. 开始信号: 长按 1000ms ===
-        Logger::info("[DEBUG] GPIO start signal: LOW 1000ms");
-        pinMode(STEP_PIN, OUTPUT);
-        digitalWrite(STEP_PIN, LOW);    // 光耦导通, 模拟按键按下
-        delay(1000);                    // 保持 1000ms
-        digitalWrite(STEP_PIN, HIGH);   // 光耦断开, 模拟按键释放
-        delay(500);                      // 保持 500ms
-
-        // === 2. 步进脉冲: 每步 500ms ===
-        Logger::info("[DEBUG] GPIO step pulses: " + String(stepCount) + " steps");
-        for (int i = 0; i < stepCount; i++) {
-            Logger::info("[DEBUG] Step " + String(i+1) + "/" + String(stepCount) + ": LOW 500ms");
-            digitalWrite(STEP_PIN, LOW);    // 模拟按键按下
-            delay(500);                     // 保持 500ms
-            digitalWrite(STEP_PIN, HIGH);   // 模拟按键释放
-            if (i < stepCount - 1) {
-                delay(500);                  // 步间间隔 50ms, 避免连续触发
-            }
-        }
-
-        // === 3. 结束信号: 长按 1000ms ===
-        Logger::info("[DEBUG] GPIO end signal: LOW 1000ms");
-        digitalWrite(STEP_PIN, LOW);    // 光耦导通, 模拟按键按下
-        delay(1000);                    // 保持 1000ms
-        digitalWrite(STEP_PIN, HIGH);   // 光耦断开, 模拟按键释放
-        Logger::info("[DEBUG] GPIO output completed");
-
+        // 启动非阻塞 GPIO 输注
+        startGpioDelivery(stepU, stepCount);
     }
 
     /**
