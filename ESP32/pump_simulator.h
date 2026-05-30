@@ -370,12 +370,12 @@ private:
     // ========== 非阻塞 GPIO 输注状态机 ==========
     enum class GpioState : uint8_t {
         IDLE = 0,
-        START_SIGNAL,
-        START_DELAY,
-        PULSE_ACTIVE,
-        PULSE_DELAY,
-        MID_DELAY,        // 步进结束后等待3s, 再执行真正的输入按压
-        END_SIGNAL,
+        START_SIGNAL,       // 按压1s唤醒
+        START_DELAY,        PULSE_ACTIVE,
+        PULSE_DELAY,        // 抬起间隔500ms
+        CONFIRM_PRESS,      // 按压1s确认
+        CONFIRM_DELAY,      // 等待(0.5*步数)s, 让泵处理输入
+        END_SIGNAL,         // 按压1s真正输入
         COMPLETED
     };
     GpioState gpioState;
@@ -383,6 +383,7 @@ private:
     uint32_t gpioDeliveryStartMs;   // 整次输注开始的绝对时间, 用于超时保护
     int gpioRemainingSteps;
     int gpioCurrentStep;
+    int gpioTotalSteps;
 
     const char* getStateName(PatchState s) {
         switch (s) {
@@ -981,6 +982,7 @@ private:
         gpioDeliveryStartMs = gpioStateStartMs;
         gpioRemainingSteps = stepCount;
         gpioCurrentStep = 0;
+        gpioTotalSteps = stepCount;
         
         Logger::info("GPIO 输注启动: " + String(stepU) + "U, " + String(stepCount) + " steps");
     }
@@ -992,17 +994,16 @@ private:
      * 时序:
      *   START_SIGNAL (LOW 1000ms) -> START_DELAY (HIGH 500ms)
      *   -> PULSE_ACTIVE (LOW 500ms) -> PULSE_DELAY (HIGH 500ms) [重复 stepCount 次]
-     *   -> MID_DELAY (HIGH 3000ms) -> END_SIGNAL (LOW 1000ms) -> COMPLETED
+     *   -> CONFIRM_PRESS (LOW 1000ms) -> CONFIRM_DELAY (HIGH 步数×500ms)
+     *   -> END_SIGNAL (LOW 1000ms) -> COMPLETED
      */
     void updateGpioStateMachine() {
-        // IDLE 状态下不操作 GPIO, 仅 COMPLETED 状态需要确保引脚回到高电平
         if (gpioState == GpioState::IDLE) {
             return;
         }
 
         static bool completedPinSet = false;
         if (gpioState == GpioState::COMPLETED) {
-            // 输注刚完成时确保引脚为高电平, 之后不再操作
             if (!completedPinSet) {
                 digitalWrite(STEP_PIN, HIGH);
                 completedPinSet = true;
@@ -1010,12 +1011,10 @@ private:
             return;
         }
 
-        // 状态机开始运行, 重置完成标志
         completedPinSet = false;
 
         uint32_t now = millis();
 
-        // 超时保护: 整次输注超过 30 秒则强制结束, 防止状态机卡死导致长期低电平
         if (now - gpioDeliveryStartMs >= 30000) {
             Logger::error("[GPIO] 输注超时 30s, 强制结束, 当前状态=" + String((int)gpioState));
             digitalWrite(STEP_PIN, HIGH);
@@ -1035,7 +1034,7 @@ private:
                     Logger::info("[GPIO] Start release: HIGH");
                 }
                 break;
-
+                    
             case GpioState::START_DELAY:
                 // 抬起后的间隔: HIGH 500ms
                 if (elapsed >= 1000) {
@@ -1050,45 +1049,49 @@ private:
                 break;
 
             case GpioState::PULSE_ACTIVE:
-                // 步进脉冲: LOW 500ms (模拟按键输入一步)
                 if (elapsed >= 1000) {
                     digitalWrite(STEP_PIN, HIGH);
+                    gpioCurrentStep++;
                     gpioState = GpioState::PULSE_DELAY;
                     gpioStateStartMs = now;
                 }
                 break;
 
             case GpioState::PULSE_DELAY:
-                // 步间间隔: HIGH 500ms
-                if (elapsed >= 500) {
+                if (elapsed >= 1000) {
                     if (gpioCurrentStep < gpioRemainingSteps) {
-                        gpioCurrentStep++;
                         digitalWrite(STEP_PIN, LOW);
                         gpioState = GpioState::PULSE_ACTIVE;
                         gpioStateStartMs = now;
                         Logger::info("[GPIO] Step " + String(gpioCurrentStep) + "/" + String(gpioRemainingSteps) + ": LOW");
                     } else {
-                        // 所有步进已输出完毕, 进入等待3s阶段
                         digitalWrite(STEP_PIN, HIGH);
-                        gpioState = GpioState::MID_DELAY;
+                        gpioState = GpioState::CONFIRM_PRESS;
                         gpioStateStartMs = now;
-                        Logger::info("[GPIO] Steps done, wait 3s before final press: HIGH");
+                        Logger::info("[GPIO] Steps done, confirm now: HIGH");
                     }
                 }
                 break;
 
-            case GpioState::MID_DELAY:
-                // 等待3s: HIGH 3000ms, 让用户准备好接收真正的输入
-                if (elapsed >= 3000) {
+            case GpioState::CONFIRM_PRESS:
+                if (elapsed >= 1000) {
+                    digitalWrite(STEP_PIN, HIGH);
+                    gpioState = GpioState::CONFIRM_DELAY;
+                    gpioStateStartMs = now;
+                    Logger::info("[GPIO] Confirm release: HIGH");
+                }
+                break;
+
+            case GpioState::CONFIRM_DELAY:
+                if (elapsed >= static_cast<uint32_t>(gpioTotalSteps * 500)) {
                     digitalWrite(STEP_PIN, LOW);
                     gpioState = GpioState::END_SIGNAL;
                     gpioStateStartMs = now;
-                    Logger::info("[GPIO] Final press: LOW");
+                    Logger::info("[GPIO] Wait " + String(gpioTotalSteps * 500 / 1000) + "s done, final press: LOW");
                 }
                 break;
 
             case GpioState::END_SIGNAL:
-                // 结束信号: 再按压1s模拟真正的输入 (LOW 1000ms)
                 if (elapsed >= 1000) {
                     digitalWrite(STEP_PIN, HIGH);
                     gpioState = GpioState::COMPLETED;
@@ -1115,6 +1118,7 @@ private:
         gpioDeliveryStartMs = 0;
         gpioRemainingSteps = 0;
         gpioCurrentStep = 0;
+        gpioTotalSteps = 0;
     }
 
     void executeQueueAction(InsulinAction& action) {
