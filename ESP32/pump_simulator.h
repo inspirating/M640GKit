@@ -133,7 +133,7 @@ struct TempBasalInfo {
 
 // ========== 队列输注系统 ==========
 static constexpr double STEP_SIZE = 0.3;
-static constexpr int STEP_PIN = 2;
+static constexpr int STEP_PIN = 3;
 
 struct InsulinAction {
     uint32_t executeTimeMs;
@@ -336,6 +336,7 @@ private:
     bool patchStateDirty;
     bool pendingBleDisconnect;
     bool nvsClearPending;
+
     uint32_t advertisingResumeTime;
     uint32_t lastPrimeNotificationTime;
 
@@ -1578,6 +1579,11 @@ private:
                 Logger::info("大剂量已加入队列: " + String(amount) + "U");
             }
             Logger::info("大剂量已开始输送: " + String(amount) + "U");
+
+            // 立即回复成功, 避免 iOS 端 30 秒 BLE 超时导致双重错误通知
+            // 泵会通过 state notification 报告大剂量进度和完成状态
+            sendResponse(CommandType::SET_BOLUS, seqNum, nullptr, 0);
+            return;
         }
         sendResponse(CommandType::SET_BOLUS, seqNum, nullptr, 0);
     }
