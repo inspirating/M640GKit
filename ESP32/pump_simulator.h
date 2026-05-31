@@ -996,15 +996,52 @@ private:
         Logger::info("临时基础率队列已构建: " + String(tempBasalQueue.size()) + " steps @ " + String(rate) + "U/hr x " + String(durationMinutes) + "min");
     }
 
-    void startGpioDelivery(double stepU, int stepCount) {
-        Logger::info("[DEBUG] startGpioDelivery: stepU=" + String(stepU) + "U, stepCount=" + String(stepCount));
-        if (stepCount < 1) return;
+    // void startGpioDelivery(double stepU, int stepCount) {
+    //     Logger::info("[DEBUG] startGpioDelivery: stepU=" + String(stepU) + "U, stepCount=" + String(stepCount));
+    //     if (stepCount < 1) return;
         
-        gpioDeliveryStartMs = millis();
-        gpioRemainingSteps = stepCount;
-        gpioCurrentStep = 0;
-        gpioTotalSteps = stepCount;
-        Logger::info("GPIO 输注启动: " + String(stepU) + "U, " + String(stepCount) + " steps");
+    //     gpioDeliveryStartMs = millis();
+    //     gpioRemainingSteps = stepCount;
+    //     gpioCurrentStep = 0;
+    //     gpioTotalSteps = stepCount;
+    //     Logger::info("GPIO 输注启动: " + String(stepU) + "U, " + String(stepCount) + " steps");
+    // }
+
+    void startGpioDelivery(double stepU, int stepCount) {
+        if (stepCount < 1) return;
+
+        if (xSemaphoreTake(xSemaphore, 0) == pdTRUE) {
+            
+            if (isDeliveryTaskRunning) {
+                xSemaphoreGive(xSemaphore); // 释放锁并退出
+                return;
+            }
+
+            isDeliveryTaskRunning = true; // 开始任务
+
+            pinMode(STEP_PIN, OUTPUT);
+            digitalWrite(STEP_PIN, HIGH); // 确保初始状态为抬起
+            
+            gpioRemainingSteps = stepCount;
+            isDeliveryTaskRunning = true; // 上锁
+
+            // 创建 FreeRTOS 线程！
+            // 参数: 函数名, 线程名称, 栈大小(字节), 传参(this), 优先级(1即可), 句柄(不用管设为NULL)
+            xTaskCreate(gpioDeliveryTask, "PumpDelivery", 4096, this, 1, NULL);
+            
+            Logger::info("GPIO 独立线程已派发: " + String(stepU) + "U, " + String(stepCount) + " steps");
+            
+            xSemaphoreGive(xSemaphore); // 任务派发后释放锁
+        } else {
+            Logger::warning("[GPIO] 正在输注中，本次请求被忽略");
+        }
+
+        // // 防重入：如果上一个线程还没跑完，忽略新的触发
+        // if (isDeliveryTaskRunning) {
+        //     Logger::warning("[GPIO] 上一笔输注线程尚未结束，忽略本次触发");
+        //     return;
+        // }
+
     }
 
     void resetGpioState() {
