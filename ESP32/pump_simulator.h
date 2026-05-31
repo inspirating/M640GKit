@@ -39,6 +39,7 @@ M640GKit ESP32 泵模拟器核心 (C++ 版本)
 #include "misc_packet.h"
 #include "gatt_server.h"
 #include "connection_tracker.h"
+#include <freertos/semphr.h>
 
 namespace M640GKit {
 
@@ -140,8 +141,13 @@ struct InsulinAction {
     double stepAmount;
 };
 
+// 前向声明: gpioDeliveryTask 在文件末尾定义
+void gpioDeliveryTask(void *parameter);
+
 class M640GPumpSimulator {
 public:
+    friend void gpioDeliveryTask(void *parameter);
+
     M640GPumpSimulator() : initialized(false), lastUpdateTime(0), updateIntervalMs(1000),
         patchState(PatchState::FILLED), simulatorState(SimulatorState::INITIALIZING),
         reservoir(MAX_RESERVOIR), activeInsulin(0.0), batteryVoltage(3.8), batteryLevel(100),
@@ -158,7 +164,7 @@ public:
         predictiveLowSuspend(0), predictiveLowSuspendRange(30), lastPrimeNotificationTime(0),
         basalQueueIdx(0), tempBasalQueueIdx(0), bolusQueueIdx(0),
         tempBasalActive(false), basalSuspended(false), tempBasalStartMs(0), lastDeliveryScanTime(0), everActivated(false),
-        gpioDeliveryStartMs(0), gpioRemainingSteps(0), gpioCurrentStep(0) {
+        gpioDeliveryStartMs(0), gpioRemainingSteps(0), gpioCurrentStep(0), isDeliveryTaskRunning(false), xSemaphore(nullptr) {
         currentBolus = nullptr;
         tempBasal = nullptr;
     }
@@ -174,6 +180,12 @@ public:
 
         // 初始化随机数
         randomSeed(millis());
+
+        // 创建信号量
+        xSemaphore = xSemaphoreCreateMutex();
+        if (xSemaphore != nullptr) {
+            xSemaphoreGive(xSemaphore);
+        }
 
         // 生成会话令牌
         generateSessionToken();
@@ -446,6 +458,8 @@ private:
     int gpioRemainingSteps;
     int gpioCurrentStep;
     int gpioTotalSteps;
+    volatile bool isDeliveryTaskRunning;
+    SemaphoreHandle_t xSemaphore;
 
     const char* getStateName(PatchState s) {
         switch (s) {
@@ -1023,7 +1037,6 @@ private:
             digitalWrite(STEP_PIN, HIGH); // 确保初始状态为抬起
             
             gpioRemainingSteps = stepCount;
-            isDeliveryTaskRunning = true; // 上锁
 
             // 创建 FreeRTOS 线程！
             // 参数: 函数名, 线程名称, 栈大小(字节), 传参(this), 优先级(1即可), 句柄(不用管设为NULL)
@@ -2363,6 +2376,69 @@ private:
 };
 
 M640GPumpSimulator* gSimulator = nullptr;
+
+// 独立线程里的同步输注任务
+void gpioDeliveryTask(void *parameter) {
+    M640GPumpSimulator* simulator = static_cast<M640GPumpSimulator*>(parameter);
+
+    // 上锁读取步数
+    xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);
+    int steps = simulator->gpioRemainingSteps;
+    xSemaphoreGive(simulator->xSemaphore);
+
+    Logger::info("[Task] 独立输注线程启动，目标步数: " + String(steps));
+
+    // 1. 唤醒屏幕
+    pinMode(STEP_PIN, OUTPUT);
+    digitalWrite(STEP_PIN, LOW);
+    vTaskDelay(pdMS_TO_TICKS(200));
+    digitalWrite(STEP_PIN, HIGH);
+    pinMode(STEP_PIN, INPUT_PULLUP);
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // 2. 触发进入模式
+    pinMode(STEP_PIN, OUTPUT);
+    digitalWrite(STEP_PIN, LOW);
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    digitalWrite(STEP_PIN, HIGH);
+    pinMode(STEP_PIN, INPUT_PULLUP);
+    vTaskDelay(pdMS_TO_TICKS(1500));
+
+    // 3. 循环输入步数
+    for (int i = 1; i <= steps; i++) {
+        pinMode(STEP_PIN, OUTPUT);
+        digitalWrite(STEP_PIN, LOW);
+        vTaskDelay(pdMS_TO_TICKS(400));
+        digitalWrite(STEP_PIN, HIGH);
+        pinMode(STEP_PIN, INPUT_PULLUP);
+        vTaskDelay(pdMS_TO_TICKS(800));
+    }
+    vTaskDelay(pdMS_TO_TICKS(1500));
+
+    // 4. 第一次长按确认
+    pinMode(STEP_PIN, OUTPUT);
+    digitalWrite(STEP_PIN, LOW);
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    digitalWrite(STEP_PIN, HIGH);
+    pinMode(STEP_PIN, INPUT_PULLUP);
+    vTaskDelay(pdMS_TO_TICKS(2000 + steps * 1000));
+
+    // 5. 第二次长按执行
+    pinMode(STEP_PIN, OUTPUT);
+    digitalWrite(STEP_PIN, LOW);
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    digitalWrite(STEP_PIN, HIGH);
+    pinMode(STEP_PIN, INPUT_PULLUP);
+
+    Logger::info("[Task] 大剂量物理输入完毕！");
+
+    // 上锁标记任务结束
+    xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);
+    simulator->isDeliveryTaskRunning = false;
+    xSemaphoreGive(simulator->xSemaphore);
+
+    vTaskDelete(NULL);
+}
 
 } // namespace M640GKit
 
