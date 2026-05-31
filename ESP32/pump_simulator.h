@@ -1037,7 +1037,14 @@ private:
 
             // 创建 FreeRTOS 线程！
             // 参数: 函数名, 线程名称, 栈大小(字节), 传参(this), 优先级(1即可), 句柄(不用管设为NULL)
-            xTaskCreate(gpioDeliveryTask, "PumpDelivery", 8192, this, 1, NULL);
+            BaseType_t taskCreated = xTaskCreate(gpioDeliveryTask, "PumpDelivery", 8192, this, 1, NULL);
+            
+            if (taskCreated != pdPASS) {
+                Logger::error("[GPIO] xTaskCreate 失败！无法创建输注线程");
+                isDeliveryTaskRunning = false;
+                xSemaphoreGive(xSemaphore);
+                return;
+            }
             
             Logger::info("GPIO 独立线程已派发: " + String(stepU) + "U, " + String(stepCount) + " steps");
             
@@ -1062,7 +1069,7 @@ private:
     }
 
     bool isGpioDeliveryComplete() const {
-        return true;
+        return !isDeliveryTaskRunning;
     }
 
     void executeQueueAction(InsulinAction& action) {
@@ -1117,6 +1124,12 @@ private:
             return;
         }
         lastDeliveryScanTime = now;
+
+        // GPIO 输注线程在运行中时，跳过队列处理（等待输注完成后由下次扫描执行）
+        if (isDeliveryTaskRunning) {
+            Logger::info("[DEBUG] GPIO 输注线程正在运行，跳过本次队列处理");
+            return;
+        }
 
         // ===== Step 1: 消费临时基础率队列 =====
         // 将已到期 (executeTimeMs <= now) 的临时基础率动作移入 bolusQueue,
@@ -1189,24 +1202,10 @@ private:
                 executeQueueAction(action);  // <-- 此处输出 GPIO 信号驱动电机
 
                 // 3.4 大剂量进度追踪
-                // 如果当前有大剂量在执行, 更新已输送量并检查是否完成
-                if (currentBolus) {
-                    double bolusRemaining = currentBolus->amount - currentBolus->delivered;
-                    double bolusPortion = min(bolusRemaining, deliverAmount);
-                    currentBolus->delivered += bolusPortion;
-
-                    // 大剂量已完成 (考虑浮点误差 0.001)
-                    if (currentBolus->delivered >= currentBolus->amount - 0.001) {
-                        double finalDelivered = currentBolus->amount;
-                        bolusHistory.push_back(*currentBolus);
-                        Logger::info("大剂量输送完成: " + String(finalDelivered) + "U");
-                        sendStateNotification();  // 通知 App 大剂量已完成
-                        delete currentBolus;
-                        currentBolus = nullptr;
-                        bolusDeliveryProgress = 0;
-                        lastReportedBolusProgress = 0;
-                    }
-                }
+                // delivered 保持不变(保持 0)，由 Trio 的 M640GDoseProgressReporter 基于时间估算进度。
+                // 实际 delivered 在 section 3.6 GPIO task 结束后统一设为全额。
+                // 避免同步通知提前带上"已完成"标志导致进度条提前结束。
+                (void)0; // no-op
             }
 
             // 3.5 将步进补偿的余量 carryOver 重新放入队列, 下次累积执行
@@ -1217,24 +1216,19 @@ private:
             }
         }
 
-        // 3.6 大剂量完成检查: GPIO 已完成但剩余量不足一个步长时, 直接完成大剂量
-        // 步进电机只能按 STEP_SIZE 整数倍输注, 当剩余量 < STEP_SIZE 时无法继续,
-        // 继续等待只会导致 carryOver 死循环, 进度条卡死不结束。
+        // 3.6 大剂量完成检查: 等 GPIO task 真正结束后才发送完成通知
         if (currentBolus && isGpioDeliveryComplete()) {
-            double bolusRemaining = currentBolus->amount - currentBolus->delivered;
-            if (bolusRemaining < STEP_SIZE) {
-                Logger::info("大剂量剩余 " + String(bolusRemaining) + "U 不足一个步长(" + String(STEP_SIZE) + "U), 标记完成");
-                currentBolus->delivered = currentBolus->amount;
-                bolusHistory.push_back(*currentBolus);
-                sendStateNotification();
-                delete currentBolus;
-                currentBolus = nullptr;
-                bolusDeliveryProgress = 0;
-                lastReportedBolusProgress = 0;
-                bolusQueue.clear();
-                bolusQueueIdx = 0;
-                resetGpioState();
-            }
+            Logger::info("大剂量完成检查: GPIO task 已结束, 标记完成");
+            currentBolus->delivered = currentBolus->amount;
+            bolusHistory.push_back(*currentBolus);
+            sendStateNotification();
+            delete currentBolus;
+            currentBolus = nullptr;
+            bolusDeliveryProgress = 0;
+            lastReportedBolusProgress = 0;
+            bolusQueue.clear();
+            bolusQueueIdx = 0;
+            resetGpioState();
         }
     }
 
