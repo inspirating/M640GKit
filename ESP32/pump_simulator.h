@@ -144,6 +144,17 @@ struct InsulinAction {
 // 前向声明: gpioDeliveryTask 在文件末尾定义
 void gpioDeliveryTask(void *parameter);
 
+void safeDelay(int ms) {
+    long start = millis();
+    while (millis() - start < ms) {
+        // 【关键】如果你的模拟器有 update() 或处理通信的方法，必须在这里调用
+        // 比如：simulator.update(); 或者 BLEDevice::handle();
+        // 这样可以防止 BLE 协议栈崩溃导致泵页面被强制撤销
+        vTaskDelay(pdMS_TO_TICKS(5)); 
+    }
+}
+
+
 class M640GPumpSimulator {
 public:
     friend void gpioDeliveryTask(void *parameter);
@@ -269,6 +280,49 @@ public:
         }
     }
 
+    // void loop() {
+    //     int steps = 10;
+
+    //     safeDelay(5000);
+
+    //     // 1. 唤醒屏幕
+    //     digitalWrite(STEP_PIN, LOW);
+    //     safeDelay(200);
+    //     digitalWrite(STEP_PIN, HIGH);
+    //     safeDelay(1000);
+
+    //     // 2. 触发进入模式
+    //     digitalWrite(STEP_PIN, LOW);
+    //     safeDelay(2000);
+    //     digitalWrite(STEP_PIN, HIGH);
+    //     safeDelay(2000);
+
+    //     // 3. 循环输入步数
+    //     for (int i = 1; i <= steps; i++) {
+    //         digitalWrite(STEP_PIN, LOW);
+    //         safeDelay(400);
+    //         digitalWrite(STEP_PIN, HIGH);
+    //         safeDelay(600);
+    //     }
+
+    //     safeDelay(3000);
+
+    //     // 4. 第一次长按确认
+    //     digitalWrite(STEP_PIN, LOW);
+    //     safeDelay(4000);
+    //     digitalWrite(STEP_PIN, HIGH);
+    //     safeDelay(steps * 3000);
+
+    //     // 5. 第二次长按执行
+    //     digitalWrite(STEP_PIN, LOW);
+    //     safeDelay(2000);
+    //     digitalWrite(STEP_PIN, HIGH);
+
+    //     // 死循环卡住，任务完成就不要再发了
+    //     while(1) {
+    //         delay(1000);
+    //     }
+    // }
 
     // // 极性假设：如果这样不行，把所有的 LOW 换成 HIGH，HIGH 换成 LOW 再试一次！
     // void loop() {
@@ -1093,7 +1147,7 @@ private:
 
             // 创建 FreeRTOS 线程！
             // 参数: 函数名, 线程名称, 栈大小(字节), 传参(this), 优先级(1即可), 句柄(不用管设为NULL)
-            BaseType_t taskCreated = xTaskCreate(gpioDeliveryTask, "PumpDelivery", 8192, this, 1, NULL);
+            BaseType_t taskCreated = xTaskCreate(gpioDeliveryTask, "PumpDelivery", 8192, this, -1, NULL);
             
             if (taskCreated != pdPASS) {
                 Logger::error("[GPIO] xTaskCreate 失败！无法创建输注线程");
@@ -2422,6 +2476,7 @@ private:
     }
 };
 
+
 M640GPumpSimulator* gSimulator = nullptr;
 
 // 5000 wait
@@ -2437,85 +2492,61 @@ void gpioDeliveryTask(void *parameter) {
     M640GPumpSimulator* simulator = static_cast<M640GPumpSimulator*>(parameter);
 
     // 上锁读取步数
-    xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);
+    // xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);
     int steps = simulator->gpioRemainingSteps;
-    xSemaphoreGive(simulator->xSemaphore);
+    // xSemaphoreGive(simulator->xSemaphore);
 
     Logger::info("[Task] 独立输注线程启动");
 
-    uint32_t taskStartMs = millis();
-    const uint32_t TASK_TIMEOUT_MS = 120000; // 120 秒超时兜底
-
-    // 超时检查辅助宏: 超时则跳转到 finish 标签
-    #define CHECK_TIMEOUT() do { \
-        if (millis() - taskStartMs >= TASK_TIMEOUT_MS) { \
-            Logger::error("[Task] 输注超时 120s，强制结束"); \
-            goto finish; \
-        } \
-    } while(0)
-
     // delay(5000); 
-    vTaskDelay(pdMS_TO_TICKS(5000));
+    safeDelay(5000);
 
     // 1. 唤醒屏幕
-    pinMode(STEP_PIN, OUTPUT);
     digitalWrite(STEP_PIN, LOW);
-    vTaskDelay(pdMS_TO_TICKS(200));
+    safeDelay(200);
     digitalWrite(STEP_PIN, HIGH);
-    CHECK_TIMEOUT();
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    safeDelay(1000);
 
     // 2. 触发进入模式
-    CHECK_TIMEOUT();
-    pinMode(STEP_PIN, OUTPUT);
     digitalWrite(STEP_PIN, LOW);
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    safeDelay(2000);
     digitalWrite(STEP_PIN, HIGH);
-    CHECK_TIMEOUT();
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    safeDelay(2000);
 
     // 3. 循环输入步数
-    CHECK_TIMEOUT();
     for (int i = 1; i <= steps; i++) {
-        CHECK_TIMEOUT();
         digitalWrite(STEP_PIN, LOW);
-        vTaskDelay(pdMS_TO_TICKS(400));
+        safeDelay(400);
         digitalWrite(STEP_PIN, HIGH);
-        vTaskDelay(pdMS_TO_TICKS(600));
+        safeDelay(600);
     }
-    CHECK_TIMEOUT();
-    vTaskDelay(pdMS_TO_TICKS(3000));
+
+    safeDelay(3000);
 
     // 4. 第一次长按确认
-    CHECK_TIMEOUT();
-    pinMode(STEP_PIN, OUTPUT);
     digitalWrite(STEP_PIN, LOW);
-    vTaskDelay(pdMS_TO_TICKS(4000));
+    safeDelay(4000);
     digitalWrite(STEP_PIN, HIGH);
-    CHECK_TIMEOUT();
-    vTaskDelay(pdMS_TO_TICKS(steps * 3000));
+    safeDelay(steps * 3000);
 
     // 5. 第二次长按执行
-    CHECK_TIMEOUT();
     digitalWrite(STEP_PIN, LOW);
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    safeDelay(2000);
     digitalWrite(STEP_PIN, HIGH);
-    // pinMode(STEP_PIN, INPUT_PULLUP);
 
     Logger::info("[Task] 大剂量物理输入完毕");
 
 finish:
     // 确保 GPIO 安全
-    // digitalWrite(STEP_PIN, HIGH);
-    // pinMode(STEP_PIN, INPUT_PULLUP);
 
     // 上锁标记任务结束
-    xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);
+    // xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);
     simulator->isDeliveryTaskRunning = false;
-    xSemaphoreGive(simulator->xSemaphore);
+    // xSemaphoreGive(simulator->xSemaphore);
 
     vTaskDelete(NULL);
 }
+
 
 #undef CHECK_TIMEOUT
 
