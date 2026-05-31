@@ -158,7 +158,7 @@ public:
         predictiveLowSuspend(0), predictiveLowSuspendRange(30), lastPrimeNotificationTime(0),
         basalQueueIdx(0), tempBasalQueueIdx(0), bolusQueueIdx(0),
         tempBasalActive(false), basalSuspended(false), tempBasalStartMs(0), lastDeliveryScanTime(0), everActivated(false),
-        gpioState(GpioState::IDLE), gpioStateStartMs(0), gpioDeliveryStartMs(0), gpioRemainingSteps(0), gpioCurrentStep(0) {
+        gpioDeliveryStartMs(0), gpioRemainingSteps(0), gpioCurrentStep(0) {
         currentBolus = nullptr;
         tempBasal = nullptr;
     }
@@ -245,18 +245,18 @@ public:
         Serial.println("[PUMP] Setup complete!");
     }
 
-    // void loop() {
-    //     if (!initialized) {
-    //         Logger::error("pump simulator not initailized yet, please call setup() first");
-    //         return;
-    //     }
+    void loop() {
+        if (!initialized) {
+            Logger::error("pump simulator not initailized yet, please call setup() first");
+            return;
+        }
 
-    //     uint32_t currentTime = millis();
-    //     if (currentTime - lastUpdateTime >= updateIntervalMs) {
-    //         lastUpdateTime = currentTime;
-    //         update();
-    //     }
-    // }
+        uint32_t currentTime = millis();
+        if (currentTime - lastUpdateTime >= updateIntervalMs) {
+            lastUpdateTime = currentTime;
+            update();
+        }
+    }
 
     // // 极性假设：如果这样不行，把所有的 LOW 换成 HIGH，HIGH 换成 LOW 再试一次！
     // void loop() {
@@ -282,58 +282,58 @@ public:
     //     }
     // }
 
-    // 假设 STEP_PIN 已经在 setup() 里 pinMode(STEP_PIN, OUTPUT) 并且 digitalWrite(STEP_PIN, HIGH) 了
-    void loop() {
-        // 给你 5 秒钟准备观察
-        delay(5000); 
-        Serial.println("====== 开始模拟完整声响大剂量输注 ======");
+    // // 假设 STEP_PIN 已经在 setup() 里 pinMode(STEP_PIN, OUTPUT) 并且 digitalWrite(STEP_PIN, HIGH) 了
+    // void loop() {
+    //     // 给你 5 秒钟准备观察
+    //     delay(5000); 
+    //     Serial.println("====== 开始模拟完整声响大剂量输注 ======");
 
-        // 第一步：唤醒屏幕 (短按)
-        Serial.println(">>> 1. 唤醒屏幕...");
-        digitalWrite(STEP_PIN, LOW);
-        delay(200);
-        digitalWrite(STEP_PIN, HIGH);
-        delay(1000); // 必须等屏幕完全亮起
+    //     // 第一步：唤醒屏幕 (短按)
+    //     Serial.println(">>> 1. 唤醒屏幕...");
+    //     digitalWrite(STEP_PIN, LOW);
+    //     delay(200);
+    //     digitalWrite(STEP_PIN, HIGH);
+    //     delay(1000); // 必须等屏幕完全亮起
 
-        // 第二步：触发进入声响大剂量模式 (长按)
-        Serial.println(">>> 2. 触发进入声响大剂量...");
-        digitalWrite(STEP_PIN, LOW);
-        delay(2000); // 长按 2 秒
-        digitalWrite(STEP_PIN, HIGH);
-        delay(2000); // 等待泵“滴”一声，并且界面完全切换过去
+    //     // 第二步：触发进入声响大剂量模式 (长按)
+    //     Serial.println(">>> 2. 触发进入声响大剂量...");
+    //     digitalWrite(STEP_PIN, LOW);
+    //     delay(2000); // 长按 2 秒
+    //     digitalWrite(STEP_PIN, HIGH);
+    //     delay(2000); // 等待泵“滴”一声，并且界面完全切换过去
 
-        // 第三步：连续输入步数（假设输入 3 步）
-        int steps = 10;
-        Serial.println(">>> 3. 开始输入步数: " + String(steps) + " 步");
-        for (int i = 1; i <= steps; i++) {
-            Serial.println("    -> 按下第 " + String(i) + " 步");
-            digitalWrite(STEP_PIN, LOW);
-            delay(400);  // 短按 0.4 秒
-            digitalWrite(STEP_PIN, HIGH);
-            delay(600);  // 抬起 0.6 秒（留足时间给泵发声反馈，这一步极易翻车）
-        }
-        delay(3000); // 输入完毕后，等一下再确认
+    //     // 第三步：连续输入步数（假设输入 3 步）
+    //     int steps = 10;
+    //     Serial.println(">>> 3. 开始输入步数: " + String(steps) + " 步");
+    //     for (int i = 1; i <= steps; i++) {
+    //         Serial.println("    -> 按下第 " + String(i) + " 步");
+    //         digitalWrite(STEP_PIN, LOW);
+    //         delay(400);  // 短按 0.4 秒
+    //         digitalWrite(STEP_PIN, HIGH);
+    //         delay(600);  // 抬起 0.6 秒（留足时间给泵发声反馈，这一步极易翻车）
+    //     }
+    //     delay(3000); // 输入完毕后，等一下再确认
 
-        // 第四步：第一次长按确认（泵会回放步数声音）
-        Serial.println(">>> 4. 确认输入的步数...");
-        digitalWrite(STEP_PIN, LOW);
-        delay(4000);
-        digitalWrite(STEP_PIN, HIGH);
-        delay(3000*8); // 【关键】泵会“滴滴滴”把刚才的 3 步响一遍给你听，必须等它响完！
+    //     // 第四步：第一次长按确认（泵会回放步数声音）
+    //     Serial.println(">>> 4. 确认输入的步数...");
+    //     digitalWrite(STEP_PIN, LOW);
+    //     delay(4000);
+    //     digitalWrite(STEP_PIN, HIGH);
+    //     delay(3000*8); // 【关键】泵会“滴滴滴”把刚才的 3 步响一遍给你听，必须等它响完！
 
-        // 第五步：第二次长按确认（真正开始推药）
-        Serial.println(">>> 5. 最终确认执行输注...");
-        digitalWrite(STEP_PIN, LOW);
-        delay(2000);
-        digitalWrite(STEP_PIN, HIGH);
+    //     // 第五步：第二次长按确认（真正开始推药）
+    //     Serial.println(">>> 5. 最终确认执行输注...");
+    //     digitalWrite(STEP_PIN, LOW);
+    //     delay(2000);
+    //     digitalWrite(STEP_PIN, HIGH);
 
-        Serial.println("====== 指令发送完毕，观察泵是否开始推推杆 ======");
+    //     Serial.println("====== 指令发送完毕，观察泵是否开始推推杆 ======");
 
-        // 死循环卡住，任务完成就不要再发了
-        while(1) {
-            delay(1000);
-        }
-    }
+    //     // 死循环卡住，任务完成就不要再发了
+    //     while(1) {
+    //         delay(1000);
+    //     }
+    // }
 
 
 private:
@@ -1012,6 +1012,10 @@ private:
         gpioRemainingSteps = 0;
         gpioCurrentStep = 0;
         gpioTotalSteps = 0;
+    }
+
+    bool isGpioDeliveryComplete() const {
+        return true;
     }
 
     void executeQueueAction(InsulinAction& action) {
