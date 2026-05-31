@@ -346,8 +346,17 @@ public:
     //         delay(1000);
     //     }
     // }
+// 5000 wait
+// 200 1000 第一步：唤醒屏幕 (短按)
+// 2000 2000 第二步：触发进入声响大剂量模式 (长按)
+// 400 600 loop
+// 3000 输入完毕后，等一下再确认
+// 4000 3000*steps 第四步：第一次长按确认（泵会回放步数声音）
+// 2000 第五步：第二次长按确认（真正开始推药）
+
     // void loop() {
-    //     delay(5000); 
+    //     // delay(5000); 
+    //     vTaskDelay(pdMS_TO_TICKS(5000));
 
     //     int steps = 10;
         
@@ -377,7 +386,7 @@ public:
     //     vTaskDelay(pdMS_TO_TICKS(4000));
     //     digitalWrite(STEP_PIN, HIGH);
     //     // 根据步数动态等待泵响完（每步大概1秒）
-    //     vTaskDelay(pdMS_TO_TICKS(2000 + steps * 3000)); 
+    //     vTaskDelay(pdMS_TO_TICKS(steps * 3000)); 
 
     //     // 5. 第二次长按执行
     //     digitalWrite(STEP_PIN, LOW);
@@ -2415,6 +2424,14 @@ private:
 
 M640GPumpSimulator* gSimulator = nullptr;
 
+// 5000 wait
+// 200 1000 第一步：唤醒屏幕 (短按)
+// 2000 2000 第二步：触发进入声响大剂量模式 (长按)
+// 400 600 loop
+// 3000 输入完毕后，等一下再确认
+// 4000 3000*steps 第四步：第一次长按确认（泵会回放步数声音）
+// 2000 第五步：第二次长按确认（真正开始推药）
+
 // 独立线程里的同步输注任务
 void gpioDeliveryTask(void *parameter) {
     M640GPumpSimulator* simulator = static_cast<M640GPumpSimulator*>(parameter);
@@ -2445,7 +2462,6 @@ void gpioDeliveryTask(void *parameter) {
     digitalWrite(STEP_PIN, LOW);
     vTaskDelay(pdMS_TO_TICKS(200));
     digitalWrite(STEP_PIN, HIGH);
-    pinMode(STEP_PIN, INPUT_PULLUP);
     CHECK_TIMEOUT();
     vTaskDelay(pdMS_TO_TICKS(1000));
 
@@ -2455,48 +2471,43 @@ void gpioDeliveryTask(void *parameter) {
     digitalWrite(STEP_PIN, LOW);
     vTaskDelay(pdMS_TO_TICKS(2000));
     digitalWrite(STEP_PIN, HIGH);
-    pinMode(STEP_PIN, INPUT_PULLUP);
     CHECK_TIMEOUT();
-    vTaskDelay(pdMS_TO_TICKS(1500));
+    vTaskDelay(pdMS_TO_TICKS(2000));
 
     // 3. 循环输入步数
     CHECK_TIMEOUT();
     for (int i = 1; i <= steps; i++) {
         CHECK_TIMEOUT();
-        pinMode(STEP_PIN, OUTPUT);
         digitalWrite(STEP_PIN, LOW);
         vTaskDelay(pdMS_TO_TICKS(400));
         digitalWrite(STEP_PIN, HIGH);
-        pinMode(STEP_PIN, INPUT_PULLUP);
-        vTaskDelay(pdMS_TO_TICKS(800));
+        vTaskDelay(pdMS_TO_TICKS(600));
     }
     CHECK_TIMEOUT();
-    vTaskDelay(pdMS_TO_TICKS(1500));
+    vTaskDelay(pdMS_TO_TICKS(3000));
 
     // 4. 第一次长按确认
     CHECK_TIMEOUT();
     pinMode(STEP_PIN, OUTPUT);
     digitalWrite(STEP_PIN, LOW);
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    vTaskDelay(pdMS_TO_TICKS(4000));
     digitalWrite(STEP_PIN, HIGH);
-    pinMode(STEP_PIN, INPUT_PULLUP);
     CHECK_TIMEOUT();
-    vTaskDelay(pdMS_TO_TICKS(2000 + steps * 1000));
+    vTaskDelay(pdMS_TO_TICKS(steps * 3000));
 
     // 5. 第二次长按执行
     CHECK_TIMEOUT();
-    pinMode(STEP_PIN, OUTPUT);
     digitalWrite(STEP_PIN, LOW);
     vTaskDelay(pdMS_TO_TICKS(2000));
     digitalWrite(STEP_PIN, HIGH);
-    pinMode(STEP_PIN, INPUT_PULLUP);
+    // pinMode(STEP_PIN, INPUT_PULLUP);
 
     Logger::info("[Task] 大剂量物理输入完毕");
 
 finish:
     // 确保 GPIO 安全
-    digitalWrite(STEP_PIN, HIGH);
-    pinMode(STEP_PIN, INPUT_PULLUP);
+    // digitalWrite(STEP_PIN, HIGH);
+    // pinMode(STEP_PIN, INPUT_PULLUP);
 
     // 上锁标记任务结束
     xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);
