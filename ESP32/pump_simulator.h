@@ -270,6 +270,53 @@ public:
         }
     }
 
+    // void loop() {
+    //     int steps = 10;
+        
+    //     // 1. 唤醒屏幕
+    //     digitalWrite(STEP_PIN, LOW);
+    //     vTaskDelay(pdMS_TO_TICKS(200));   // FreeRTOS 标准的 delay 写法，不会阻塞主线程
+    //     digitalWrite(STEP_PIN, HIGH);
+    //     vTaskDelay(pdMS_TO_TICKS(1000)); 
+
+    //     // 2. 触发进入模式
+    //     digitalWrite(STEP_PIN, LOW);
+    //     vTaskDelay(pdMS_TO_TICKS(2000)); 
+    //     digitalWrite(STEP_PIN, HIGH);
+    //     vTaskDelay(pdMS_TO_TICKS(1500)); 
+
+    //     // 3. 循环输入步数
+    //     for (int i = 1; i <= steps; i++) {
+    //         digitalWrite(STEP_PIN, LOW);
+    //         vTaskDelay(pdMS_TO_TICKS(400));
+    //         digitalWrite(STEP_PIN, HIGH);
+    //         vTaskDelay(pdMS_TO_TICKS(800)); // 这里的时序你自己测出完美的数值填进来
+    //     }
+    //     vTaskDelay(pdMS_TO_TICKS(1500)); 
+
+    //     // 4. 第一次长按确认
+    //     digitalWrite(STEP_PIN, LOW);
+    //     vTaskDelay(pdMS_TO_TICKS(2000));
+    //     digitalWrite(STEP_PIN, HIGH);
+    //     // 根据步数动态等待泵响完（每步大概1秒）
+    //     vTaskDelay(pdMS_TO_TICKS(2000 + steps * 1000)); 
+
+    //     // 5. 第二次长按执行
+    //     digitalWrite(STEP_PIN, LOW);
+    //     vTaskDelay(pdMS_TO_TICKS(2000));
+    //     digitalWrite(STEP_PIN, HIGH);
+
+    //     Logger::info("[Task] 大剂量物理输入完毕！");
+
+        
+    //     // 线程执行完毕，必须自行销毁！
+    //     // vTaskDelete(NULL);
+
+    //     while(1) {
+    //         delay(1000);
+    //     }
+    // }
+
     // // 极性假设：如果这样不行，把所有的 LOW 换成 HIGH，HIGH 换成 LOW 再试一次！
     // void loop() {
     //     delay(5000); // 每 5 秒尝试一次，给你时间观察
