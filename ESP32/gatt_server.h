@@ -20,6 +20,7 @@ GATT 服务器 (C++ 版本 - Arduino BLE 库)
 #include <BLEUtils.h>
 #include <BLE2902.h>
 #include <BLEAdvertising.h>
+#include <esp_mac.h>
 #include "enums.h"
 #include "crc8.h"
 
@@ -66,6 +67,18 @@ public:
         Serial.println("[GATT] Initializing BLE device...");
         // 初始化 BLE with more memory for larger MTU
         BLEDevice::init("MT");
+
+        // 设置固定的 BLE 地址 (基于 efuse MAC), 使 iOS 能跨重启识别同一设备
+        {
+            uint8_t bleMac[6];
+            esp_efuse_mac_get_default(bleMac);
+            // 第1字节高2位设 0b11, 标记为随机静态地址
+            bleMac[0] = (bleMac[0] & 0xCF) | 0xC0;
+            esp_ble_gap_set_rand_addr(bleMac);
+            Serial.printf("[GATT] BLE MAC address set (persistent): %02X:%02X:%02X:%02X:%02X:%02X\n",
+                          bleMac[0], bleMac[1], bleMac[2], bleMac[3], bleMac[4], bleMac[5]);
+        }
+
         Serial.println("[GATT] BLE device initialized with name 'MT'");
         
         Serial.println("[GATT] Creating BLE server...");

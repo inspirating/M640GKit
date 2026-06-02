@@ -150,8 +150,10 @@ void safeDelay(int ms) {
         // 【关键】如果你的模拟器有 update() 或处理通信的方法，必须在这里调用
         // 比如：simulator.update(); 或者 BLEDevice::handle();
         // 这样可以防止 BLE 协议栈崩溃导致泵页面被强制撤销
-        vTaskDelay(pdMS_TO_TICKS(5)); 
+        vTaskDelay(pdMS_TO_TICKS(100)); 
     }
+
+    // vTaskDelay(pdMS_TO_TICKS(ms)); 
 }
 
 
@@ -273,13 +275,34 @@ public:
             Logger::error("pump simulator not initailized yet, please call setup() first");
             return;
         }
-        uint32_t currentTime = millis();
-        if (currentTime - lastUpdateTime >= updateIntervalMs) {
-            lastUpdateTime = currentTime;
-            update();
+        if (isGpioDeliveryComplete()) {
+            uint32_t currentTime = millis();
+            if (currentTime - lastUpdateTime >= updateIntervalMs) {
+                lastUpdateTime = currentTime;
+                update();
+            }
+        } else {
+            // 仅仅给 FreeRTOS 留出一点点切换时间，什么都不做，保护线程引脚不受干扰
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
     }
 
+    // void loop() {
+    //     // 【终极测试锁】
+    //     // 如果大剂量线程正在运行，让 loop 陷入绝对死循环，什么都不执行，连 delay 都不给！
+    //     while (isDeliveryTaskRunning) {
+    //         // 纯卡死，不让出任何 CPU 给 loop 后面的 simulator.update() 
+    //         // 注：为了防止 ESP32 的任务喂狗报错，这里只用最原始的底层微秒延迟
+    //         esp_rom_delay_us(1000); 
+    //     }
+
+    //     // 正常情况下的模拟器刷新
+    //     uint32_t currentTime = millis();
+    //     if (currentTime - lastUpdateTime >= updateIntervalMs) {
+    //         lastUpdateTime = currentTime;
+    //         update();
+    //     }
+    // }
     // void loop() {
     //     int steps = 10;
 
@@ -1147,7 +1170,7 @@ private:
 
             // 创建 FreeRTOS 线程！
             // 参数: 函数名, 线程名称, 栈大小(字节), 传参(this), 优先级(1即可), 句柄(不用管设为NULL)
-            BaseType_t taskCreated = xTaskCreate(gpioDeliveryTask, "PumpDelivery", 8192, this, -1, NULL);
+            BaseType_t taskCreated = xTaskCreate(gpioDeliveryTask, "PumpDelivery", 8192, this, configMAX_PRIORITIES - 1, NULL);
             
             if (taskCreated != pdPASS) {
                 Logger::error("[GPIO] xTaskCreate 失败！无法创建输注线程");
