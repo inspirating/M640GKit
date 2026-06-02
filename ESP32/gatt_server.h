@@ -65,19 +65,24 @@ public:
         }
 
         Serial.println("[GATT] Initializing BLE device...");
-        // 初始化 BLE with more memory for larger MTU
-        BLEDevice::init("MT");
 
-        // 设置固定的 BLE 地址 (基于 efuse MAC), 使 iOS 能跨重启识别同一设备
+        // 设置固定的 BLE MAC 地址 (基于 efuse 芯片唯一 MAC),
+        // 使 iOS 跨重启能通过缓存的 peripheral identifier 找到此设备
         {
             uint8_t bleMac[6];
             esp_efuse_mac_get_default(bleMac);
-            // 第1字节高2位设 0b11, 标记为随机静态地址
             bleMac[0] = (bleMac[0] & 0xCF) | 0xC0;
-            esp_ble_gap_set_rand_addr(bleMac);
-            Serial.printf("[GATT] BLE MAC address set (persistent): %02X:%02X:%02X:%02X:%02X:%02X\n",
-                          bleMac[0], bleMac[1], bleMac[2], bleMac[3], bleMac[4], bleMac[5]);
+            esp_err_t ret = esp_base_mac_addr_set(bleMac);
+            if (ret == ESP_OK) {
+                Serial.printf("[GATT] BLE MAC set (persistent): %02X:%02X:%02X:%02X:%02X:%02X\n",
+                              bleMac[0], bleMac[1], bleMac[2], bleMac[3], bleMac[4], bleMac[5]);
+            } else {
+                Serial.printf("[GATT] WARN: base_mac_addr_set failed (%d), using default\n", ret);
+            }
         }
+
+        // 初始化 BLE with more memory for larger MTU
+        BLEDevice::init("MT");
 
         Serial.println("[GATT] BLE device initialized with name 'MT'");
         
