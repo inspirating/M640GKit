@@ -1,4 +1,4 @@
-﻿import CoreBluetooth
+import CoreBluetooth
 
 class BluetoothManager: NSObject, CBCentralManagerDelegate {
     public var pumpManager: M640GPumpManager?
@@ -208,6 +208,7 @@ class BluetoothManager: NSObject, CBCentralManagerDelegate {
     func clearPeripheral() {
         peripheral = nil
         peripheralManager = nil
+        UserDefaults.standard.removeObject(forKey: "M640GLastConnectedPeripheralUUID")
     }
 }
 
