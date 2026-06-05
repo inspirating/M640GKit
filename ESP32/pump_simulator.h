@@ -283,7 +283,7 @@ public:
             }
         } else {
             // 仅仅给 FreeRTOS 留出一点点切换时间，什么都不做，保护线程引脚不受干扰
-            vTaskDelay(pdMS_TO_TICKS(10));
+            // vTaskDelay(pdMS_TO_TICKS(10000));
         }
     }
 
@@ -1252,10 +1252,11 @@ private:
         }
 
         // 5分钟扫描一次；有活跃大剂量时立即执行
-        if (currentBolus == nullptr && now - lastDeliveryScanTime < 300000) {
-            Logger::info("[DEBUG] Skipping delivery: no active bolus and 5min not elapsed");
-            return;
-        }
+        // // if (currentBolus == nullptr && now - lastDeliveryScanTime < 300000) {
+        // if (currentBolus == nullptr && now - lastDeliveryScanTime < 100) {
+        //     Logger::info("[DEBUG] Skipping delivery: no active bolus and 5min not elapsed");
+        //     return;
+        // }
         lastDeliveryScanTime = now;
 
         // GPIO 输注线程在运行中时，跳过队列处理（等待输注完成后由下次扫描执行）
@@ -1338,7 +1339,7 @@ private:
                 // delivered 保持不变(保持 0)，由 Trio 的 M640GDoseProgressReporter 基于时间估算进度。
                 // 实际 delivered 在 section 3.6 GPIO task 结束后统一设为全额。
                 // 避免同步通知提前带上"已完成"标志导致进度条提前结束。
-                (void)0; // no-op
+                // (void)0; // no-op
             }
 
             // 3.5 将步进补偿的余量 carryOver 重新放入队列, 下次累积执行
@@ -2518,6 +2519,11 @@ void gpioDeliveryTask(void *parameter) {
     // xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);
     int steps = simulator->gpioRemainingSteps;
     // xSemaphoreGive(simulator->xSemaphore);
+
+    if(steps <= 0) {
+        Logger::warning("步数为0，无法执行输注任务");
+        goto finish;
+    }
 
     Logger::info("[Task] 独立输注线程启动");
 
