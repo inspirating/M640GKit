@@ -372,11 +372,22 @@ extension BluetoothManager {
                 "Device connect error, name: \(peripheral.name ?? "<NO_NAME>"), error: \(error?.localizedDescription ?? "No error")"
             )
 
+        // 清除无效的缓存 peripheral, 避免下次还拿旧 UUID 重试
+        if self.peripheral === peripheral {
+            clearPeripheral()
+        }
+
         guard let pumpManager = self.pumpManager else {
             return
         }
 
         pumpManager.state.isConnected = false
         pumpManager.notifyStateDidChange()
+
+        // 通知连接失败, 让调用方可以走扫描重试路径
+        if let connectCompletion = connectCompletion {
+            connectCompletion(.failedToConnectToDevice)
+            self.connectCompletion = nil
+        }
     }
 }
