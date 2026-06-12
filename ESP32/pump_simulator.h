@@ -134,7 +134,7 @@ struct TempBasalInfo {
 
 // ========== 队列输注系统 ==========
 static constexpr double STEP_SIZE = 0.5;
-static constexpr int STEP_PIN = 6;
+static constexpr int STEP_PIN = 6; 
 
 struct InsulinAction {
     uint32_t executeTimeMs;
@@ -145,15 +145,15 @@ struct InsulinAction {
 void gpioDeliveryTask(void *parameter);
 
 void safeDelay(int ms) {
-    long start = millis();
-    while (millis() - start < ms) {
-        // 【关键】如果你的模拟器有 update() 或处理通信的方法，必须在这里调用
-        // 比如：simulator.update(); 或者 BLEDevice::handle();
-        // 这样可以防止 BLE 协议栈崩溃导致泵页面被强制撤销
-        vTaskDelay(pdMS_TO_TICKS(100)); 
-    }
+    // long start = millis();
+    // while (millis() - start < ms) {
+    //     // 【关键】如果你的模拟器有 update() 或处理通信的方法，必须在这里调用
+    //     // 比如：simulator.update(); 或者 BLEDevice::handle();
+    //     // 这样可以防止 BLE 协议栈崩溃导致泵页面被强制撤销
+    //     vTaskDelay(pdMS_TO_TICKS(100)); 
+    // }
 
-    // vTaskDelay(pdMS_TO_TICKS(ms)); 
+    vTaskDelay(pdMS_TO_TICKS(ms)); 
 }
 
 
@@ -1186,11 +1186,11 @@ private:
             Logger::warning("[GPIO] 正在输注中，本次请求被忽略");
         }
 
-        // // 防重入：如果上一个线程还没跑完，忽略新的触发
-        // if (isDeliveryTaskRunning) {
-        //     Logger::warning("[GPIO] 上一笔输注线程尚未结束，忽略本次触发");
-        //     return;
-        // }
+        // 防重入：如果上一个线程还没跑完，忽略新的触发
+        if (isDeliveryTaskRunning) {
+            Logger::warning("[GPIO] 上一笔输注线程尚未结束，忽略本次触发");
+            return;
+        }
 
     }
 
@@ -1252,11 +1252,11 @@ private:
         }
 
         // 5分钟扫描一次；有活跃大剂量时立即执行
-        // // if (currentBolus == nullptr && now - lastDeliveryScanTime < 300000) {
-        // if (currentBolus == nullptr && now - lastDeliveryScanTime < 100) {
-        //     Logger::info("[DEBUG] Skipping delivery: no active bolus and 5min not elapsed");
-        //     return;
-        // }
+        // if (currentBolus == nullptr && now - lastDeliveryScanTime < 300000) {
+        if (currentBolus == nullptr && now - lastDeliveryScanTime < 100) {
+            Logger::info("[DEBUG] Skipping delivery: no active bolus and 5min not elapsed");
+            return;
+        }
         lastDeliveryScanTime = now;
 
         // GPIO 输注线程在运行中时，跳过队列处理（等待输注完成后由下次扫描执行）
@@ -2522,7 +2522,7 @@ void gpioDeliveryTask(void *parameter) {
 
     if(steps <= 0) {
         Logger::warning("步数为0，无法执行输注任务");
-        goto finish;
+        // goto finish;
     }
 
     Logger::info("[Task] 独立输注线程启动");
@@ -2542,30 +2542,81 @@ void gpioDeliveryTask(void *parameter) {
     digitalWrite(STEP_PIN, HIGH);
     safeDelay(2000);
 
-    // 3. 循环输入步数
-    for (int i = 1; i <= steps; i++) {
-        digitalWrite(STEP_PIN, LOW);
-        safeDelay(400);
-        digitalWrite(STEP_PIN, HIGH);
-        safeDelay(600);
-    }
+    // // 3. 循环输入步数
+    // for (int i = 1; i <= steps; i++) {
+    //     // 模拟人类手指按压的细微不稳定性 (比如随机增加 0 ~ 30 毫秒)
+    //     int pressJitter = random(0, 30);
+    //     // 模拟人类手指抬起节奏的随机微调 (比如随机增加 0 ~ 50 毫秒)
+    //     int releaseJitter = random(0, 50);
 
-    safeDelay(3000);
+    //     digitalWrite(STEP_PIN, LOW);
+    //     safeDelay(80 + pressJitter);
+    //     digitalWrite(STEP_PIN, HIGH);
+    //     safeDelay(800+ releaseJitter);
+    // }
+
+
+    digitalWrite(STEP_PIN, LOW);
+    delay(80);
+    digitalWrite(STEP_PIN, HIGH);
+    delay(830);
+
+    digitalWrite(STEP_PIN, LOW);
+    delay(110);
+    digitalWrite(STEP_PIN, HIGH);
+    delay(700);
+
+    digitalWrite(STEP_PIN, LOW);
+    delay(100);
+    digitalWrite(STEP_PIN, HIGH);
+    delay(600);
+
+    digitalWrite(STEP_PIN, LOW);
+    delay(100);
+    digitalWrite(STEP_PIN, HIGH);
+    delay(600);
+
+    //
+    digitalWrite(STEP_PIN, LOW);
+    delay(100);
+    digitalWrite(STEP_PIN, HIGH);
+    delay(600);
+
+    digitalWrite(STEP_PIN, LOW);
+    delay(100);
+    digitalWrite(STEP_PIN, HIGH);
+    delay(600);
+
+    digitalWrite(STEP_PIN, LOW);
+    delay(100);
+    digitalWrite(STEP_PIN, HIGH);
+    delay(500);
+
+    digitalWrite(STEP_PIN, LOW);
+    delay(80);
+    digitalWrite(STEP_PIN, HIGH);
+    delay(500);
+
+
+    // delay(1000); // 注释掉，不然只能输注0.5u
 
     // 4. 第一次长按确认
     digitalWrite(STEP_PIN, LOW);
-    safeDelay(4000);
+    delay(500);
     digitalWrite(STEP_PIN, HIGH);
-    safeDelay(steps * 3000);
+    delay(steps * 500 + 500);
 
     // 5. 第二次长按执行
     digitalWrite(STEP_PIN, LOW);
-    safeDelay(2000);
+    delay(2000);
     digitalWrite(STEP_PIN, HIGH);
+
+    // 给硬件和电容留 500ms 的电平释放缓冲期
+    safeDelay(500);
 
     Logger::info("[Task] 大剂量物理输入完毕");
 
-finish:
+// finish:
     // 确保 GPIO 安全
 
     // 上锁标记任务结束
@@ -2574,6 +2625,9 @@ finish:
     // xSemaphoreGive(simulator->xSemaphore);
 
     vTaskDelete(NULL);
+
+    // digitalWrite(STEP_PIN, HIGH);
+    // pinMode(STEP_PIN, OUTPUT);
 }
 
 

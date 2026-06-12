@@ -60,14 +60,16 @@ void setup() {
     // 初始化 LED (ESP32-C3 常见引脚: 8, 2, 3)
     Serial.print("Initializing LED on pin ");
     Serial.println(LED_BUILTIN);
-    pinMode(LED_BUILTIN, OUTPUT);
+    
     digitalWrite(LED_BUILTIN, LOW);
+    pinMode(LED_BUILTIN, OUTPUT);
 
     // // 初始化 GPIO6 (STEP_PIN) 作为光耦控制输出, 低电平有效
     // // 必须先 digitalWrite(HIGH) 再 pinMode(OUTPUT),
     // // 否则 pinMode 时输出寄存器默认 LOW, 会先输出短暂低电平
-    pinMode(STEP_PIN, OUTPUT);
     digitalWrite(STEP_PIN, HIGH);
+    pinMode(STEP_PIN, OUTPUT);
+    
     Serial.println("GPIO6(STEP_PIN) initialized as optocoupler control (active-low, default HIGH)");
 
     // 设置全局实例指针 (用于回调)
