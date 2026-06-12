@@ -2528,19 +2528,19 @@ void gpioDeliveryTask(void *parameter) {
     Logger::info("[Task] 独立输注线程启动");
 
     // delay(5000); 
-    safeDelay(5000);
+    // safeDelay(5000);
 
     // 1. 唤醒屏幕
-    digitalWrite(STEP_PIN, LOW);
-    safeDelay(200);
-    digitalWrite(STEP_PIN, HIGH);
-    safeDelay(1000);
+    // digitalWrite(STEP_PIN, HIGH);
+    // safeDelay(200);
+    // digitalWrite(STEP_PIN, LOW);
+    // safeDelay(1000);
 
     // 2. 触发进入模式
-    digitalWrite(STEP_PIN, LOW);
-    safeDelay(2000);
     digitalWrite(STEP_PIN, HIGH);
-    safeDelay(2000);
+    safeDelay(1000);
+    digitalWrite(STEP_PIN, LOW);
+    // safeDelay(2000);
 
     // // 3. 循环输入步数
     // for (int i = 1; i <= steps; i++) {
@@ -2556,60 +2556,60 @@ void gpioDeliveryTask(void *parameter) {
     // }
 
 
-    digitalWrite(STEP_PIN, LOW);
-    delay(80);
     digitalWrite(STEP_PIN, HIGH);
+    delay(80);
+    digitalWrite(STEP_PIN, LOW);
     delay(830);
 
-    digitalWrite(STEP_PIN, LOW);
-    delay(110);
     digitalWrite(STEP_PIN, HIGH);
+    delay(110);
+    digitalWrite(STEP_PIN, LOW);
     delay(700);
 
-    digitalWrite(STEP_PIN, LOW);
-    delay(100);
     digitalWrite(STEP_PIN, HIGH);
+    delay(100);
+    digitalWrite(STEP_PIN, LOW);
     delay(600);
 
-    digitalWrite(STEP_PIN, LOW);
-    delay(100);
     digitalWrite(STEP_PIN, HIGH);
+    delay(100);
+    digitalWrite(STEP_PIN, LOW);
     delay(600);
 
     //
-    digitalWrite(STEP_PIN, LOW);
-    delay(100);
     digitalWrite(STEP_PIN, HIGH);
+    delay(100);
+    digitalWrite(STEP_PIN, LOW);
     delay(600);
 
-    digitalWrite(STEP_PIN, LOW);
-    delay(100);
     digitalWrite(STEP_PIN, HIGH);
+    delay(100);
+    digitalWrite(STEP_PIN, LOW);
     delay(600);
 
-    digitalWrite(STEP_PIN, LOW);
-    delay(100);
     digitalWrite(STEP_PIN, HIGH);
+    delay(100);
+    digitalWrite(STEP_PIN, LOW);
     delay(500);
 
-    digitalWrite(STEP_PIN, LOW);
-    delay(80);
     digitalWrite(STEP_PIN, HIGH);
+    delay(80);
+    digitalWrite(STEP_PIN, LOW);
     delay(500);
 
 
     // delay(1000); // 注释掉，不然只能输注0.5u
 
     // 4. 第一次长按确认
-    digitalWrite(STEP_PIN, LOW);
-    delay(500);
     digitalWrite(STEP_PIN, HIGH);
+    delay(500);
+    digitalWrite(STEP_PIN, LOW);
     delay(steps * 500 + 500);
 
     // 5. 第二次长按执行
-    digitalWrite(STEP_PIN, LOW);
-    delay(2000);
     digitalWrite(STEP_PIN, HIGH);
+    delay(2000);
+    digitalWrite(STEP_PIN, LOW);
 
     // 给硬件和电容留 500ms 的电平释放缓冲期
     safeDelay(500);
