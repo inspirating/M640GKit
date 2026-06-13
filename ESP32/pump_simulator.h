@@ -134,7 +134,7 @@ struct TempBasalInfo {
 
 // ========== 队列输注系统 ==========
 static constexpr double STEP_SIZE = 0.5;
-static constexpr int STEP_PIN = 6; 
+static constexpr int STEP_PIN = 7; 
 
 struct InsulinAction {
     uint32_t executeTimeMs;
@@ -479,6 +479,70 @@ public:
     //     while(1) {
     //         delay(1000);
     //     }
+    // }
+
+    // bool hasExecuted = false;
+
+    // void loop() {
+    //     if (hasExecuted) {
+    //         delay(1); // 必须留 delay(1) 或 yield()，防止触发看门狗
+    //         return; 
+    //     }
+
+    //     // 刚开机，先静静等待 5 秒钟，让 ESP32 蓝牙广播稳定，也给泵一个稳定的供电初始电位
+    //     delay(5000); 
+
+    //     Serial.println("=========================================");
+    //     Serial.println(">>> 触发测试：开始执行单次大剂量输入流程...");
+    //     Serial.println("=========================================");
+
+    //     // 1. 短按唤醒 / 进入声音大剂量界面
+    //     digitalWrite(STEP_PIN, HIGH); 
+    //     delay(140);                   
+    //     digitalWrite(STEP_PIN, LOW);  
+        
+    //     Serial.println("步骤 1 完成：已发送唤醒脉冲，等待界面加载...");
+    //     delay(3000); // 延长到 3 秒，确保泵的菜单完全加载完毕出来
+
+    //     // 2. 长按触发输入模式 (必须大于 2 秒)
+    //     digitalWrite(STEP_PIN, HIGH); 
+    //     delay(2200);                  
+    //     digitalWrite(STEP_PIN, LOW);  
+        
+    //     Serial.println("步骤 2 完成：已发送长按触发，等待音频就绪...");
+    //     delay(2000); // 给泵 2 秒钟准备
+
+    //     // 3. 循环输入步数 (放慢速度，确保消抖通过)
+    //     Serial.println("步骤 3：开始按 200ms/250ms 的安全速度敲击 5 步...");
+    //     for (int i = 1; i <= 5; i++) {
+    //         digitalWrite(STEP_PIN, HIGH); 
+    //         delay(200); // 稳稳按下 200ms
+    //         digitalWrite(STEP_PIN, LOW);  
+    //         delay(250); // 稳稳松开 250ms
+    //     }
+    //     delay(2000); 
+
+    //     // 4. 第一次长按确认
+    //     Serial.println("步骤 4：长按确认步数...");
+    //     digitalWrite(STEP_PIN, HIGH); 
+    //     delay(2500);                  
+    //     digitalWrite(STEP_PIN, LOW);  
+        
+    //     // 释放后，死等泵把“滴滴滴”的声音播完（5步 * 500ms + 缓冲）
+    //     delay(5 * 500 + 1000); 
+
+    //     // 5. 第二次长按最终执行输注
+    //     Serial.println("步骤 5：最终长按执行...");
+    //     digitalWrite(STEP_PIN, HIGH); 
+    //     delay(2500);                  
+    //     digitalWrite(STEP_PIN, LOW);  
+
+    //     Serial.println("=========================================");
+    //     Serial.println(">>> [SUCCESS] 单次测试流程完全结束，锁定 loop！");
+    //     Serial.println("=========================================");
+
+    //     // 【核心修复 3】：锁死状态，防止进入下一次 loop 循环
+    //     hasExecuted = true;
     // }
 
 private:
@@ -2527,97 +2591,54 @@ void gpioDeliveryTask(void *parameter) {
 
     Logger::info("[Task] 独立输注线程启动");
 
-    // delay(5000); 
-    // safeDelay(5000);
+// ==================== 修改后的 TS5A3166 声音大剂量物理敲击时序 ====================
+    // steps = 10; // 举例：输入 10 步
 
-    // 1. 唤醒屏幕
-    // digitalWrite(STEP_PIN, HIGH);
-    // safeDelay(200);
-    // digitalWrite(STEP_PIN, LOW);
-    // safeDelay(1000);
+    // 1. 唤醒屏幕 / 进入界面 (第一次短按)
+    Serial.println(">>> 1. 短按唤醒/进入声音大剂量...");
+    // digitalWrite(STEP_PIN, HIGH); // 高电平：按下
+    // delay(140);                   // TS5A3166 纯净信号，140ms 稳定骗过消抖
+    // digitalWrite(STEP_PIN, LOW);  // 低电平：松开
+    // delay(1000);                  // 等待屏幕或界面完全加载
 
-    // 2. 触发进入模式
-    digitalWrite(STEP_PIN, HIGH);
-    safeDelay(1000);
-    digitalWrite(STEP_PIN, LOW);
-    // safeDelay(2000);
+    // 2. 触发进入模式 (长按 2 秒)
+    Serial.println(">>> 2. 长按触发模式...");
+    digitalWrite(STEP_PIN, HIGH); // 高电平：按下
+    delay(2000);                  // 持续稳定按下 2 秒
+    digitalWrite(STEP_PIN, LOW);  // 低电平：松开
+    delay(1500);                  // 等待泵发出准备就绪的提示音
 
-    // // 3. 循环输入步数
-    // for (int i = 1; i <= steps; i++) {
-    //     // 模拟人类手指按压的细微不稳定性 (比如随机增加 0 ~ 30 毫秒)
-    //     int pressJitter = random(0, 30);
-    //     // 模拟人类手指抬起节奏的随机微调 (比如随机增加 0 ~ 50 毫秒)
-    //     int releaseJitter = random(0, 50);
+    // 3. 循环输入步数 (核心修改：拉长按下与松开时间)
+    Serial.println(">>> 3. 开始循环敲击步数...");
+    for (int i = 1; i <= steps; i++) {
+        digitalWrite(STEP_PIN, HIGH); // 高电平：按下
+        delay(500);                   // 按下维持 140ms（确保泵能 100% 识别到）
+        digitalWrite(STEP_PIN, LOW);  // 低电平：松开
+        delay(500);                   // 松开维持 140ms（给泵充足的反应和扫描复位时间）
+    }
+    delay(2000); // 步数输完后，稳一稳，准备确认
 
-    //     digitalWrite(STEP_PIN, LOW);
-    //     safeDelay(80 + pressJitter);
-    //     digitalWrite(STEP_PIN, HIGH);
-    //     safeDelay(800+ releaseJitter);
-    // }
+    // 4. 第一次长按确认 (修正：电平和延时重新对齐)
+    Serial.println(">>> 4. 第一次长按确认输入的步数...");
+    digitalWrite(STEP_PIN, HIGH); // 高电平：按下
+    delay(2500);                  // 长按 2.5 秒触发确认
+    digitalWrite(STEP_PIN, LOW);  // 低电平：松开
+    
+    // 【关键等待】松开后，泵会“滴滴滴”把刚才输入的步数回放一遍，必须等它完全响完！
+    delay(steps * 500); 
 
-
-    digitalWrite(STEP_PIN, HIGH);
-    delay(80);
-    digitalWrite(STEP_PIN, LOW);
-    delay(830);
-
-    digitalWrite(STEP_PIN, HIGH);
-    delay(110);
-    digitalWrite(STEP_PIN, LOW);
-    delay(700);
-
-    digitalWrite(STEP_PIN, HIGH);
-    delay(100);
-    digitalWrite(STEP_PIN, LOW);
-    delay(600);
-
-    digitalWrite(STEP_PIN, HIGH);
-    delay(100);
-    digitalWrite(STEP_PIN, LOW);
-    delay(600);
-
-    //
-    digitalWrite(STEP_PIN, HIGH);
-    delay(100);
-    digitalWrite(STEP_PIN, LOW);
-    delay(600);
-
-    digitalWrite(STEP_PIN, HIGH);
-    delay(100);
-    digitalWrite(STEP_PIN, LOW);
-    delay(600);
-
-    digitalWrite(STEP_PIN, HIGH);
-    delay(100);
-    digitalWrite(STEP_PIN, LOW);
-    delay(500);
-
-    digitalWrite(STEP_PIN, HIGH);
-    delay(80);
-    digitalWrite(STEP_PIN, LOW);
-    delay(500);
-
-
-    // delay(1000); // 注释掉，不然只能输注0.5u
-
-    // 4. 第一次长按确认
-    digitalWrite(STEP_PIN, HIGH);
-    delay(500);
-    digitalWrite(STEP_PIN, LOW);
-    delay(steps * 500 + 500);
-
-    // 5. 第二次长按执行
-    digitalWrite(STEP_PIN, HIGH);
-    delay(2000);
-    digitalWrite(STEP_PIN, LOW);
-
-    // 给硬件和电容留 500ms 的电平释放缓冲期
-    safeDelay(500);
-
-    Logger::info("[Task] 大剂量物理输入完毕");
+    // 5. 第二次长按执行输注 (修正：电平和延时重新对齐)
+    Serial.println(">>> 5. 第二次长按最终执行输注...");
+    digitalWrite(STEP_PIN, HIGH); // 高电平：按下
+    delay(2500);                  // 长按 2.5 秒触发输注
+    digitalWrite(STEP_PIN, LOW);  // 低电平：松开（彻底完成）
+    
+    Serial.println(">>> [SUCCESS] 声音大剂量物理时序模拟完毕！");
 
 // finish:
-    // 确保 GPIO 安全
+    // 确保 GPIO 安全: TS5A3166 LOW = 断开
+    digitalWrite(STEP_PIN, LOW);
+    pinMode(STEP_PIN, OUTPUT);
 
     // 上锁标记任务结束
     // xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);

@@ -64,18 +64,13 @@ void setup() {
     digitalWrite(LED_BUILTIN, LOW);
     pinMode(LED_BUILTIN, OUTPUT);
 
-    // // 初始化 GPIO6 (STEP_PIN) 作为光耦控制输出, 低电平有效
-    // // 必须先 digitalWrite(HIGH) 再 pinMode(OUTPUT),
-    // // 否则 pinMode 时输出寄存器默认 LOW, 会先输出短暂低电平
-    // digitalWrite(STEP_PIN, HIGH);
-    // pinMode(STEP_PIN, OUTPUT);
-
-    // ====== 【新增：初始化 TS5A3166 控制端并立刻断开】 ======
+    // 初始化 GPIO6 (STEP_PIN) 作为 TS5A3166 模拟开关控制, 高电平导通
+    // 必须先 pinMode(OUTPUT) 再 digitalWrite(LOW),
+    // 确保 pinMode 切换瞬间输出寄存器默认 LOW, 开关不会误触发
     pinMode(STEP_PIN, OUTPUT);
-    digitalWrite(STEP_PIN, LOW); // 确保开机瞬间开关处于绝对断开状态
-    // ========================================================
+    digitalWrite(STEP_PIN, LOW); // TS5A3166: LOW = 断开
     
-    Serial.println("GPIO6(STEP_PIN) initialized as optocoupler control (active-low, default HIGH)");
+    Serial.println("GPIO6(STEP_PIN) initialized as TS5A3166 control (active-high, default LOW)");
 
     // 设置全局实例指针 (用于回调)
     gSimulator = &pumpSimulator;
