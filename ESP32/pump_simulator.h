@@ -176,7 +176,7 @@ public:
         expirationTimer(0), alarmSetting(0),
         predictiveLowSuspend(0), predictiveLowSuspendRange(30), lastPrimeNotificationTime(0),
         basalQueueIdx(0), tempBasalQueueIdx(0), bolusQueueIdx(0),
-        tempBasalActive(false), basalSuspended(false), tempBasalStartMs(0), lastDeliveryScanTime(0), everActivated(false),
+        tempBasalActive(false), basalSuspended(false), suspendResumeTimeMs(0), tempBasalStartMs(0), lastDeliveryScanTime(0), everActivated(false),
         gpioDeliveryStartMs(0), gpioRemainingSteps(0), gpioCurrentStep(0), isDeliveryTaskRunning(false), xSemaphore(nullptr) {
         currentBolus = nullptr;
         tempBasal = nullptr;
@@ -647,6 +647,7 @@ private:
     size_t bolusQueueIdx;
     bool tempBasalActive;
     bool basalSuspended;
+    uint32_t suspendResumeTimeMs;  // 0=不自动恢复, >0=自动恢复的绝对时间
     uint32_t tempBasalStartMs;
     uint32_t lastDeliveryScanTime;
     bool everActivated;
@@ -822,6 +823,17 @@ private:
             elapsedPrefs.begin("pump", false);
             elapsedPrefs.putUInt("elapsedTime", totalElapsedTime);
             elapsedPrefs.end();
+        }
+
+        // 自动恢复: suspend 到期后自动恢复
+        if (basalSuspended && suspendResumeTimeMs > 0 && millis() >= suspendResumeTimeMs) {
+            suspendResumeTimeMs = 0;
+            basalSuspended = false;
+            setPatchState(PatchState::ACTIVE);
+            simulatorState = SimulatorState::RUNNING;
+            addRecord(4, 0, 0);
+            buildBasalQueue();
+            Logger::info("暂停到期, 泵已自动恢复 -> ACTIVE");
         }
 
         processDeliveryQueues();
@@ -2091,6 +2103,12 @@ private:
             uint8_t cause = data[4];
             uint8_t duration = data[5];
             Logger::info("暂停原因: " + String(cause) + ", 时长: " + String(duration) + "分钟");
+            if (duration > 0) {
+                suspendResumeTimeMs = millis() + (uint32_t)duration * 60000;
+                Logger::info("将在 " + String(duration) + " 分钟后自动恢复");
+            } else {
+                suspendResumeTimeMs = 0;
+            }
         }
 
         setPatchState(PatchState::SUSPENDED);
@@ -2142,6 +2160,7 @@ private:
         simulatorState = SimulatorState::RUNNING;
         addRecord(4, 0, 0);
         basalSuspended = false;
+        suspendResumeTimeMs = 0;
         buildBasalQueue();
         Logger::info("泵已恢复 -> ACTIVE");
         sendResponse(CommandType::RESUME_PUMP, seqNum, nullptr, 0);
