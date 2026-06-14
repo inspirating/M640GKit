@@ -1394,18 +1394,29 @@ private:
         }
 
         // 3.6 大剂量完成检查: 等 GPIO task 真正结束后才发送完成通知
+        // 只有实际输注过 (deliverAmount > 0) 才标记完成,
+        // 否则 carryOver 还在队列里等累积, 不能提前结束
         if (currentBolus && isGpioDeliveryComplete()) {
-            Logger::info("大剂量完成检查: GPIO task 已结束, 标记完成");
-            currentBolus->delivered = currentBolus->amount;
-            bolusHistory.push_back(*currentBolus);
-            sendStateNotification();
-            delete currentBolus;
-            currentBolus = nullptr;
-            bolusDeliveryProgress = 0;
-            lastReportedBolusProgress = 0;
-            bolusQueue.clear();
-            bolusQueueIdx = 0;
-            resetGpioState();
+            // 检查 bolusQueue 里是否还有未输注的余量 (carryOver)
+            double pendingSum = 0;
+            for (const auto& a : bolusQueue) {
+                pendingSum += a.stepAmount;
+            }
+            if (fabs(pendingSum) < 0.001) {
+                Logger::info("大剂量完成检查: GPIO task 已结束, 标记完成");
+                currentBolus->delivered = currentBolus->amount;
+                bolusHistory.push_back(*currentBolus);
+                sendStateNotification();
+                delete currentBolus;
+                currentBolus = nullptr;
+                bolusDeliveryProgress = 0;
+                lastReportedBolusProgress = 0;
+                bolusQueue.clear();
+                bolusQueueIdx = 0;
+                resetGpioState();
+            } else {
+                Logger::info("大剂量完成检查: carryOver=" + String(pendingSum) + "U, 等待累积到 STEP_SIZE 后再输注");
+            }
         }
     }
 
@@ -1863,8 +1874,22 @@ private:
             }
 
             if (currentBolus != nullptr) {
-                Logger::warning("已有大剂量在执行中");
-                sendErrorResponse(CommandType::SET_BOLUS, BLEErrorCode::PUMP_BUSY);
+                // 如果当前 bolus 还有 carryOver 未输注, 允许新 bolus 叠加
+                // 否则拒绝 (正在 GPIO 输注中)
+                if (isDeliveryTaskRunning) {
+                    Logger::warning("已有大剂量在GPIO输注中");
+                    sendErrorResponse(CommandType::SET_BOLUS, BLEErrorCode::PUMP_BUSY);
+                    return;
+                }
+                // 叠加: 新量加入队列, 更新 currentBolus 的 amount
+                Logger::info("叠加新大剂量: " + String(amount) + "U 到已有 " + String(currentBolus->amount) + "U");
+                currentBolus->amount += amount;
+                InsulinAction bolusAction;
+                bolusAction.stepAmount = amount;
+                bolusQueue.push_back(bolusAction);
+                addRecord(1, amount, 0);
+                Logger::info("大剂量已叠加到队列: " + String(amount) + "U, 总计: " + String(currentBolus->amount) + "U");
+                sendResponse(CommandType::SET_BOLUS, seqNum, nullptr, 0);
                 return;
             }
 
