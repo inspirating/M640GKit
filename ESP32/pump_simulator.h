@@ -1393,30 +1393,23 @@ private:
             }
         }
 
-        // 3.6 大剂量完成检查: 等 GPIO task 真正结束后才发送完成通知
-        // 只有实际输注过 (deliverAmount > 0) 才标记完成,
-        // 否则 carryOver 还在队列里等累积, 不能提前结束
+        // 3.6 大剂量完成检查
+        // handleSetBolusRequest 已返回成功给 Trio, 必须通知 Trio 完成
+        // 否则进度条会一直卡住
+        // carryOver 留在 bolusQueue 里等下次累积到 STEP_SIZE 再输注
         if (currentBolus && isGpioDeliveryComplete()) {
-            // 检查 bolusQueue 里是否还有未输注的余量 (carryOver)
-            double pendingSum = 0;
-            for (const auto& a : bolusQueue) {
-                pendingSum += a.stepAmount;
-            }
-            if (fabs(pendingSum) < 0.001) {
-                Logger::info("大剂量完成检查: GPIO task 已结束, 标记完成");
-                currentBolus->delivered = currentBolus->amount;
-                bolusHistory.push_back(*currentBolus);
-                sendStateNotification();
-                delete currentBolus;
-                currentBolus = nullptr;
-                bolusDeliveryProgress = 0;
-                lastReportedBolusProgress = 0;
-                bolusQueue.clear();
-                bolusQueueIdx = 0;
-                resetGpioState();
-            } else {
-                Logger::info("大剂量完成检查: carryOver=" + String(pendingSum) + "U, 等待累积到 STEP_SIZE 后再输注");
-            }
+            Logger::info("大剂量完成: 通知Trio已完成 (carryOver留在队列累积)");
+            currentBolus->delivered = currentBolus->amount;
+            bolusHistory.push_back(*currentBolus);
+            sendStateNotification();
+            sendSynchronizeNotification();
+            delete currentBolus;
+            currentBolus = nullptr;
+            bolusDeliveryProgress = 0;
+            lastReportedBolusProgress = 0;
+            // 不清 bolusQueue, carryOver 留着下次累积
+            bolusQueueIdx = 0;
+            resetGpioState();
         }
     }
 
