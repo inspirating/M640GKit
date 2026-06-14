@@ -1220,41 +1220,32 @@ private:
     void startGpioDelivery(double stepU, int stepCount) {
         if (stepCount < 1) return;
 
-        if (xSemaphoreTake(xSemaphore, 0) == pdTRUE) {
-            
-            if (isDeliveryTaskRunning) {
-                xSemaphoreGive(xSemaphore); // 释放锁并退出
-                return;
-            }
-
-            isDeliveryTaskRunning = true; // 开始任务
-
-            gpioRemainingSteps = stepCount;
-
-            // 创建 FreeRTOS 线程！
-            // 参数: 函数名, 线程名称, 栈大小(字节), 传参(this), 优先级(1即可), 句柄(不用管设为NULL)
-            BaseType_t taskCreated = xTaskCreate(gpioDeliveryTask, "PumpDelivery", 8192, this, configMAX_PRIORITIES - 1, NULL);
-            
-            if (taskCreated != pdPASS) {
-                Logger::error("[GPIO] xTaskCreate 失败！无法创建输注线程");
-                isDeliveryTaskRunning = false;
-                xSemaphoreGive(xSemaphore);
-                return;
-            }
-            
-            Logger::info("GPIO 独立线程已派发: " + String(stepU) + "U, " + String(stepCount) + " steps");
-            
-            xSemaphoreGive(xSemaphore); // 任务派发后释放锁
-        } else {
-            Logger::warning("[GPIO] 正在输注中，本次请求被忽略");
+        // 防重入: 信号量保护, 确保任何时候只有一个输注线程
+        if (xSemaphoreTake(xSemaphore, 0) != pdTRUE) {
+            Logger::warning("[GPIO] 无法获取信号量, 正在输注中，本次请求被忽略");
+            return;
         }
 
-        // 防重入：如果上一个线程还没跑完，忽略新的触发
         if (isDeliveryTaskRunning) {
+            xSemaphoreGive(xSemaphore);
             Logger::warning("[GPIO] 上一笔输注线程尚未结束，忽略本次触发");
             return;
         }
 
+        isDeliveryTaskRunning = true;
+        gpioRemainingSteps = stepCount;
+
+        BaseType_t taskCreated = xTaskCreate(gpioDeliveryTask, "PumpDelivery", 8192, this, configMAX_PRIORITIES - 1, NULL);
+        
+        if (taskCreated != pdPASS) {
+            Logger::error("[GPIO] xTaskCreate 失败！无法创建输注线程");
+            isDeliveryTaskRunning = false;
+            xSemaphoreGive(xSemaphore);
+            return;
+        }
+        
+        Logger::info("GPIO 独立线程已派发: " + String(stepU) + "U, " + String(stepCount) + " steps");
+        xSemaphoreGive(xSemaphore);
     }
 
     void resetGpioState() {
@@ -1376,24 +1367,49 @@ private:
             }
             Logger::info("[DEBUG] deliverAmount=" + String(deliverAmount) + "U, carryOver=" + String(carryOver) + "U");
 
-            // 3.3 执行实际输注
+            // 3.3 安全检查: 限制单次输注量不超过储药器余量和小时/日最大量
             if (deliverAmount > 0.001) {
-                // 扣除储药器, 更新统计 (basal 和 bolus 都要扣)
-                reservoir = max(0.0, reservoir - deliverAmount);
-                activeInsulin += deliverAmount;
-                hourlyDelivered += deliverAmount;
-                dailyDelivered += deliverAmount;
-                Logger::info("输注记录, 储药器余量: " + String(reservoir) + "U");
+                // 储药器余量检查
+                if (deliverAmount > reservoir) {
+                    Logger::warning("[安全] 输注量 " + String(deliverAmount) + "U 超过储药器余量 " + String(reservoir) + "U, 截断");
+                    double excess = deliverAmount - reservoir;
+                    deliverAmount = reservoir;
+                    carryOver += excess;  // 多出的部分放回 carryOver
+                }
 
-                if (currentBolus != nullptr) {
-                    // 大剂量: 通过 GPIO 物理按键输注
-                    InsulinAction action;
-                    action.stepAmount = deliverAmount;
-                    executeQueueAction(action);
-                    // delivered 保持 0, 由 Trio M640GDoseProgressReporter 基于时间估算
-                } else {
-                    // 基础率/临时基础率: 只记录, 不走 GPIO 物理按键
-                    Logger::info("[BASAL] 基础率输注 " + String(deliverAmount) + "U (软件记录, 无GPIO)");
+                // 每小时最大量检查
+                double hourlyRemaining = hourlyMaxInsulin - hourlyDelivered;
+                if (deliverAmount > hourlyRemaining) {
+                    Logger::warning("[安全] 输注量 " + String(deliverAmount) + "U 超过小时剩余配额 " + String(hourlyRemaining) + "U, 截断");
+                    double excess = deliverAmount - hourlyRemaining;
+                    deliverAmount = hourlyRemaining;
+                    carryOver += excess;
+                }
+
+                // 每日最大量检查
+                double dailyRemaining = dailyMaxInsulin - dailyDelivered;
+                if (deliverAmount > dailyRemaining) {
+                    Logger::warning("[安全] 输注量 " + String(dailyRemaining) + "U 超过日剩余配额 " + String(dailyRemaining) + "U, 截断");
+                    double excess = deliverAmount - dailyRemaining;
+                    deliverAmount = dailyRemaining;
+                    carryOver += excess;
+                }
+
+                // 二次检查: 截断后可能小于步长
+                if (deliverAmount > 0.001) {
+                    reservoir = max(0.0, reservoir - deliverAmount);
+                    activeInsulin += deliverAmount;
+                    hourlyDelivered += deliverAmount;
+                    dailyDelivered += deliverAmount;
+                    Logger::info("输注记录, 储药器余量: " + String(reservoir) + "U");
+
+                    if (currentBolus != nullptr) {
+                        InsulinAction action;
+                        action.stepAmount = deliverAmount;
+                        executeQueueAction(action);
+                    } else {
+                        Logger::info("[BASAL] 基础率输注 " + String(deliverAmount) + "U (软件记录, 无GPIO)");
+                    }
                 }
             }
 
