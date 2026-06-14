@@ -1331,8 +1331,8 @@ private:
         }
 
         // ===== Step 2: 消费基础率队列 =====
-        // 将已到期的基础率动作移入 bolusQueue, 与临时基础率和大剂量统一调度
-        if (!basalSuspended && basalQueueIdx < basalQueue.size()) {
+        // 临时基础率优先级高于基础率, tempBasalActive 时不消费 basalQueue
+        if (!basalSuspended && !tempBasalActive && basalQueueIdx < basalQueue.size()) {
             while (basalQueueIdx < basalQueue.size() && now >= basalQueue[basalQueueIdx].executeTimeMs) {
                 bolusQueue.push_back(basalQueue[basalQueueIdx]);
                 basalQueueIdx++;
