@@ -1150,61 +1150,48 @@ private:
 
         if (actualCount == 0) return;
 
+        // 按 5 分钟间隔拆分, 24h = 288 个 5 分钟段
+        const uint16_t INTERVAL_MIN = 5;
+        const uint16_t TOTAL_SLOTS = 288;
         uint32_t baseTime = millis();
-        uint32_t scheduleStartMs = 0;
 
-        for (uint16_t seg = 0; seg < 48; seg++) {
-            uint16_t segStartMin = seg * 30;
+        for (uint16_t slot = 0; slot < TOTAL_SLOTS; slot++) {
+            uint16_t slotStartMin = slot * INTERVAL_MIN;
             double rate = 0;
             for (int8_t e = (int8_t)actualCount - 1; e >= 0; e--) {
-                if (entries[e].startTimeMinutes <= segStartMin) {
+                if (entries[e].startTimeMinutes <= slotStartMin) {
                     rate = entries[e].rate;
                     break;
                 }
             }
 
-            if (rate <= 0) {
-                scheduleStartMs += 1800000;
-                continue;
-            }
+            if (rate <= 0) continue;
 
-            uint32_t segmentDurationMs = 1800000;
-            double totalU = rate * 0.5;
-            uint32_t numSteps = static_cast<uint32_t>(totalU / STEP_SIZE);
-            if (numSteps == 0) numSteps = 1;
-
-            uint32_t intervalMs = segmentDurationMs / numSteps;
-            for (uint32_t s = 0; s < numSteps; s++) {
-                uint32_t offset = (s * segmentDurationMs) / numSteps;
-                InsulinAction action;
-                action.executeTimeMs = baseTime + scheduleStartMs + offset;
-                action.stepAmount = min(STEP_SIZE, totalU - s * STEP_SIZE);
-                basalQueue.push_back(action);
-            }
-            scheduleStartMs += segmentDurationMs;
+            InsulinAction action;
+            action.executeTimeMs = baseTime + (uint32_t)slot * INTERVAL_MIN * 60000;
+            action.stepAmount = rate * INTERVAL_MIN / 60.0; // rate × 5min / 60min
+            basalQueue.push_back(action);
         }
-        Logger::info("基础率队列已构建: " + String(basalQueue.size()) + " steps");
+        Logger::info("基础率队列已构建: " + String(basalQueue.size()) + " steps (5min间隔)");
     }
 
     void buildTempBasalQueue(double rate, uint16_t durationMinutes) {
         tempBasalQueue.clear();
         tempBasalQueueIdx = 0;
 
-        double totalU = rate * durationMinutes / 60.0;
-        uint32_t numSteps = static_cast<uint32_t>(totalU / STEP_SIZE);
-        if (numSteps == 0) numSteps = 1;
-
-        uint32_t totalDurationMs = durationMinutes * 60 * 1000;
-        uint32_t intervalMs = totalDurationMs / numSteps;
+        // 按 5 分钟间隔拆分
+        const uint16_t INTERVAL_MIN = 5;
+        uint32_t numSlots = durationMinutes / INTERVAL_MIN;
+        if (numSlots == 0) numSlots = 1;
         uint32_t baseTime = millis();
 
-        for (uint32_t s = 0; s < numSteps; s++) {
+        for (uint32_t s = 0; s < numSlots; s++) {
             InsulinAction action;
-            action.executeTimeMs = baseTime + s * intervalMs;
-            action.stepAmount = min(STEP_SIZE, totalU - s * STEP_SIZE);
+            action.executeTimeMs = baseTime + s * INTERVAL_MIN * 60000;
+            action.stepAmount = rate * INTERVAL_MIN / 60.0;
             tempBasalQueue.push_back(action);
         }
-        Logger::info("临时基础率队列已构建: " + String(tempBasalQueue.size()) + " steps @ " + String(rate) + "U/hr x " + String(durationMinutes) + "min");
+        Logger::info("临时基础率队列已构建: " + String(tempBasalQueue.size()) + " steps (5min间隔) @ " + String(rate) + "U/hr x " + String(durationMinutes) + "min");
     }
 
     // void startGpioDelivery(double stepU, int stepCount) {
