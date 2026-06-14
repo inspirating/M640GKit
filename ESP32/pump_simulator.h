@@ -1276,15 +1276,7 @@ private:
 
         Logger::info("[DEBUG] executeQueueAction called, stepU=" + String(stepU) + "U, stepCount=" + String(stepCount));
 
-        // 扣除本次输注量, 更新各项统计
-        reservoir = max(0.0, reservoir - stepU);
-        activeInsulin += stepU;
-        hourlyDelivered += stepU;
-        dailyDelivered += stepU;
-
-        Logger::info("输注完成, 储药器余量: " + String(reservoir) + "U");
-        
-        // 启动非阻塞 GPIO 输注
+        // 启动 GPIO 物理按键输注 (储药器已在 processDeliveryQueues section 3.3 扣除)
         startGpioDelivery(stepU, stepCount);
     }
 
@@ -1316,8 +1308,7 @@ private:
         }
 
         // 5分钟扫描一次；有活跃大剂量时立即执行
-        // if (currentBolus == nullptr && now - lastDeliveryScanTime < 300000) {
-        if (currentBolus == nullptr && now - lastDeliveryScanTime < 100) {
+        if (currentBolus == nullptr && now - lastDeliveryScanTime < 300000) {
             Logger::info("[DEBUG] Skipping delivery: no active bolus and 5min not elapsed");
             return;
         }
@@ -1361,9 +1352,7 @@ private:
             }
         }
 
-        // ===== Step 3: 处理 bolusQueue - 汇总、步进补偿、执行输注 =====
-        // 将队列中所有待输注量汇总, 然后按电机最小步长 STEP_SIZE 进行取整,
-        // 最后通过 executeQueueAction() 输出 GPIO 脉冲驱动电机。
+        // ===== Step 3: 处理 bolusQueue - 区分 bolus 和 basal =====
         if (!bolusQueue.empty()) {
             // 3.1 汇总所有待输注量
             double sum = 0;
@@ -1374,36 +1363,39 @@ private:
             Logger::info("[DEBUG] bolusQueue sum=" + String(sum) + "U");
 
             // 3.2 步进补偿: 将总量取整到最近的 STEP_SIZE 边界
-            // 由于电机只能按固定步长 (如 0.3U) 动作, 不足一个步长的部分
-            // 需要累积到下一次处理, 避免输注精度丢失。
             double remainder = fmod(sum, STEP_SIZE);
             if (remainder < 0) remainder += STEP_SIZE;
 
             double deliverAmount;
             double carryOver;
             if (remainder >= STEP_SIZE / 2.0) {
-                // 余量 >= 半步: 向上取整, 多输的部分记为负 carryOver
                 deliverAmount = sum + (STEP_SIZE - remainder);
                 carryOver = remainder - STEP_SIZE;
             } else {
-                // 余量 < 半步: 向下取整, 少输的部分记为正 carryOver
                 deliverAmount = sum - remainder;
                 carryOver = remainder;
             }
             Logger::info("[DEBUG] deliverAmount=" + String(deliverAmount) + "U, carryOver=" + String(carryOver) + "U");
 
-            // 3.3 执行实际输注 (GPIO 脉冲输出)
+            // 3.3 执行实际输注
             if (deliverAmount > 0.001) {
-                Logger::info("[DEBUG] Calling executeQueueAction with deliverAmount=" + String(deliverAmount) + "U");
-                InsulinAction action;
-                action.stepAmount = deliverAmount;
-                executeQueueAction(action);  // <-- 此处输出 GPIO 信号驱动电机
+                // 扣除储药器, 更新统计 (basal 和 bolus 都要扣)
+                reservoir = max(0.0, reservoir - deliverAmount);
+                activeInsulin += deliverAmount;
+                hourlyDelivered += deliverAmount;
+                dailyDelivered += deliverAmount;
+                Logger::info("输注记录, 储药器余量: " + String(reservoir) + "U");
 
-                // 3.4 大剂量进度追踪
-                // delivered 保持不变(保持 0)，由 Trio 的 M640GDoseProgressReporter 基于时间估算进度。
-                // 实际 delivered 在 section 3.6 GPIO task 结束后统一设为全额。
-                // 避免同步通知提前带上"已完成"标志导致进度条提前结束。
-                // (void)0; // no-op
+                if (currentBolus != nullptr) {
+                    // 大剂量: 通过 GPIO 物理按键输注
+                    InsulinAction action;
+                    action.stepAmount = deliverAmount;
+                    executeQueueAction(action);
+                    // delivered 保持 0, 由 Trio M640GDoseProgressReporter 基于时间估算
+                } else {
+                    // 基础率/临时基础率: 只记录, 不走 GPIO 物理按键
+                    Logger::info("[BASAL] 基础率输注 " + String(deliverAmount) + "U (软件记录, 无GPIO)");
+                }
             }
 
             // 3.5 将步进补偿的余量 carryOver 重新放入队列, 下次累积执行
