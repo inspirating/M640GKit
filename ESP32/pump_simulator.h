@@ -2596,16 +2596,16 @@ void gpioDeliveryTask(void *parameter) {
     M640GPumpSimulator* simulator = static_cast<M640GPumpSimulator*>(parameter);
 
     // 上锁读取步数
-    // xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);
+    xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);
     int steps = simulator->gpioRemainingSteps;
-    // xSemaphoreGive(simulator->xSemaphore);
+    xSemaphoreGive(simulator->xSemaphore);
 
-    if(steps <= 0) {
-        Logger::warning("步数为0，无法执行输注任务");
-        // goto finish;
+    if (steps <= 0) {
+        Logger::warning("[Task] 步数为0，跳过输注");
+        goto finish;
     }
 
-    Logger::info("[Task] 独立输注线程启动");
+    Logger::info("[Task] 独立输注线程启动, steps=" + String(steps));
 
 // ==================== 修改后的 TS5A3166 声音大剂量物理敲击时序 ====================
     // steps = 10; // 举例：输入 10 步
@@ -2651,20 +2651,17 @@ void gpioDeliveryTask(void *parameter) {
     
     Serial.println(">>> [SUCCESS] 声音大剂量物理时序模拟完毕！");
 
-// finish:
+finish:
     // 确保 GPIO 安全: TS5A3166 LOW = 断开
     digitalWrite(STEP_PIN, LOW);
     pinMode(STEP_PIN, OUTPUT);
 
     // 上锁标记任务结束
-    // xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);
+    xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);
     simulator->isDeliveryTaskRunning = false;
-    // xSemaphoreGive(simulator->xSemaphore);
+    xSemaphoreGive(simulator->xSemaphore);
 
     vTaskDelete(NULL);
-
-    // digitalWrite(STEP_PIN, HIGH);
-    // pinMode(STEP_PIN, OUTPUT);
 }
 
 
