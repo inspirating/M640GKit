@@ -176,7 +176,7 @@ public:
         expirationTimer(0), alarmSetting(0),
         predictiveLowSuspend(0), predictiveLowSuspendRange(30), lastPrimeNotificationTime(0),
         basalQueueIdx(0), tempBasalQueueIdx(0), bolusQueueIdx(0),
-        tempBasalActive(false), basalSuspended(false), suspendResumeTimeMs(0), tempBasalStartMs(0), lastDeliveryScanTime(0), everActivated(false),
+        tempBasalActive(false), basalSuspended(false), suspendResumeTimeMs(0), stepCarryOver(0.0), tempBasalStartMs(0), lastDeliveryScanTime(0), everActivated(false), lastHourResetSec(0), lastDayResetSec(0),
         gpioDeliveryStartMs(0), gpioRemainingSteps(0), gpioCurrentStep(0), isDeliveryTaskRunning(false), xSemaphore(nullptr) {
         currentBolus = nullptr;
         tempBasal = nullptr;
@@ -224,7 +224,38 @@ public:
             } else if (patchState == PatchState::SUSPENDED || patchState == PatchState::PAUSED) {
                 simulatorState = SimulatorState::SUSPENDED;
             }
+
+            // 恢复输注统计数据
+            Preferences statsPrefs;
+            statsPrefs.begin("pumpStats", true);
+            hourlyDelivered = statsPrefs.getDouble("hourlyDel", 0.0);
+            dailyDelivered = statsPrefs.getDouble("dailyDel", 0.0);
+            reservoir = statsPrefs.getDouble("reservoir", MAX_RESERVOIR);
+            stepCarryOver = statsPrefs.getDouble("stepCarry", 0.0);
+            uint32_t savedLastHourReset = statsPrefs.getUInt("lastHourRst", 0);
+            uint32_t savedLastDayReset = statsPrefs.getUInt("lastDayRst", 0);
+            statsPrefs.end();
+
+            // 恢复 resetHourlyDailyCounters 的计时基准
+            // 如果重启间隔超过1小时/1天, 计数器应归零
+            uint32_t nowSec = millis() / 1000;
+            if (savedLastHourReset > 0 && nowSec - savedLastHourReset < 3600) {
+                // 在同一小时内, 恢复计数和计时基准
+                lastHourResetSec = savedLastHourReset;
+            } else {
+                hourlyDelivered = 0.0;
+                lastHourResetSec = nowSec;
+            }
+            if (savedLastDayReset > 0 && nowSec - savedLastDayReset < 86400) {
+                // 在同一天内, 恢复计数和计时基准
+                lastDayResetSec = savedLastDayReset;
+            } else {
+                dailyDelivered = 0.0;
+                lastDayResetSec = nowSec;
+            }
+
             Logger::info("从NVS恢复: patchStartTime=" + String(patchStartTime) + " state=" + String(getStateName(patchState)) + " elapsed=" + String(totalElapsedTime));
+            Logger::info("统计恢复: hourlyDel=" + String(hourlyDelivered) + " dailyDel=" + String(dailyDelivered) + " reservoir=" + String(reservoir) + " carryOver=" + String(stepCarryOver));
         } else {
             patchStartTime = 0;
             // 检查patch是否曾经被激活过（独立持久化标记，不会被handleStopPatchRequest清除）
@@ -648,9 +679,12 @@ private:
     bool tempBasalActive;
     bool basalSuspended;
     uint32_t suspendResumeTimeMs;  // 0=不自动恢复, >0=自动恢复的绝对时间
+    double stepCarryOver;  // 步进补偿余量, 独立跟踪, 不放入 bolusQueue
     uint32_t tempBasalStartMs;
     uint32_t lastDeliveryScanTime;
     bool everActivated;
+    uint32_t lastHourResetSec;  // 上次小时计数器重置时间(秒), 持久化到NVS
+    uint32_t lastDayResetSec;   // 上次日计数器重置时间(秒), 持久化到NVS
 
     uint32_t gpioDeliveryStartMs;   // 整次输注开始的绝对时间, 用于超时保护
     int gpioRemainingSteps;
@@ -862,18 +896,28 @@ private:
     }
 
     void resetHourlyDailyCounters() {
-        static uint32_t lastHourReset = 0;
-        static uint32_t lastDayReset = 0;
         uint32_t now = millis() / 1000;
 
-        if (now - lastHourReset >= 3600) {
+        if (now - lastHourResetSec >= 3600) {
             hourlyDelivered = 0.0;
-            lastHourReset = now;
+            lastHourResetSec = now;
         }
-        if (now - lastDayReset >= 86400) {
+        if (now - lastDayResetSec >= 86400) {
             dailyDelivered = 0.0;
-            lastDayReset = now;
+            lastDayResetSec = now;
         }
+    }
+
+    void persistStats() {
+        Preferences prefs;
+        prefs.begin("pumpStats", false);
+        prefs.putDouble("hourlyDel", hourlyDelivered);
+        prefs.putDouble("dailyDel", dailyDelivered);
+        prefs.putDouble("reservoir", reservoir);
+        prefs.putDouble("stepCarry", stepCarryOver);
+        prefs.putUInt("lastHourRst", lastHourResetSec);
+        prefs.putUInt("lastDayRst", lastDayResetSec);
+        prefs.end();
     }
 
     void updatePrimeProgress() {
@@ -1344,55 +1388,47 @@ private:
 
         // ===== Step 3: 处理 bolusQueue - 区分 bolus 和 basal =====
         if (!bolusQueue.empty()) {
-            // 3.1 汇总所有待输注量
-            double sum = 0;
+            // 3.1 汇总所有待输注量 (含 stepCarryOver)
+            double sum = stepCarryOver;
             for (const auto& action : bolusQueue) {
                 sum += action.stepAmount;
             }
             bolusQueue.clear();
-            Logger::info("[DEBUG] bolusQueue sum=" + String(sum) + "U");
+            stepCarryOver = 0;
+            Logger::info("[DEBUG] bolusQueue sum=" + String(sum) + "U (含carryOver)");
 
             // 3.2 步进补偿: 将总量取整到最近的 STEP_SIZE 边界
             double remainder = fmod(sum, STEP_SIZE);
             if (remainder < 0) remainder += STEP_SIZE;
 
             double deliverAmount;
-            double carryOver;
             if (remainder >= STEP_SIZE / 2.0) {
                 deliverAmount = sum + (STEP_SIZE - remainder);
-                carryOver = remainder - STEP_SIZE;
+                stepCarryOver = remainder - STEP_SIZE;
             } else {
                 deliverAmount = sum - remainder;
-                carryOver = remainder;
+                stepCarryOver = remainder;
             }
-            Logger::info("[DEBUG] deliverAmount=" + String(deliverAmount) + "U, carryOver=" + String(carryOver) + "U");
+            Logger::info("[DEBUG] deliverAmount=" + String(deliverAmount) + "U, stepCarryOver=" + String(stepCarryOver) + "U");
 
             // 3.3 安全检查: 限制单次输注量不超过储药器余量和小时/日最大量
+            // stepCarryOver 只记录步进补偿余量(±0.25U), 不参与安全检测
             if (deliverAmount > 0.001) {
-                // 储药器余量检查
                 if (deliverAmount > reservoir) {
                     Logger::warning("[安全] 输注量 " + String(deliverAmount) + "U 超过储药器余量 " + String(reservoir) + "U, 截断");
-                    double excess = deliverAmount - reservoir;
                     deliverAmount = reservoir;
-                    carryOver += excess;  // 多出的部分放回 carryOver
                 }
 
-                // 每小时最大量检查
+                double dailyRemaining = dailyMaxInsulin - dailyDelivered;
+                if (deliverAmount > dailyRemaining) {
+                    Logger::warning("[安全] 输注量 " + String(deliverAmount) + "U 超过日剩余配额 " + String(dailyRemaining) + "U, 截断");
+                    deliverAmount = dailyRemaining;
+                }
+
                 double hourlyRemaining = hourlyMaxInsulin - hourlyDelivered;
                 if (deliverAmount > hourlyRemaining) {
                     Logger::warning("[安全] 输注量 " + String(deliverAmount) + "U 超过小时剩余配额 " + String(hourlyRemaining) + "U, 截断");
-                    double excess = deliverAmount - hourlyRemaining;
                     deliverAmount = hourlyRemaining;
-                    carryOver += excess;
-                }
-
-                // 每日最大量检查
-                double dailyRemaining = dailyMaxInsulin - dailyDelivered;
-                if (deliverAmount > dailyRemaining) {
-                    Logger::warning("[安全] 输注量 " + String(dailyRemaining) + "U 超过日剩余配额 " + String(dailyRemaining) + "U, 截断");
-                    double excess = deliverAmount - dailyRemaining;
-                    deliverAmount = dailyRemaining;
-                    carryOver += excess;
                 }
 
                 // 二次检查: 截断后可能小于步长
@@ -1412,13 +1448,9 @@ private:
                     }
                 }
             }
-
-            // 3.5 将步进补偿的余量 carryOver 重新放入队列, 下次累积执行
-            if (fabs(carryOver) > 0.001) {
-                InsulinAction carryAction;
-                carryAction.stepAmount = carryOver;
-                bolusQueue.push_back(carryAction);
-            }
+            // 持久化统计数据, 防止重启丢失
+            persistStats();
+            // stepCarryOver 独立保存, 不放入 bolusQueue, 不会被 clear() 丢失
         }
 
         // 3.6 大剂量完成检查
@@ -1967,6 +1999,7 @@ private:
             currentBolus = nullptr;
             bolusDeliveryProgress = 0;
             lastReportedBolusProgress = 0;
+            // stepCarryOver 独立保存, bolusQueue 可安全清空
             bolusQueue.clear();
             bolusQueueIdx = 0;
             sendStateNotification();
@@ -2138,6 +2171,7 @@ private:
             currentBolus = nullptr;
             bolusDeliveryProgress = 0;
             lastReportedBolusProgress = 0;
+            // stepCarryOver 独立保存, bolusQueue 可安全清空
             bolusQueue.clear();
             bolusQueueIdx = 0;
         }
@@ -2312,6 +2346,8 @@ private:
         totalElapsedTime = 0;
         hourlyDelivered = 0;
         dailyDelivered = 0;
+        lastHourResetSec = millis() / 1000;
+        lastDayResetSec = millis() / 1000;
         basalSequence = 0;
         basalSuspended = false;
         tempBasalActive = false;
@@ -2319,6 +2355,7 @@ private:
         basalQueueIdx = 0;
         tempBasalQueue.clear();
         tempBasalQueueIdx = 0;
+        // prime 重置储药器, carryOver 不保留
         bolusQueue.clear();
         bolusQueueIdx = 0;
         buildBasalQueue();
@@ -2378,6 +2415,8 @@ private:
         activeInsulin = 0;
         hourlyDelivered = 0;
         dailyDelivered = 0;
+        lastHourResetSec = millis() / 1000;
+        lastDayResetSec = millis() / 1000;
         basalSequence = 0;
         primeProgress = 0;
         lastNotifiedState = PatchState::NONE;
@@ -2405,6 +2444,7 @@ private:
         basalQueueIdx = 0;
         tempBasalQueue.clear();
         tempBasalQueueIdx = 0;
+        // stop patch 重置所有状态, carryOver 不保留
         bolusQueue.clear();
         bolusQueueIdx = 0;
         basalSuspended = false;
