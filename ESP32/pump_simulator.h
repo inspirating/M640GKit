@@ -134,6 +134,7 @@ struct TempBasalInfo {
 
 // ========== 队列输注系统 ==========
 static constexpr double STEP_SIZE = 0.5;
+static constexpr double CARRYOVER_MAX = 2.0;  // carryOver 硬上限: 防止撞上限时欠债无限累积, 配额恢复时一次性补打成过量
 static constexpr int STEP_PIN = 7; 
 
 struct InsulinAction {
@@ -232,6 +233,9 @@ public:
             dailyDelivered = statsPrefs.getDouble("dailyDel", 0.0);
             reservoir = statsPrefs.getDouble("reservoir", MAX_RESERVOIR);
             stepCarryOver = statsPrefs.getDouble("stepCarry", 0.0);
+            // 防御: NVS 里的旧值 (可能来自更早版本固件四舍五入产生的负值, 或异常累积) 统一封顶到 [0, CARRYOVER_MAX]
+            if (stepCarryOver < 0) stepCarryOver = 0;
+            if (stepCarryOver > CARRYOVER_MAX) stepCarryOver = CARRYOVER_MAX;
             uint32_t savedLastHourReset = statsPrefs.getUInt("lastHourRst", 0);
             uint32_t savedLastDayReset = statsPrefs.getUInt("lastDayRst", 0);
             statsPrefs.end();
@@ -1397,41 +1401,54 @@ private:
             stepCarryOver = 0;
             Logger::info("[DEBUG] bolusQueue sum=" + String(sum) + "U (含carryOver)");
 
-            // 3.2 步进补偿: 将总量取整到最近的 STEP_SIZE 边界
-            double remainder = fmod(sum, STEP_SIZE);
-            if (remainder < 0) remainder += STEP_SIZE;
-
-            double deliverAmount;
-            if (remainder >= STEP_SIZE / 2.0) {
-                deliverAmount = sum + (STEP_SIZE - remainder);
-                stepCarryOver = remainder - STEP_SIZE;
-            } else {
-                deliverAmount = sum - remainder;
-                stepCarryOver = remainder;
+            // 3.2 步进补偿: 向下取整到 STEP_SIZE 边界 (只少打, 绝不多打)
+            // 安全原则: 输注泵宁可少打可补, 不可超打。carryOver 恒 >= 0, 表示"欠"的胰岛素,
+            // 下次累积到 >= STEP_SIZE 时补打。保持守恒: sum == deliverAmount + stepCarryOver。
+            double deliverAmount = floor(sum / STEP_SIZE) * STEP_SIZE;
+            if (deliverAmount < 0) deliverAmount = 0;  // 防御: sum 为负时不打
+            stepCarryOver = sum - deliverAmount;        // 恒 >= 0, 范围 [0, STEP_SIZE)
+            // 硬上限保护: carryOver 不允许超过 CARRYOVER_MAX。
+            // 若 sum 本身超过 2U 却因故无法取整输注 (例如长期撞储药器/配额上限),
+            // 累积的欠债超过 2U 时直接丢弃超额, 宁可少打也不在配额恢复时一次性补打出过量。
+            if (stepCarryOver > CARRYOVER_MAX) {
+                Logger::warning("[安全] stepCarryOver=" + String(stepCarryOver) + "U 超过上限 " + String(CARRYOVER_MAX) + "U, 丢弃超额");
+                stepCarryOver = CARRYOVER_MAX;
             }
-            Logger::info("[DEBUG] deliverAmount=" + String(deliverAmount) + "U, stepCarryOver=" + String(stepCarryOver) + "U");
+            Logger::info("[DEBUG] deliverAmount=" + String(deliverAmount) + "U, stepCarryOver=" + String(stepCarryOver) + "U (floor)");
 
             // 3.3 安全检查: 限制单次输注量不超过储药器余量和小时/日最大量
-            // stepCarryOver 只记录步进补偿余量(±0.25U), 不参与安全检测
+            // 关键: 截断后必须重新向下取整到 STEP_SIZE, 否则 deliverAmount 不是 0.5U 的倍数,
+            // 会导致 executeQueueAction 的 stepCount=round(... ) 与账面不一致 (账面记 0.3U, GPIO 实打 0.5U)。
+            // 被截断/取整掉的差额全部补回 stepCarryOver, 保持 sum == delivered + carryOver 不破。
             if (deliverAmount > 0.001) {
-                if (deliverAmount > reservoir) {
-                    Logger::warning("[安全] 输注量 " + String(deliverAmount) + "U 超过储药器余量 " + String(reservoir) + "U, 截断");
-                    deliverAmount = reservoir;
+                double capped = deliverAmount;
+                if (capped > reservoir) {
+                    Logger::warning("[安全] 输注量 " + String(capped) + "U 超过储药器余量 " + String(reservoir) + "U, 截断");
+                    capped = reservoir;
                 }
-
                 double dailyRemaining = dailyMaxInsulin - dailyDelivered;
-                if (deliverAmount > dailyRemaining) {
-                    Logger::warning("[安全] 输注量 " + String(deliverAmount) + "U 超过日剩余配额 " + String(dailyRemaining) + "U, 截断");
-                    deliverAmount = dailyRemaining;
+                if (capped > dailyRemaining) {
+                    Logger::warning("[安全] 输注量 " + String(capped) + "U 超过日剩余配额 " + String(dailyRemaining) + "U, 截断");
+                    capped = dailyRemaining;
                 }
-
                 double hourlyRemaining = hourlyMaxInsulin - hourlyDelivered;
-                if (deliverAmount > hourlyRemaining) {
-                    Logger::warning("[安全] 输注量 " + String(deliverAmount) + "U 超过小时剩余配额 " + String(hourlyRemaining) + "U, 截断");
-                    deliverAmount = hourlyRemaining;
+                if (capped > hourlyRemaining) {
+                    Logger::warning("[安全] 输注量 " + String(capped) + "U 超过小时剩余配额 " + String(hourlyRemaining) + "U, 截断");
+                    capped = hourlyRemaining;
                 }
 
-                // 二次检查: 截断后可能小于步长
+                // 截断后再向下取整到 STEP_SIZE, 保证 GPIO 步数与账面完全一致
+                double finalDeliver = floor(capped / STEP_SIZE) * STEP_SIZE;
+                if (finalDeliver < 0) finalDeliver = 0;
+                // 截断 + 二次取整掉的部分补回 carryOver (下次补打), 不丢失
+                stepCarryOver += (deliverAmount - finalDeliver);
+                deliverAmount = finalDeliver;
+                // 二次封顶: 截断回补可能使 carryOver 超过 CARRYOVER_MAX, 超额丢弃防止配额恢复时过量补打
+                if (stepCarryOver > CARRYOVER_MAX) {
+                    Logger::warning("[安全] 截断后 stepCarryOver=" + String(stepCarryOver) + "U 超过上限 " + String(CARRYOVER_MAX) + "U, 丢弃超额");
+                    stepCarryOver = CARRYOVER_MAX;
+                }
+
                 if (deliverAmount > 0.001) {
                     reservoir = max(0.0, reservoir - deliverAmount);
                     activeInsulin += deliverAmount;
@@ -1446,6 +1463,8 @@ private:
                     } else {
                         Logger::info("[BASAL] 基础率输注 " + String(deliverAmount) + "U (软件记录, 无GPIO)");
                     }
+                } else {
+                    Logger::info("[DEBUG] 截断+取整后本次不输注, 全部转入 carryOver=" + String(stepCarryOver) + "U");
                 }
             }
             // 持久化统计数据, 防止重启丢失
@@ -2355,7 +2374,7 @@ private:
         basalQueueIdx = 0;
         tempBasalQueue.clear();
         tempBasalQueueIdx = 0;
-        // prime 重置储药器, carryOver 不保留
+        // prime: 储药器换新, 但 stepCarryOver 刻意保留 (这是上一个 patch 欠的胰岛素, 不应凭空消失)
         bolusQueue.clear();
         bolusQueueIdx = 0;
         buildBasalQueue();
@@ -2444,7 +2463,7 @@ private:
         basalQueueIdx = 0;
         tempBasalQueue.clear();
         tempBasalQueueIdx = 0;
-        // stop patch 重置所有状态, carryOver 不保留
+        // stop patch: stepCarryOver 刻意保留 (这是本贴欠的胰岛素统计, 不应凭空消失, 保留用于对账)
         bolusQueue.clear();
         bolusQueueIdx = 0;
         basalSuspended = false;
