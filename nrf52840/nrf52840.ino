@@ -35,6 +35,13 @@ M640GKit 泵模拟器 - nRF52840 (PCA10056) Arduino 入口文件
 // 使用 M640GKit 命名空间
 using namespace M640GKit;
 
+// Adafruit nRF52 用 -fno-exceptions 编译, 标准库 <vector> 引用了
+// std::__throw_length_error 但没有实现, 链接时报 undefined reference。
+// 提供空实现: 实际触发时挂起 (嵌入式无异常支持, 不应到达此处)。
+namespace std {
+    void __throw_length_error(const char*) { while (1) delay(1); }
+}
+
 // ========== 引脚定义 ==========
 // STEP_PIN: 控制 TS5A3166 模拟开关, 高电平导通 = 按下泵按键。
 // 实际常量定义在 pump_simulator.h 内 (static constexpr int STEP_PIN = 33),
@@ -109,9 +116,8 @@ void setup() {
     Serial.println("LED will blink fast when advertising, slow when connected");
 
     // 打印内存信息 (替代 ESP32 的 ESP.getFreeHeap)
-    Serial.print("Free heap: ");
-    Serial.print(xPortGetFreeHeapSize());  // FreeRTOS 堆剩余 (Adafruit nRF52 自带 FreeRTOS)
-    Serial.println(" bytes");
+    // Adafruit nRF52 的 FreeRTOS 未导出 xPortGetFreeHeapSize, 此处仅打印提示
+    Serial.println("Free heap: see FreeRTOS stats (xPortGetFreeHeapSize unavailable on nRF52)");
 
     Serial.println("========================================\n");
     Serial.flush();

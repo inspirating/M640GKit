@@ -46,13 +46,16 @@ typedef void (*ConnectCallback)();
 class GATTServer;
 
 // ---------- Bluefruit 静态回调转发 ----------
-// Adafruit Bluefruit 的 setConnectCallback/setDisconnectCallback/setWriteCallback
-// 只接受无用户数据的静态函数, 故用全局指针转发到当前 GATTServer 实例。
-// (pump_simulator.h 全局只有一个 GATTServer 实例 gattServer)
+// Adafruit Bluefruit 的回调只接受无用户数据的静态函数, 故用全局指针转发到当前
+// GATTServer 实例。(pump_simulator.h 全局只有一个 GATTServer 实例 gattServer)
+//
+// 关键差异: ESP32 BLE 有 onConnect/onDisconnect 两个独立回调; Adafruit Bluefruit
+// 只有一个 setEventCallback(ble_evt_t*), 需在内部按 evt->header.evt_id 分发。
+// gattEventCallback 负责识别 BLE_GAP_EVT_CONNECTED / BLE_GAP_EVT_DISCONNECTED
+// 并转发到原有的 onConnect / onDisconnect 逻辑。
 static GATTServer* sActiveGatt = nullptr;
 
-void gattConnectCallback(uint16_t conn_handle);
-void gattDisconnectCallback(uint16_t conn_handle, uint8_t reason);
+void gattEventCallback(ble_evt_t* evt);
 void gattWriteCallback(uint16_t conn_handle, BLECharacteristic* chr, uint8_t* data, uint16_t len);
 
 // ---------- GATTServer 类 ----------
@@ -83,24 +86,26 @@ public:
         Bluefruit.setName("MT");
         Serial.println("[GATT] Bluefruit initialized with name 'MT'");
 
-        // 连接/断开回调
+        // 连接/断开回调: Adafruit Bluefruit 用单一 setEventCallback(ble_evt_t*),
+        // 不像 ESP32 有 setConnectCallback/setDisconnectCallback。在回调内部按事件 ID 分发。
         sActiveGatt = this;
-        Bluefruit.setConnectCallback(gattConnectCallback);
-        Bluefruit.setDisconnectCallback(gattDisconnectCallback);
+        Bluefruit.setEventCallback(gattEventCallback);
 
         // 创建 GATT 服务 + 两个特征值
         Serial.println("[GATT] Creating BLE service...");
         bleService = new BLEService(SERVICE_UUID);
 
         // 写入特征 (可写 + notify): Trio 下发命令走这里
+        // Adafruit 用 CHR_PROPS_* 枚举 (ESP32 是 PROPERTY_*)。
+        // CHR_PROPS_WRITE = 写需响应; CHR_PROPS_WRITE_WO_RESP = 写无需响应。
         writeChr = new BLECharacteristic(WRITE_UUID,
-            BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR);
-        writeChr->setWriteCallback(gattWriteCallback, false);  // false = 不要在中断上下文
+            CHR_PROPS_WRITE | CHR_PROPS_WRITE_WO_RESP);
+        writeChr->setWriteCallback(gattWriteCallback, false);  // false = 不要在 Ada callback 上下文
         Serial.println("[GATT] Write characteristic created");
 
         // 读取/通知特征 (可读 + notify): 泵向 Trio 上报走这里
         readChr = new BLECharacteristic(READ_UUID,
-            BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+            CHR_PROPS_READ | CHR_PROPS_NOTIFY);
         Serial.println("[GATT] Read characteristic created");
 
         // 启动服务并注册特征值
@@ -158,7 +163,7 @@ public:
             0x01,
         };
         Bluefruit.Advertising.addData(
-            BLE_GAP_ADV_TYPE_MANUFACTURER_SPECIFIC_DATA, mfg, sizeof(mfg));
+            BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA, mfg, sizeof(mfg));
 
         Serial.print("[ADV] Manufacturer data (");
         Serial.print(sizeof(mfg));
@@ -227,40 +232,41 @@ private:
     BLECharacteristic* writeChr;
     BLEDis* bledis;  // Device Information Service (可选, 当前未启用)
 
-    friend void gattConnectCallback(uint16_t);
-    friend void gattDisconnectCallback(uint16_t, uint8_t);
+    friend void gattEventCallback(ble_evt_t*);
     friend void gattWriteCallback(uint16_t, BLECharacteristic*, uint8_t*, uint16_t);
 };
 
 // ---------- 静态回调实现 (转发到 GATTServer 实例) ----------
 
-inline void gattConnectCallback(uint16_t conn_handle) {
-    (void)conn_handle;
-    Serial.println("");
-    Serial.println("========================================");
-    Serial.println("[BLE] CLIENT CONNECTED!");
-    Serial.println("========================================");
-    Serial.println("");
-    if (sActiveGatt && sActiveGatt->onConnect) {
-        sActiveGatt->onConnect();
-    }
-}
+// 统一事件回调: Adafruit Bluefruit 的 setEventCallback 只给一个入口,
+// 在这里按 evt_id 分发到 connect / disconnect 逻辑。
+inline void gattEventCallback(ble_evt_t* evt) {
+    if (evt == nullptr || sActiveGatt == nullptr) return;
 
-inline void gattDisconnectCallback(uint16_t conn_handle, uint8_t reason) {
-    (void)conn_handle;
-    (void)reason;
-    Serial.println("");
-    Serial.println("========================================");
-    Serial.println("[BLE] CLIENT DISCONNECTED!");
-    Serial.println("========================================");
-    Serial.println("");
-    if (sActiveGatt && sActiveGatt->onDisconnect) {
-        sActiveGatt->onDisconnect();
-    }
-    if (sActiveGatt) {
+    // evt_id 编码: 高 8 位是模块 BLE_GAP_EVT/BLE_GATTS_EVT..., 低 8 位是子事件号。
+    // 直接比对完整的 BLE_GAP_EVT_CONNECTED / BLE_GAP_EVT_DISCONNECTED 即可。
+    if (evt->header.evt_id == BLE_GAP_EVT_CONNECTED) {
+        Serial.println("");
+        Serial.println("========================================");
+        Serial.println("[BLE] CLIENT CONNECTED!");
+        Serial.println("========================================");
+        Serial.println("");
+        if (sActiveGatt->onConnect) {
+            sActiveGatt->onConnect();
+        }
+    } else if (evt->header.evt_id == BLE_GAP_EVT_DISCONNECTED) {
+        Serial.println("");
+        Serial.println("========================================");
+        Serial.println("[BLE] CLIENT DISCONNECTED!");
+        Serial.println("========================================");
+        Serial.println("");
+        if (sActiveGatt->onDisconnect) {
+            sActiveGatt->onDisconnect();
+        }
         Serial.println("[BLE] Restarting advertising...");
         sActiveGatt->startAdvertising();
     }
+    // 其他事件 (扫描响应、配对等) 不处理, pump_simulator.h 不依赖。
 }
 
 inline void gattWriteCallback(uint16_t conn_handle, BLECharacteristic* chr,

@@ -282,18 +282,17 @@ private:
         return true;
     }
 
-    // 把 buf 的 sz 字节整体覆盖写回文件。
+    // 把 buf 的 sz 字节整体覆盖写回文件 (文件不存在时 LittleFS 写模式会自动创建)。
     bool writeFile(const uint8_t* buf, size_t sz) {
         File f(InternalFS);
+        // FILE_O_WRITE: 打开并定位到文件头; 文件不存在则创建。
         if (!f.open(filePath, FILE_O_WRITE)) {
-            // 文件不存在则创建
-            if (!f.open(filePath, FILE_O_WRITE)) {
-                Serial.print("[PREFS] ERROR 写入失败(无法打开): ");
-                Serial.println(filePath);
-                return false;
-            }
+            Serial.print("[PREFS] ERROR 写入失败(无法打开/创建): ");
+            Serial.println(filePath);
+            return false;
         }
-        f.truncate(0);      // LittleFS 需先清空再写, 避免残留
+        // 截断到 0, 确保旧内容不残留 (若文件原本更长, 不截断会留尾巴)。
+        f.truncate(0);
         size_t written = f.write(buf, sz);
         f.close();
         if (written != sz) {
