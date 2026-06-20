@@ -1,6 +1,6 @@
 /*
 ================================================================================
-M640GKit 泵模拟器 - nRF52840 (PCA10056) Arduino 入口文件
+M640GKit 泵模拟器 - nRF52840 (Nice!Nano) Arduino 入口文件
 ================================================================================
 
 该程序模拟 M640G 胰岛素泵, 作为 BLE GATT Server 运行,
@@ -11,19 +11,19 @@ M640GKit 泵模拟器 - nRF52840 (PCA10056) Arduino 入口文件
   - 删除 esp_reset_reason() / ESP.getFreeHeap(): ESP32 专属 API
   - 新增 InternalFS.begin(): Adafruit nRF52 的 LittleFS 持久化初始化
     (替代 ESP32 的 NVS/Preferences)
-  - LED 极性: nRF52840 DK 板载 LED 是低电平点亮 (ESP32 多为高电平)
-  - STEP_PIN: 默认用 P1.01 (见下方说明, PCA10056 上 P0.07 被占用)
+  - LED 极性: Nice!Nano 板载 LED 是低电平点亮 (ESP32 多为高电平)
+  - STEP_PIN: 默认用 P1.02 (Nice!Nano 引脚号 34)
 
 硬件要求:
-  - Nordic nRF52840 DK 开发板 (PCA10056)
+  - Nice!Nano v2 (nRF52840, Pro Micro 兼容引脚)
   - Arduino IDE + Adafruit nRF52 板卡包 (Board Manager 安装)
-  - 选板: "nRF52840 DK (PCA10056)" (Adafruit nRF52 包内)
+  - 选板: "Adafruit Feather nRF52840 Express" 或 "Nice!Nano" (如有)
 
 使用方法:
-  1. Arduino IDE -> 工具 -> 开发板 -> Adafruit nRF52 -> "nRF52840 DK (PCA10056)"
+  1. Arduino IDE -> 工具 -> 开发板 -> Adafruit nRF52 -> 选对应板
   2. 工具 -> SoftDevice -> S140
   3. 工具 -> 串口 -> 选对应 COM 口
-  4. 上传
+  4. 双击 RST 进入 UF2 bootloader 后上传, 或直接上传
   5. 串口监视器 (115200 baud)
 
 对应 ESP32: ESP32.ino
@@ -44,15 +44,15 @@ namespace std {
 
 // ========== 引脚定义 ==========
 // STEP_PIN: 控制 TS5A3166 模拟开关, 高电平导通 = 按下泵按键。
-// 实际常量定义在 pump_simulator.h 内 (static constexpr int STEP_PIN = 33),
-// 指向 PCA10056 的 P1.01 (Adafruit nRF52 引脚号; P0.07 与板载 Button 1 冲突, 故避开)。
-// 如你接在其他引脚, 改 pump_simulator.h 第 144 行的 STEP_PIN 即可。
+// 实际常量定义在 pump_simulator.h 内 (static constexpr int STEP_PIN = 34),
+// 指向 Nice!Nano 的 P1.02 (Adafruit nRF52 引脚号: P1.x = 32 + x, 故 P1.02 = 34)。
+// 如你接在其他引脚, 改 pump_simulator.h 的 STEP_PIN 即可。
 // (Adafruit nRF52 引脚号映射: P0.x = x; P1.x = 32 + x)
 
-// LED 引脚: nRF52840 DK 板载 LED1, Adafruit nRF52 核心已定义为 LED_BUILTIN。
+// LED 引脚: Nice!Nano 板载蓝色 LED 在 P0.15, Adafruit nRF52 核心已定义为 LED_BUILTIN。
 // 板载 LED 为低电平点亮 (active-low), 与 ESP32 相反。
 #ifndef LED_BUILTIN
-  #define LED_BUILTIN LED1  // PCA10056: LED1 = P0.27
+  #define LED_BUILTIN 15  // Nice!Nano: LED = P0.15
 #endif
 
 // 全局模拟器实例
@@ -77,7 +77,7 @@ void setup() {
     NRF_POWER->RESETREAS = 1;  // 写任意值清除
 
     Serial.println("\n========================================");
-    Serial.println("  M640GKit 泵模拟器 (nRF52840 DK PCA10056)");
+    Serial.println("  M640GKit 泵模拟器 (Nice!Nano nRF52840)");
     Serial.println("========================================");
     Serial.println("正在初始化...");
     Serial.flush();
@@ -88,7 +88,7 @@ void setup() {
     InternalFS.begin();
     Serial.println("InternalFS ready");
 
-    // ---------- 初始化 LED (nRF52840 DK 板载 LED 为低电平点亮) ----------
+    // ---------- 初始化 LED (Nice!Nano 板载 LED 为低电平点亮) ----------
     Serial.print("Initializing LED on pin ");
     Serial.println(LED_BUILTIN);
     // 板载 LED 低电平点亮: 初始设 HIGH = 灭灯
@@ -96,12 +96,12 @@ void setup() {
     digitalWrite(LED_BUILTIN, HIGH);  // HIGH = 灭 (active-low)
 
     // ---------- 初始化 STEP_PIN (TS5A3166 控制, 高电平导通) ----------
-    // STEP_PIN 定义在 pump_simulator.h (= 33 = P1.01 on PCA10056)。
+    // STEP_PIN 定义在 pump_simulator.h (= 34 = P1.02 on Nice!Nano)。
     // 必须先 pinMode(OUTPUT) 再 digitalWrite(LOW),
     // 确保 pinMode 切换瞬间输出寄存器默认 LOW, 开关不会误触发。
     pinMode(STEP_PIN, OUTPUT);
     digitalWrite(STEP_PIN, LOW);  // TS5A3166: LOW = 断开
-    Serial.print("STEP_PIN (P1.01=");
+    Serial.print("STEP_PIN (P1.02=");
     Serial.print(STEP_PIN);
     Serial.println(") initialized as TS5A3166 control (active-high, default LOW)");
 
