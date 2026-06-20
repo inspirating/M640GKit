@@ -1661,11 +1661,10 @@ private:
         Serial.println("");
         Logger::info("========== BLE 客户端已连接 ==========");
 
-        if (gattServer.advertisingSuspended) {
-            Logger::info("广播暂停期间收到连接, 拒绝并断开");
-            gattServer.disconnectAll();
-            return;
-        }
+        // 不再检查 advertisingSuspended 拒绝连接:
+        // 原逻辑每次断开都设 advertisingSuspended=true, iOS 用缓存 peripheral 重连时
+        // 会被拒绝, 断开后又设 true, 形成死循环, 导致永远连不上。
+        // advertisingSuspended 现在仅用于控制是否广播, 不阻止已建立的连接。
 
         isConnected = true;
         lastActivityTime = millis();
@@ -1690,9 +1689,15 @@ private:
         currentCmdType = 0;
         connectionTracker.onDisconnect("BLE 断开");
 
-        gattServer.advertisingSuspended = true;
-        advertisingResumeTime = millis() + 10000;
-        Logger::info("BLE广播已暂停10秒, 防止客户端自动重连");
+        // 不再每次断开都暂停广播:
+        // 原逻辑会导致 iOS 自动重连时被拒绝 (handleBleConnect 已移除拒绝逻辑),
+        // 但暂停广播仍会导致 iOS 扫描找不到设备。
+        // 广播暂停仅在 pendingBleDisconnect (主动停止 patch) 时设置, 那里是永久暂停。
+        // 正常断开后立即恢复广播, 允许 iOS 重连。
+        gattServer.advertisingSuspended = false;
+        advertisingResumeTime = 0;
+        gattServer.startAdvertising();
+        Logger::info("BLE断开, 已恢复广播等待重连");
     }
 
     void processCompleteCommand(const uint8_t* data, uint8_t len) {

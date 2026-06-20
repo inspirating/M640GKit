@@ -103,7 +103,7 @@ public:
         // CHR_PROPS_NOTIFY = 允许 iOS 订阅后接收 notify 回包 (与 ESP32 版 PROPERTY_NOTIFY 对齐)
         writeChr = new BLECharacteristic(WRITE_UUID,
             CHR_PROPS_WRITE | CHR_PROPS_WRITE_WO_RESP | CHR_PROPS_NOTIFY);
-        writeChr->setWriteCallback(gattWriteCallback, false);  // false = 不要在 Ada callback 上下文
+        writeChr->setWriteCallback(gattWriteCallback, true);  // true = 延迟到主循环执行, 避免在中断上下文中调 notify() 失败
         Serial.println("[GATT] Write characteristic created");
 
         // 读取/通知特征 (可读 + notify): 泵向 Trio 上报走这里
