@@ -78,12 +78,14 @@ public:
 
         Serial.println("[GATT] Initializing Bluefruit BLE...");
 
-        // 初始化 Bluefruit: maxPrph=1 (Peripheral 角色), maxCentral=0
-        Bluefruit.begin(0, 1);
+        // 初始化 Bluefruit: maxPrph=1 (Peripheral 角色, 作为 GATT Server 广播), maxCentral=0
+        Bluefruit.begin(1, 0);
         // 限制发射功率, 省电 (0 dBm 足够近距离配对)
         Bluefruit.setTxPower(4);
         // 设备名 (iOS 扫描显示 + 用于广播包)
         Bluefruit.setName("MT");
+        // 设置连接参数: iOS 要求 15ms - 4s, 与 ESP32 版 setMinPreferred(0x06)/setMaxPreferred(0x12) 对齐
+        Bluefruit.Periph.setConnInterval(6, 12);  // 单位 1.25ms -> 7.5ms / 15ms
         Serial.println("[GATT] Bluefruit initialized with name 'MT'");
 
         // 连接/断开回调: Adafruit Bluefruit 用单一 setEventCallback(ble_evt_t*),
@@ -95,11 +97,12 @@ public:
         Serial.println("[GATT] Creating BLE service...");
         bleService = new BLEService(SERVICE_UUID);
 
-        // 写入特征 (可写 + notify): Trio 下发命令走这里
+        // 写入特征 (可写 + notify): Trio 下发命令走这里, 也用于 sendResponse 回包
         // Adafruit 用 CHR_PROPS_* 枚举 (ESP32 是 PROPERTY_*)。
         // CHR_PROPS_WRITE = 写需响应; CHR_PROPS_WRITE_WO_RESP = 写无需响应。
+        // CHR_PROPS_NOTIFY = 允许 iOS 订阅后接收 notify 回包 (与 ESP32 版 PROPERTY_NOTIFY 对齐)
         writeChr = new BLECharacteristic(WRITE_UUID,
-            CHR_PROPS_WRITE | CHR_PROPS_WRITE_WO_RESP);
+            CHR_PROPS_WRITE | CHR_PROPS_WRITE_WO_RESP | CHR_PROPS_NOTIFY);
         writeChr->setWriteCallback(gattWriteCallback, false);  // false = 不要在 Ada callback 上下文
         Serial.println("[GATT] Write characteristic created");
 
@@ -178,8 +181,16 @@ public:
         // 超时: 0 = 永久广播
         Bluefruit.Advertising.setFastTimeout(30);
 
+        // 将 Service UUID 加入 Scan Response (扫描响应包),
+        // iOS 主动扫描时能读到 UUID, 用于 Trio/Loop 识别设备。
+        // 注意: 放在广播包里会增大广播包, 可能超出 31 字节; 放 Scan Response 更安全。
+        Bluefruit.ScanResponse.clearData();
+        Bluefruit.ScanResponse.addUuid(BLEUuid(SERVICE_UUID));
+        Bluefruit.ScanResponse.addName();
+
         Serial.println("[ADV] Starting BLE advertising...");
-        Bluefruit.Advertising.start(0);  // 0 = 持续广播
+        // Adafruit nRF52: start() 参数是广播秒数, 0 = 持续广播
+        Bluefruit.Advertising.start(0);
         Serial.println("[ADV] BLE advertising is now active!");
         Serial.println("[ADV] Device name: MT");
         Serial.println("[ADV] Service UUID: " + String(SERVICE_UUID));
