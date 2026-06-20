@@ -57,6 +57,7 @@ static GATTServer* sActiveGatt = nullptr;
 
 void gattEventCallback(ble_evt_t* evt);
 void gattWriteCallback(uint16_t conn_handle, BLECharacteristic* chr, uint8_t* data, uint16_t len);
+void gattCccdWriteCallback(uint16_t conn_handle, BLECharacteristic* chr, uint16_t cccd_value);
 
 // ---------- GATTServer 类 ----------
 class GATTServer {
@@ -103,12 +104,17 @@ public:
         // CHR_PROPS_NOTIFY = 允许 iOS 订阅后接收 notify 回包 (与 ESP32 版 PROPERTY_NOTIFY 对齐)
         writeChr = new BLECharacteristic(WRITE_UUID,
             CHR_PROPS_WRITE | CHR_PROPS_WRITE_WO_RESP | CHR_PROPS_NOTIFY);
-        writeChr->setWriteCallback(gattWriteCallback, true);  // true = 延迟到主循环执行, 避免在中断上下文中调 notify() 失败
+        writeChr->setPermission(SECMODE_OPEN, SECMODE_OPEN);  // 读/写均开放
+        writeChr->setMaxLen(256);  // 兼容大命令包
+        writeChr->setWriteCallback(gattWriteCallback, false);  // false = 立即在中断上下文执行, 写响应更及时
         Serial.println("[GATT] Write characteristic created");
 
         // 读取/通知特征 (可读 + notify): 泵向 Trio 上报走这里
         readChr = new BLECharacteristic(READ_UUID,
             CHR_PROPS_READ | CHR_PROPS_NOTIFY);
+        readChr->setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);  // 只读, CCCD 可写由底层自动处理
+        readChr->setMaxLen(64);  // buildSynchronizeData 最大约 48 字节, 留余量
+        readChr->setCccdWriteCallback(gattCccdWriteCallback, true);  // 监听 iOS 订阅/取消订阅
         Serial.println("[GATT] Read characteristic created");
 
         // 启动服务并注册特征值
@@ -223,18 +229,38 @@ public:
 
     // 原始通知 (不做 CRC 修正) —— pump_simulator.h 主要走这个
     bool sendRawNotification(const uint8_t* data, size_t len) {
-        if (readChr == nullptr) return false;
-        if (!Bluefruit.connected()) return false;
-        readChr->notify(data, len);
-        return true;
+        if (readChr == nullptr) {
+            Serial.println("[GATT][E] sendRawNotification: readChr is null");
+            return false;
+        }
+        if (!Bluefruit.connected()) {
+            Serial.println("[GATT][E] sendRawNotification: not connected");
+            return false;
+        }
+        bool ok = readChr->notify(data, len);
+        Serial.print("[GATT][I] notify sent, len=");
+        Serial.print(len);
+        Serial.print(" result=");
+        Serial.println(ok ? "OK" : "FAIL");
+        return ok;
     }
 
     // 响应: 通过写特征值 notify (与 ESP32 版一致, 用于请求的即时回包)
     bool sendResponse(const uint8_t* data, size_t len) {
-        if (writeChr == nullptr) return false;
-        if (!Bluefruit.connected()) return false;
-        writeChr->notify(data, len);
-        return true;
+        if (writeChr == nullptr) {
+            Serial.println("[GATT][E] sendResponse: writeChr is null");
+            return false;
+        }
+        if (!Bluefruit.connected()) {
+            Serial.println("[GATT][E] sendResponse: not connected");
+            return false;
+        }
+        bool ok = writeChr->notify(data, len);
+        Serial.print("[GATT][I] response notify sent, len=");
+        Serial.print(len);
+        Serial.print(" result=");
+        Serial.println(ok ? "OK" : "FAIL");
+        return ok;
     }
 
 private:
@@ -245,6 +271,7 @@ private:
 
     friend void gattEventCallback(ble_evt_t*);
     friend void gattWriteCallback(uint16_t, BLECharacteristic*, uint8_t*, uint16_t);
+    friend void gattCccdWriteCallback(uint16_t, BLECharacteristic*, uint16_t);
 };
 
 // ---------- 静态回调实现 (转发到 GATTServer 实例) ----------
@@ -288,6 +315,29 @@ inline void gattWriteCallback(uint16_t conn_handle, BLECharacteristic* chr,
         if (len > 0) {
             sActiveGatt->onWriteRequest(data, len);
         }
+    }
+}
+
+// CCCD (Client Characteristic Configuration Descriptor) 写入回调:
+// iOS 订阅/取消订阅 notify 时会写入 0x2902 描述符, 触发此回调。
+// value 的 bit0 = notify, bit1 = indicate。
+// 必须捕获此事件并设置 isSubscribed, 否则 pump_simulator.h 中所有 notify 都不会发送。
+inline void gattCccdWriteCallback(uint16_t conn_handle, BLECharacteristic* chr,
+                                  uint16_t cccd_value) {
+    (void)conn_handle;
+    (void)chr;
+    bool notifyEnabled = (cccd_value & 0x0001) != 0;
+    bool indicateEnabled = (cccd_value & 0x0002) != 0;
+
+    Serial.print("[BLE] CCCD updated: 0x");
+    Serial.print(cccd_value, HEX);
+    Serial.print(" - Notify: ");
+    Serial.print(notifyEnabled ? "ON" : "OFF");
+    Serial.print(", Indicate: ");
+    Serial.println(indicateEnabled ? "ON" : "OFF");
+
+    if (sActiveGatt && sActiveGatt->onSubscribe) {
+        sActiveGatt->onSubscribe(notifyEnabled || indicateEnabled);
     }
 }
 

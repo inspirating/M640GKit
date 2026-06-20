@@ -187,7 +187,7 @@ public:
         predictiveLowSuspend(0), predictiveLowSuspendRange(30), lastPrimeNotificationTime(0),
         basalQueueIdx(0), tempBasalQueueIdx(0), bolusQueueIdx(0),
         tempBasalActive(false), basalSuspended(false), suspendResumeTimeMs(0), stepCarryOver(0.0), tempBasalStartMs(0), lastDeliveryScanTime(0), everActivated(false), lastHourResetSec(0), lastDayResetSec(0),
-        gpioDeliveryStartMs(0), gpioRemainingSteps(0), gpioCurrentStep(0), isDeliveryTaskRunning(false), xSemaphore(nullptr) {
+        gpioDeliveryStartMs(0), gpioRemainingSteps(0), gpioCurrentStep(0), isDeliveryTaskRunning(false), xSemaphore(nullptr), pendingSubscribeNotify(false) {
         currentBolus = nullptr;
         tempBasal = nullptr;
     }
@@ -294,7 +294,8 @@ public:
         gattServer.onWriteRequest = handleWriteRequestStatic;
         gattServer.onConnect = handleConnectStatic;
         gattServer.onDisconnect = handleDisconnectStatic;
-        
+        gattServer.onSubscribe = handleSubscribeStatic;
+
         Serial.println("[PUMP] Starting GATT server...");
         gattServer.start();
         Serial.println("[PUMP] GATT server started");
@@ -319,15 +320,13 @@ public:
             Logger::error("pump simulator not initailized yet, please call setup() first");
             return;
         }
-        if (isGpioDeliveryComplete()) {
-            uint32_t currentTime = millis();
-            if (currentTime - lastUpdateTime >= updateIntervalMs) {
-                lastUpdateTime = currentTime;
-                update();
-            }
-        } else {
-            // 仅仅给 FreeRTOS 留出一点点切换时间，什么都不做，保护线程引脚不受干扰
-            // vTaskDelay(pdMS_TO_TICKS(10000));
+        // 不再用 isGpioDeliveryComplete() 门控 update():
+        // 原逻辑会导致 prime 进度 (updatePrimeProgress) 在 GPIO 输注期间完全停滞。
+        // processDeliveryQueues 内部已有 isDeliveryTaskRunning 检查, 不会重复触发 GPIO。
+        uint32_t currentTime = millis();
+        if (currentTime - lastUpdateTime >= updateIntervalMs) {
+            lastUpdateTime = currentTime;
+            update();
         }
     }
 
@@ -705,6 +704,7 @@ private:
     int gpioTotalSteps;
     volatile bool isDeliveryTaskRunning;
     SemaphoreHandle_t xSemaphore;
+    volatile bool pendingSubscribeNotify;  // 在BLE中断中设置, 主循环中消费
 
     const char* getStateName(PatchState s) {
         switch (s) {
@@ -887,6 +887,14 @@ private:
         processDeliveryQueues();
         updatePrimeProgress();
         resetHourlyDailyCounters();
+
+        // 检查订阅后初始状态通知标志 (在 BLE 中断中设置, 避免 vector 堆分配在中断上下文)
+        if (pendingSubscribeNotify) {
+            pendingSubscribeNotify = false;
+            Serial.println("[STATE] pendingSubscribeNotify fired, calling sendStateNotification");
+            sendStateNotification();
+        }
+
         checkAndSendStateNotification();
         sendPingHeartbeat();
         checkConnectionTimeout();
@@ -964,10 +972,16 @@ private:
     }
 
     void sendStateNotification() {
-        if (!isSubscribed || !isConnected) return;
+        if (!isSubscribed || !isConnected) {
+            Serial.println("[STATE] skip: not subscribed or not connected");
+            return;
+        }
         std::vector<uint8_t> syncData = buildSynchronizeData();
+        Serial.print("[STATE] sending notification, state=");
+        Serial.print(getStateName(patchState));
+        Serial.print(" dataLen=");
+        Serial.println(syncData.size());
         sendNotificationPacket(syncData);
-        Logger::debug("发送状态通知, 状态=" + String(getStateName(patchState)));
     }
 
     void sendPingHeartbeat() {
@@ -1525,6 +1539,13 @@ private:
         }
     }
 
+    static void handleSubscribeStatic(bool subscribed) {
+        extern M640GPumpSimulator* gSimulator;
+        if (gSimulator) {
+            gSimulator->handleSubscribe(subscribed);
+        }
+    }
+
     void handleWriteRequest(const uint8_t* data, size_t len) {
         lastActivityTime = millis();
 
@@ -1641,7 +1662,12 @@ private:
             Serial.println("");
             connectionTracker.onConnect();
             Logger::info("客户端已订阅通知");
-            sendStateNotification();
+            // 不在此处直接调用 sendStateNotification() — 它在 BLE 中断上下文中
+            // (CCCD 回调 -> gattCccdWriteCallback -> onSubscribe) 执行,
+            // 而 buildSynchronizeData 涉及 std::vector 堆分配, 在 nRF52840
+            // SoftDevice 中断上下文中可能崩溃或死锁。
+            // 改为设置标志位, 在主循环 update() 中安全发送。
+            pendingSubscribeNotify = true;
         } else {
             Serial.println("");
             Serial.println("----------------------------------------");
