@@ -1,0 +1,279 @@
+/*
+================================================================================
+GATT 服务器 (nRF52840 / Adafruit Bluefruit 版本)
+================================================================================
+
+作为 GATT Server 运行, 模拟 M640G 泵设备。对应 ESP32/gatt_server.h。
+
+设计原则: 公共 API 与 ESP32 版完全一致 (GATTServer 类的 start/stop/
+startAdvertising/stopAdvertising/disconnectAll/sendNotification/
+sendRawNotification/sendResponse + 4 个回调指针 + advertisingSuspended 成员),
+使 pump_simulator.h 零改动复用。
+
+内部用 Adafruit Bluefruit 库 (bluefruit.h) 实现底层 BLE:
+  - BLEService + 两个 BLECharacteristic (READ_UUID 读+notify, WRITE_UUID 写+notify)
+  - 厂商广播数据 59 6A 65 D1 79 98 01 01 (iOS 配对识别, 字节序不可变)
+  - Bluefruit.setConnectCallback / setDisconnectCallback / chr.setWriteCallback
+
+与 ESP32 版的关键差异:
+  - 删除 esp_efuse_mac_get_default / esp_base_mac_addr_set: nRF52840 的 MAC 由
+    SoftDevice 器件 ID 决定, 跨重启天然稳定 (比 ESP32 更可靠), 但与 ESP32 不同,
+    故 Trio 首次需重新配对一次 (见 README)。
+  - 回调模型: ESP32 用继承 BLE*Callbacks; Adafruit 用全局静态函数回调 + 一个
+    静态 gattServer 指针转发到实例 (Bluefruit 回调不支持用户数据传参)。
+================================================================================
+*/
+
+#ifndef M640G_GATT_SERVER_H
+#define M640G_GATT_SERVER_H
+
+#include <Arduino.h>
+#include <string>
+#include <vector>
+#include <bluefruit.h>
+#include "enums.h"
+#include "crc8.h"
+
+namespace M640GKit {
+
+// 回调函数类型定义 (签名与 ESP32 版完全一致)
+typedef void (*WriteRequestCallback)(const uint8_t* data, size_t len);
+typedef void (*SubscribeCallback)(bool subscribed);
+typedef void (*DisconnectCallback)();
+typedef void (*ConnectCallback)();
+
+// 前向声明
+class GATTServer;
+
+// ---------- Bluefruit 静态回调转发 ----------
+// Adafruit Bluefruit 的 setConnectCallback/setDisconnectCallback/setWriteCallback
+// 只接受无用户数据的静态函数, 故用全局指针转发到当前 GATTServer 实例。
+// (pump_simulator.h 全局只有一个 GATTServer 实例 gattServer)
+static GATTServer* sActiveGatt = nullptr;
+
+void gattConnectCallback(uint16_t conn_handle);
+void gattDisconnectCallback(uint16_t conn_handle, uint8_t reason);
+void gattWriteCallback(uint16_t conn_handle, BLECharacteristic* chr, uint8_t* data, uint16_t len);
+
+// ---------- GATTServer 类 ----------
+class GATTServer {
+public:
+    bool isRunning = false;
+    WriteRequestCallback onWriteRequest = nullptr;
+    SubscribeCallback onSubscribe = nullptr;
+    DisconnectCallback onDisconnect = nullptr;
+    ConnectCallback onConnect = nullptr;
+    bool advertisingSuspended = false;
+
+    GATTServer() : bledis(nullptr) {}
+
+    void start() {
+        if (isRunning) {
+            Serial.println("[GATT] Server already running");
+            return;
+        }
+
+        Serial.println("[GATT] Initializing Bluefruit BLE...");
+
+        // 初始化 Bluefruit: maxPrph=1 (Peripheral 角色), maxCentral=0
+        Bluefruit.begin(0, 1);
+        // 限制发射功率, 省电 (0 dBm 足够近距离配对)
+        Bluefruit.setTxPower(4);
+        // 设备名 (iOS 扫描显示 + 用于广播包)
+        Bluefruit.setName("MT");
+        Serial.println("[GATT] Bluefruit initialized with name 'MT'");
+
+        // 连接/断开回调
+        sActiveGatt = this;
+        Bluefruit.setConnectCallback(gattConnectCallback);
+        Bluefruit.setDisconnectCallback(gattDisconnectCallback);
+
+        // 创建 GATT 服务 + 两个特征值
+        Serial.println("[GATT] Creating BLE service...");
+        bleService = new BLEService(SERVICE_UUID);
+
+        // 写入特征 (可写 + notify): Trio 下发命令走这里
+        writeChr = new BLECharacteristic(WRITE_UUID,
+            BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR);
+        writeChr->setWriteCallback(gattWriteCallback, false);  // false = 不要在中断上下文
+        Serial.println("[GATT] Write characteristic created");
+
+        // 读取/通知特征 (可读 + notify): 泵向 Trio 上报走这里
+        readChr = new BLECharacteristic(READ_UUID,
+            BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+        Serial.println("[GATT] Read characteristic created");
+
+        // 启动服务并注册特征值
+        bleService->begin();
+        writeChr->begin();
+        readChr->begin();
+        // 给读特征值设一个初始空值 (避免 iOS 首次读到脏数据)
+        readChr->write(nullptr, 0);
+
+        Serial.println("[GATT] BLE service started");
+
+        // 开始广播
+        Serial.println("[GATT] Starting BLE advertising...");
+        startAdvertising();
+        Serial.println("[GATT] BLE advertising started");
+
+        isRunning = true;
+        Serial.println("[GATT] GATT Server is now running!");
+    }
+
+    void stop() {
+        if (!isRunning) return;
+        Bluefruit.Advertising.stop();
+        isRunning = false;
+    }
+
+    void disconnectAll() {
+        uint16_t conn = Bluefruit.connHandle();
+        if (conn != BLE_CONN_HANDLE_INVALID) {
+            Bluefruit.disconnect(conn);
+        }
+    }
+
+    void startAdvertising() {
+        if (advertisingSuspended) {
+            Serial.println("[ADV] Advertising suspended, skipping...");
+            return;
+        }
+        Serial.println("[ADV] Configuring BLE advertising...");
+
+        Bluefruit.Advertising.stop();
+        Bluefruit.Advertising.clearData();
+
+        // 广播参数: 允许主动扫描响应
+        Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
+        // 设备名 (MT)
+        Bluefruit.Advertising.addName();
+
+        // 厂商数据 (iOS 配对识别用, 字节序和内容必须与 ESP32 版一字不差):
+        // [0-1] company id LE (0x6A59), [2-5] pump SN, [6] device type, [7] version
+        const uint8_t mfg[] = {
+            0x59, 0x6A,
+            0x65, 0xD1, 0x79, 0x98,
+            0x01,
+            0x01,
+        };
+        Bluefruit.Advertising.addData(
+            BLE_GAP_ADV_TYPE_MANUFACTURER_SPECIFIC_DATA, mfg, sizeof(mfg));
+
+        Serial.print("[ADV] Manufacturer data (");
+        Serial.print(sizeof(mfg));
+        Serial.print(" bytes): ");
+        for (size_t i = 0; i < sizeof(mfg); i++) {
+            Serial.printf("%02X ", mfg[i]);
+        }
+        Serial.println("");
+
+        // 间隔: 20ms - 150ms (与 ESP32 的 min 0x06 / max 0x12 量级相当)
+        Bluefruit.Advertising.setInterval(32, 243);  // 单位 0.625ms -> 20ms / 152ms
+        // 超时: 0 = 永久广播
+        Bluefruit.Advertising.setFastTimeout(30);
+
+        Serial.println("[ADV] Starting BLE advertising...");
+        Bluefruit.Advertising.start(0);  // 0 = 持续广播
+        Serial.println("[ADV] BLE advertising is now active!");
+        Serial.println("[ADV] Device name: MT");
+        Serial.println("[ADV] Service UUID: " + String(SERVICE_UUID));
+        Serial.println("[ADV] Waiting for mobile device to connect...");
+    }
+
+    void stopAdvertising() {
+        Bluefruit.Advertising.stop();
+    }
+
+    // 通知: 可选 CRC 修正 (与 ESP32 版 sendNotification 行为一致)。
+    // 当前 pump_simulator.h 实际走 sendRawNotification, 这里保留以保 API 完整。
+    bool sendNotification(const uint8_t* data, size_t len, bool useCrcHack = true) {
+        if (readChr == nullptr) return false;
+
+        std::vector<uint8_t> payload(data, data + len);
+        if (useCrcHack && len > 0 && len >= 6 && data[1] != 0x00) {
+            uint8_t expectedCrc = crc8Calculate(data, len - 1);
+            if (payload[len - 1] != expectedCrc) {
+                payload[len - 1] = expectedCrc;
+            }
+        }
+        readChr->notify(payload.data(), payload.size());
+        return true;
+    }
+
+    bool sendNotificationWithCrcHack(const uint8_t* data, size_t len) {
+        return sendNotification(data, len, true);
+    }
+
+    // 原始通知 (不做 CRC 修正) —— pump_simulator.h 主要走这个
+    bool sendRawNotification(const uint8_t* data, size_t len) {
+        if (readChr == nullptr) return false;
+        if (!Bluefruit.connected()) return false;
+        readChr->notify(data, len);
+        return true;
+    }
+
+    // 响应: 通过写特征值 notify (与 ESP32 版一致, 用于请求的即时回包)
+    bool sendResponse(const uint8_t* data, size_t len) {
+        if (writeChr == nullptr) return false;
+        if (!Bluefruit.connected()) return false;
+        writeChr->notify(data, len);
+        return true;
+    }
+
+private:
+    BLEService* bleService;
+    BLECharacteristic* readChr;
+    BLECharacteristic* writeChr;
+    BLEDis* bledis;  // Device Information Service (可选, 当前未启用)
+
+    friend void gattConnectCallback(uint16_t);
+    friend void gattDisconnectCallback(uint16_t, uint8_t);
+    friend void gattWriteCallback(uint16_t, BLECharacteristic*, uint8_t*, uint16_t);
+};
+
+// ---------- 静态回调实现 (转发到 GATTServer 实例) ----------
+
+inline void gattConnectCallback(uint16_t conn_handle) {
+    (void)conn_handle;
+    Serial.println("");
+    Serial.println("========================================");
+    Serial.println("[BLE] CLIENT CONNECTED!");
+    Serial.println("========================================");
+    Serial.println("");
+    if (sActiveGatt && sActiveGatt->onConnect) {
+        sActiveGatt->onConnect();
+    }
+}
+
+inline void gattDisconnectCallback(uint16_t conn_handle, uint8_t reason) {
+    (void)conn_handle;
+    (void)reason;
+    Serial.println("");
+    Serial.println("========================================");
+    Serial.println("[BLE] CLIENT DISCONNECTED!");
+    Serial.println("========================================");
+    Serial.println("");
+    if (sActiveGatt && sActiveGatt->onDisconnect) {
+        sActiveGatt->onDisconnect();
+    }
+    if (sActiveGatt) {
+        Serial.println("[BLE] Restarting advertising...");
+        sActiveGatt->startAdvertising();
+    }
+}
+
+inline void gattWriteCallback(uint16_t conn_handle, BLECharacteristic* chr,
+                              uint8_t* data, uint16_t len) {
+    (void)conn_handle;
+    (void)chr;
+    if (sActiveGatt && sActiveGatt->onWriteRequest) {
+        if (len > 0) {
+            sActiveGatt->onWriteRequest(data, len);
+        }
+    }
+}
+
+} // namespace M640GKit
+
+#endif // M640G_GATT_SERVER_H
