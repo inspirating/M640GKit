@@ -87,8 +87,7 @@ public:
 
         Serial.println("[GATT] Initializing Bluefruit BLE...");
 
-        // 配置 Peripheral 连接参数: MTU=247, 事件长度, HVN 队列, WRITE CMD 队列
-        // 必须在 Bluefruit.begin() 之前调用。MTU 247 支持 244 字节有效 notify 数据,
+        // 配置 Peripheral 连接参数: MTU=247 支持 244 字节有效 notify 数据,
         // 这样 SYNCHRONIZE 响应 46 字节可一次性发送, iOS 能正确解析。
         Bluefruit.configPrphConn(247, BLE_GAP_EVENT_LENGTH_DEFAULT,
                                  BLE_GATTS_HVN_TX_QUEUE_SIZE_DEFAULT,
@@ -97,12 +96,12 @@ public:
 
         // 初始化 Bluefruit: maxPrph=1 (Peripheral 角色, 作为 GATT Server 广播), maxCentral=0
         Bluefruit.begin(1, 0);
-        // 限制发射功率, 省电 (0 dBm 足够近距离配对)
-        Bluefruit.setTxPower(4);
+        // 最大功率 (+8 dBm), 保证连接稳定, 减少重连/断开
+        Bluefruit.setTxPower(8);
         // 设备名 (iOS 扫描显示 + 用于广播包)
         Bluefruit.setName("MT");
-        // 设置连接参数: iOS 要求 15ms - 4s, 与 ESP32 版 setMinPreferred(0x06)/setMaxPreferred(0x12) 对齐
-        Bluefruit.Periph.setConnInterval(6, 12);  // 单位 1.25ms -> 7.5ms / 15ms
+        // 设置连接参数: 较宽范围让 iOS 选择它喜欢的间隔
+        Bluefruit.Periph.setConnInterval(12, 24);  // 15ms - 30ms
         Serial.println("[GATT] Bluefruit initialized with name 'MT'");
 
         // 连接/断开回调: Adafruit Bluefruit 用单一 setEventCallback(ble_evt_t*),
@@ -204,10 +203,11 @@ public:
         }
         Serial.println("");
 
-        // 间隔: 20ms - 150ms (与 ESP32 的 min 0x06 / max 0x12 量级相当)
-        Bluefruit.Advertising.setInterval(32, 243);  // 单位 0.625ms -> 20ms / 152ms
+        // 间隔: 100ms - 250ms, 较慢的广告间隔使 iOS 有足够时间完成服务发现
+        // 避免因广播过快导致 iOS 在重连时跳过关键状态。
+        Bluefruit.Advertising.setInterval(160, 400);  // 单位 0.625ms -> 100ms / 250ms
         // 超时: 0 = 永久广播
-        Bluefruit.Advertising.setFastTimeout(30);
+        Bluefruit.Advertising.setFastTimeout(0);
 
         // 将 Service UUID 加入 Scan Response (扫描响应包),
         // iOS 主动扫描时能读到 UUID, 用于 Trio/Loop 识别设备。
@@ -360,8 +360,8 @@ inline void gattEventCallback(ble_evt_t* evt) {
         if (sActiveGatt->onDisconnect) {
             sActiveGatt->onDisconnect();
         }
-        Serial.println("[BLE] Restarting advertising...");
-        sActiveGatt->startAdvertising();
+        // 不再在这里调用 startAdvertising() — handleBleDisconnect() 已经会调用,
+        // 重复调用会导致广播重启两次, 第二次 stop() 打断第一次, 拖慢重连速度。
     }
     // 其他事件 (扫描响应、配对等) 不处理, pump_simulator.h 不依赖。
 }

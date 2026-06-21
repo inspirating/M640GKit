@@ -1315,9 +1315,9 @@ private:
         isDeliveryTaskRunning = true;
         gpioRemainingSteps = stepCount;
 
-        // nRF52840: RAM 比 ESP32 紧张(PCA10056 共 256KB 但 SoftDevice 占一部分),
-        // GPIO 任务体只有 digitalWrite+delay, 4096 字节栈充裕且避免 RAM 溢出。
-        BaseType_t taskCreated = xTaskCreate(gpioDeliveryTask, "PumpDelivery", 4096, this, configMAX_PRIORITIES - 1, NULL);
+        // GPIO 任务优先级必须低于 BLE 事件处理任务, 否则会抢占 BLE 导致断连。
+        // 用优先级 1 (低), 确保 Bluefruit 协议栈能正常处理连接事件。
+        BaseType_t taskCreated = xTaskCreate(gpioDeliveryTask, "PumpDelivery", 4096, this, 1, NULL);
         
         if (taskCreated != pdPASS) {
             Logger::error("[GPIO] xTaskCreate 失败！无法创建输注线程");
@@ -1381,7 +1381,7 @@ private:
 
         // 5分钟扫描一次；有活跃大剂量时立即执行
         if (currentBolus == nullptr && now - lastDeliveryScanTime < 300000) {
-            Logger::info("[DEBUG] Skipping delivery: no active bolus and 5min not elapsed");
+            // Logger::info("[DEBUG] Skipping delivery: no active bolus and 5min not elapsed");
             return;
         }
         lastDeliveryScanTime = now;
@@ -1670,12 +1670,9 @@ private:
             Serial.println("");
             connectionTracker.onConnect();
             Logger::info("客户端已订阅通知");
-            // 不在此处直接调用 sendStateNotification() — 它在 BLE 中断上下文中
-            // (CCCD 回调 -> gattCccdWriteCallback -> onSubscribe) 执行,
-            // 而 buildSynchronizeData 涉及 std::vector 堆分配, 在 nRF52840
-            // SoftDevice 中断上下文中可能崩溃或死锁。
-            // 改为设置标志位, 在主循环 update() 中安全发送。
-            pendingSubscribeNotify = true;
+            // 不主动发送状态通知 — Trio 期望先发 AUTH_REQ 认证,
+            // 认证前收到通知会导致 Trio 跳过 PRIME 直接 ACTIVATE。
+            // 状态通知会在 SYNCHRONIZE 流程中按需发送。
         } else {
             Serial.println("");
             Serial.println("----------------------------------------");
@@ -2748,33 +2745,33 @@ void gpioDeliveryTask(void *parameter) {
     // 2. 触发进入模式 (长按 2 秒)
     Serial.println(">>> 2. 长按触发模式...");
     digitalWrite(STEP_PIN, HIGH); // 高电平：按下
-    delay(2000);                  // 持续稳定按下 2 秒
+    safeDelay(2000);              // 持续稳定按下 2 秒
     digitalWrite(STEP_PIN, LOW);  // 低电平：松开
-    delay(1500);                  // 等待泵发出准备就绪的提示音
+    safeDelay(1500);              // 等待泵发出准备就绪的提示音
 
     // 3. 循环输入步数 (核心修改：拉长按下与松开时间)
     Serial.println(">>> 3. 开始循环敲击步数...");
     for (int i = 1; i <= steps; i++) {
         digitalWrite(STEP_PIN, HIGH); // 高电平：按下
-        delay(500);                   // 按下维持 140ms（确保泵能 100% 识别到）
+        safeDelay(500);               // 按下维持 500ms
         digitalWrite(STEP_PIN, LOW);  // 低电平：松开
-        delay(500);                   // 松开维持 140ms（给泵充足的反应和扫描复位时间）
+        safeDelay(500);               // 松开维持 500ms
     }
-    delay(2000); // 步数输完后，稳一稳，准备确认
+    safeDelay(2000); // 步数输完后，稳一稳，准备确认
 
     // 4. 第一次长按确认 (修正：电平和延时重新对齐)
     Serial.println(">>> 4. 第一次长按确认输入的步数...");
     digitalWrite(STEP_PIN, HIGH); // 高电平：按下
-    delay(2500);                  // 长按 2.5 秒触发确认
+    safeDelay(2500);              // 长按 2.5 秒触发确认
     digitalWrite(STEP_PIN, LOW);  // 低电平：松开
     
     // 【关键等待】松开后，泵会“滴滴滴”把刚才输入的步数回放一遍，必须等它完全响完！
-    delay(steps * 500); 
+    safeDelay(steps * 500);
 
     // 5. 第二次长按执行输注 (修正：电平和延时重新对齐)
     Serial.println(">>> 5. 第二次长按最终执行输注...");
     digitalWrite(STEP_PIN, HIGH); // 高电平：按下
-    delay(2500);                  // 长按 2.5 秒触发输注
+    safeDelay(2500);              // 长按 2.5 秒触发输注
     digitalWrite(STEP_PIN, LOW);  // 低电平：松开（彻底完成）
     
     Serial.println(">>> [SUCCESS] 声音大剂量物理时序模拟完毕！");
