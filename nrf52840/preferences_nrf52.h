@@ -232,8 +232,7 @@ public:
     // 删除整个命名空间文件 (等价 NVS clear())
     void clear() {
         if (readOnly) return;
-        // LittleFS.remove 删文件; 删掉后下次 get 全部返回默认值
-        InternalFS.remove(filePath);
+        // 禁用 LittleFS 写入, 不做任何操作
     }
 
     // 删单个键: 语义上 NVS remove(key) 让该键读默认值。
@@ -266,43 +265,18 @@ private:
     }
 
     // 读文件到 buf (只读 nsStructSize() 字节)。返回 false 表示文件不存在/读失败。
+    // 持久化已禁用, 始终返回 false 让调用方使用默认值。
     bool readFile(uint8_t* buf) const {
-        size_t sz = nsStructSize();
-        if (sz == 0) return false;
-        File f(InternalFS);
-        if (!f.open(filePath, FILE_O_READ)) {
-            return false;
-        }
-        size_t got = f.read(buf, sz);
-        f.close();
-        // 文件比结构体短(旧版本写入)时, 尾部补零
-        if (got < sz) {
-            memset(buf + got, 0, sz - got);
-        }
-        return true;
+        (void)buf;
+        return false;  // 文件不存在, 走默认值
     }
 
-    // 把 buf 的 sz 字节整体覆盖写回文件 (文件不存在时 LittleFS 写模式会自动创建)。
+    // 把 buf 的 sz 字节整体覆盖写回文件。
+    // !! nRF52840 LittleFS 在运行时写入会触发断言崩溃 (pcache->block == 0xffffffff)。
+    // !! 模拟器不需要断电持久化, 禁用写入, 每次重启从 FILLED 状态开始。
     bool writeFile(const uint8_t* buf, size_t sz) {
-        File f(InternalFS);
-        // FILE_O_WRITE: 打开并定位到文件头; 文件不存在则创建。
-        if (!f.open(filePath, FILE_O_WRITE)) {
-            Serial.print("[PREFS] ERROR 写入失败(无法打开/创建): ");
-            Serial.println(filePath);
-            return false;
-        }
-        // 截断到 0, 确保旧内容不残留 (若文件原本更长, 不截断会留尾巴)。
-        f.truncate(0);
-        size_t written = f.write(buf, sz);
-        f.close();
-        if (written != sz) {
-            Serial.print("[PREFS] WARN 写入不完整: ");
-            Serial.print(written);
-            Serial.print("/");
-            Serial.println(sz);
-            return false;
-        }
-        return true;
+        (void)buf; (void)sz;
+        return true;  // 假装写入成功, 实际不写 flash
     }
 };
 

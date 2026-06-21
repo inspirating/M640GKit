@@ -815,8 +815,8 @@ private:
     void update() {
         static uint32_t updateCallCount = 0;
         updateCallCount++;
-        Serial.print("[UPDATE] called #");
-        Serial.println(updateCallCount);
+        // Serial.print("[UPDATE] called #");
+        // Serial.println(updateCallCount);
 
         static uint32_t elapsedAccumulator = 0;
         elapsedAccumulator += updateIntervalMs;
@@ -1370,12 +1370,12 @@ private:
      */
     void processDeliveryQueues() {
         uint32_t now = millis();
-        Logger::info("[DEBUG] processDeliveryQueues called, patchState=" + String(getStateName(patchState)) + 
-                     ", currentBolus=" + String(currentBolus ? "yes" : "null") + 
-                     ", bolusQueue.size=" + String(bolusQueue.size()));
+        // Logger::info("[DEBUG] processDeliveryQueues called, patchState=" + String(getStateName(patchState)) + 
+        //              ", currentBolus=" + String(currentBolus ? "yes" : "null") + 
+        //              ", bolusQueue.size=" + String(bolusQueue.size()));
 
         if (patchState != PatchState::ACTIVE && patchState != PatchState::ACTIVE_ALT) {
-            Logger::info("[DEBUG] patchState not ACTIVE, skipping delivery");
+            // Logger::info("[DEBUG] patchState not ACTIVE, skipping delivery");
             return;
         }
 
