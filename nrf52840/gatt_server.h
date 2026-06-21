@@ -74,9 +74,7 @@ public:
     GATTServer() : bledis(nullptr), notifyMutex(nullptr) {}
 
     ~GATTServer() {
-        if (notifyMutex) {
-            vSemaphoreDelete(notifyMutex);
-        }
+        // notifyMutex 已禁用 (nullptr), 不需要删除
     }
 
     void start() {
@@ -96,12 +94,15 @@ public:
 
         // 初始化 Bluefruit: maxPrph=1 (Peripheral 角色, 作为 GATT Server 广播), maxCentral=0
         Bluefruit.begin(1, 0);
-        // 最大功率 (+8 dBm), 保证连接稳定, 减少重连/断开
+        // 最大功率 (+8 dBm), 保证连接稳定
         Bluefruit.setTxPower(8);
         // 设备名 (iOS 扫描显示 + 用于广播包)
         Bluefruit.setName("MT");
-        // 设置连接参数: 较宽范围让 iOS 选择它喜欢的间隔
-        Bluefruit.Periph.setConnInterval(12, 24);  // 15ms - 30ms
+        // 设置连接参数: 较长间隔提高稳定性, iOS 接受范围 15ms - 4s
+        // min=24 (30ms), max=40 (50ms), slave_latency=0, timeout=400 (4s)
+        Bluefruit.Periph.setConnInterval(24, 40);
+        Bluefruit.Periph.setConnSlaveLatency(0);
+        Bluefruit.Periph.setConnSupervisionTimeout(400);
         Serial.println("[GATT] Bluefruit initialized with name 'MT'");
 
         // 连接/断开回调: Adafruit Bluefruit 用单一 setEventCallback(ble_evt_t*),
@@ -149,11 +150,9 @@ public:
         isRunning = true;
         Serial.println("[GATT] GATT Server is now running! v20250621-1");
 
-        // 创建 notify 互斥量, 防止多个任务并发调用 notify 导致 HVN 队列竞争
-        notifyMutex = xSemaphoreCreateMutex();
-        if (notifyMutex == nullptr) {
-            Serial.println("[GATT][E] Failed to create notify mutex");
-        }
+        // notify 互斥量已禁用: 在单连接场景下, Bluefruit 内部已做队列管理,
+        // 加锁反而可能增加 BLE 事件处理延迟, 导致连接不稳定。
+        notifyMutex = nullptr;
     }
 
     void stop() {
@@ -203,11 +202,9 @@ public:
         }
         Serial.println("");
 
-        // 间隔: 100ms - 250ms, 较慢的广告间隔使 iOS 有足够时间完成服务发现
-        // 避免因广播过快导致 iOS 在重连时跳过关键状态。
-        Bluefruit.Advertising.setInterval(160, 400);  // 单位 0.625ms -> 100ms / 250ms
-        // 超时: 0 = 永久广播
-        Bluefruit.Advertising.setFastTimeout(0);
+        // 广告间隔: 默认快速模式 (62.5ms / 187.5ms), 让 iOS 容易发现设备。
+        Bluefruit.Advertising.setInterval(100, 300);  // 62.5ms / 187.5ms
+        Bluefruit.Advertising.setFastTimeout(0);      // 0 = 永久快速广播
 
         // 将 Service UUID 加入 Scan Response (扫描响应包),
         // iOS 主动扫描时能读到 UUID, 用于 Trio/Loop 识别设备。
@@ -291,22 +288,14 @@ private:
             return false;
         }
 
-        // 加锁, 串行化 notify 调用, 避免 HVN 队列竞争
-        if (notifyMutex && xSemaphoreTake(notifyMutex, pdMS_TO_TICKS(100)) != pdTRUE) {
-            Serial.print("[GATT][E] ");
-            Serial.print(name);
-            Serial.println(": failed to take notify mutex");
-            return false;
-        }
-
         // Bluefruit 内部会根据当前协商的 MTU 自动在 ATT 层分片,
         // iOS 底层会自动重组。不要应用层手动分包。
         bool ok = false;
-        for (int retry = 0; retry < 5; retry++) {
+        for (int retry = 0; retry < 10; retry++) {
             ok = chr->notify(data, len);
             if (ok) break;
-            // HVN 队列暂时满, 短暂等待后重试
-            delayMicroseconds(500);
+            // HVN 队列暂时满, 短暂让出 CPU 后重试
+            vTaskDelay(pdMS_TO_TICKS(5));
         }
 
         Serial.print("[GATT][I] ");
@@ -316,7 +305,6 @@ private:
         Serial.print(" result=");
         Serial.println(ok ? "OK" : "FAIL");
 
-        if (notifyMutex) xSemaphoreGive(notifyMutex);
         return ok;
     }
 
@@ -348,18 +336,22 @@ inline void gattEventCallback(ble_evt_t* evt) {
         Serial.println("========================================");
         Serial.println("");
 
+        Serial.println("[BLE] Calling onConnect callback...");
         if (sActiveGatt->onConnect) {
             sActiveGatt->onConnect();
         }
+        Serial.println("[BLE] onConnect callback returned");
     } else if (evt->header.evt_id == BLE_GAP_EVT_DISCONNECTED) {
         Serial.println("");
         Serial.println("========================================");
         Serial.println("[BLE] CLIENT DISCONNECTED!");
         Serial.println("========================================");
         Serial.println("");
+        Serial.println("[BLE] Calling onDisconnect callback...");
         if (sActiveGatt->onDisconnect) {
             sActiveGatt->onDisconnect();
         }
+        Serial.println("[BLE] onDisconnect callback returned");
         // 不再在这里调用 startAdvertising() — handleBleDisconnect() 已经会调用,
         // 重复调用会导致广播重启两次, 第二次 stop() 打断第一次, 拖慢重连速度。
     }

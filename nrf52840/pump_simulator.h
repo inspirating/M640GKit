@@ -179,7 +179,7 @@ public:
         isConnected(false), isSubscribed(false), isAuthenticated(false), sessionToken{0}, pumpTimezone(0),
         timeSyncPending(false), sequenceNumber(0), pingCounter(0), lastPingTime(0),
         connectionTimeoutMs(15000), lastActivityTime(0), patchId(0),
-        lastNotifiedState(PatchState::NONE), patchStateDirty(false), pendingBleDisconnect(false), nvsClearPending(false), advertisingResumeTime(0),
+        lastNotifiedState(PatchState::FILLED), patchStateDirty(false), pendingBleDisconnect(false), nvsClearPending(false), advertisingResumeTime(0),
         hourlyMaxInsulin(DEFAULT_HOURLY_MAX), dailyMaxInsulin(DEFAULT_DAILY_MAX),
         hourlyDelivered(0.0), dailyDelivered(0.0),
         currentBasalRate(0.6), basalSequence(0),
@@ -896,11 +896,10 @@ private:
         // 检查订阅后初始状态通知标志 (在 BLE 中断中设置, 避免 vector 堆分配在中断上下文)
         if (pendingSubscribeNotify) {
             pendingSubscribeNotify = false;
-            Serial.println("[STATE] pendingSubscribeNotify fired, calling sendStateNotification");
-            sendStateNotification();
+            // 不再主动发送状态通知 — Trio 在 SYNCHRONIZE 后已经知道状态,
+            // 额外的通知会打乱 PRIME/ACTIVATE 流程。
         }
 
-        checkAndSendStateNotification();
         sendPingHeartbeat();
         checkConnectionTimeout();
 
@@ -2622,28 +2621,23 @@ private:
 
     void sendResponse(CommandType cmdType, uint8_t seqNum, const uint8_t* data, uint8_t dataLen) {
         uint8_t totalContentLen = 2 + dataLen;
-
-        uint8_t header[4] = {
-            static_cast<uint8_t>(totalContentLen + 5),
-            static_cast<uint8_t>(cmdType),
-            seqNum,
-            0
-        };
+        uint8_t totalPacketLen = totalContentLen + 6;
 
         uint8_t packet[256];
-        memcpy(packet, header, 4);
+        packet[0] = static_cast<uint8_t>(totalContentLen + 5);
+        packet[1] = static_cast<uint8_t>(cmdType);
+        packet[2] = seqNum;
+        packet[3] = 0;
         packet[4] = 0;
         packet[5] = 0;
         if (dataLen > 0) {
             memcpy(packet + 6, data, dataLen);
         }
-
-        uint8_t crc = crc8Calculate(packet, totalContentLen + 4);
-        packet[totalContentLen + 4] = crc;
+        packet[totalContentLen + 4] = crc8Calculate(packet, totalContentLen + 4);
         packet[totalContentLen + 5] = 0;
 
-        Logger::hexDump("TX", "-->", packet, totalContentLen + 6);
-        gattServer.sendResponse(packet, totalContentLen + 6);
+        Logger::hexDump("TX", "-->", packet, totalPacketLen);
+        gattServer.sendResponse(packet, totalPacketLen);
     }
 
     void sendErrorResponse(CommandType cmdType, uint16_t errorCode) {

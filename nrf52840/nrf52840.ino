@@ -62,8 +62,11 @@ void setup() {
     // 初始化串口 (PCA10056 默认走 USB CDC 或 UART0, 取决于板卡包配置)
     Serial.begin(115200);
 
-    // 给串口一些时间初始化
-    delay(1000);
+    // 等待 USB CDC 枚举完成, 否则 setup 日志会丢失
+    uint32_t usbWaitStart = millis();
+    while (!Serial && (millis() - usbWaitStart < 5000)) {
+        delay(10);
+    }
 
     Serial.println("nRF52840 starting...");
     Serial.println("Version: 1.0.0-nrf52840");
