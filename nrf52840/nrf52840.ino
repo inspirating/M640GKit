@@ -85,8 +85,17 @@ void setup() {
     // ---------- 初始化持久化文件系统 (替代 ESP32 NVS) ----------
     // InternalFS 是 Adafruit nRF52 内置的 LittleFS, preferences_nrf52.h 依赖它。
     Serial.println("Initializing InternalFS (LittleFS)...");
-    InternalFS.begin();
-    Serial.println("InternalFS ready");
+    if (!InternalFS.begin()) {
+        Serial.println("[FS] LittleFS mount failed, formatting...");
+        InternalFS.format();
+        if (!InternalFS.begin()) {
+            Serial.println("[FS] LittleFS still failed after format, continuing without persistence");
+        } else {
+            Serial.println("[FS] LittleFS formatted and mounted");
+        }
+    } else {
+        Serial.println("InternalFS ready");
+    }
 
     // ---------- 初始化 LED (Nice!Nano 板载 LED 为低电平点亮) ----------
     Serial.print("Initializing LED on pin ");

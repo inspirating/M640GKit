@@ -31,6 +31,8 @@ sendRawNotification/sendResponse + 4 个回调指针 + advertisingSuspended 成�
 #include <string>
 #include <vector>
 #include <bluefruit.h>
+#include <FreeRTOS.h>
+#include <semphr.h>
 #include "enums.h"
 #include "crc8.h"
 
@@ -69,7 +71,13 @@ public:
     ConnectCallback onConnect = nullptr;
     bool advertisingSuspended = false;
 
-    GATTServer() : bledis(nullptr) {}
+    GATTServer() : bledis(nullptr), notifyMutex(nullptr) {}
+
+    ~GATTServer() {
+        if (notifyMutex) {
+            vSemaphoreDelete(notifyMutex);
+        }
+    }
 
     void start() {
         if (isRunning) {
@@ -78,6 +86,14 @@ public:
         }
 
         Serial.println("[GATT] Initializing Bluefruit BLE...");
+
+        // 配置 Peripheral 连接参数: MTU=247, 事件长度, HVN 队列, WRITE CMD 队列
+        // 必须在 Bluefruit.begin() 之前调用。MTU 247 支持 244 字节有效 notify 数据,
+        // 这样 SYNCHRONIZE 响应 46 字节可一次性发送, iOS 能正确解析。
+        Bluefruit.configPrphConn(247, BLE_GAP_EVENT_LENGTH_DEFAULT,
+                                 BLE_GATTS_HVN_TX_QUEUE_SIZE_DEFAULT,
+                                 BLE_GATTC_WRITE_CMD_TX_QUEUE_SIZE_DEFAULT);
+        Serial.println("[GATT] Peripheral MTU configured to 247");
 
         // 初始化 Bluefruit: maxPrph=1 (Peripheral 角色, 作为 GATT Server 广播), maxCentral=0
         Bluefruit.begin(1, 0);
@@ -105,15 +121,15 @@ public:
         writeChr = new BLECharacteristic(WRITE_UUID,
             CHR_PROPS_WRITE | CHR_PROPS_WRITE_WO_RESP | CHR_PROPS_NOTIFY);
         writeChr->setPermission(SECMODE_OPEN, SECMODE_OPEN);  // 读/写均开放
-        writeChr->setMaxLen(256);  // 兼容大命令包
-        writeChr->setWriteCallback(gattWriteCallback, false);  // false = 立即在中断上下文执行, 写响应更及时
+        writeChr->setMaxLen(247);  // 兼容 MTU=247 下的大包 notify
+        writeChr->setWriteCallback(gattWriteCallback, true);  // true = 延迟到主循环执行, 避免 ISR 上下文 notify 冲突
         Serial.println("[GATT] Write characteristic created");
 
         // 读取/通知特征 (可读 + notify): 泵向 Trio 上报走这里
         readChr = new BLECharacteristic(READ_UUID,
             CHR_PROPS_READ | CHR_PROPS_NOTIFY);
         readChr->setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);  // 只读, CCCD 可写由底层自动处理
-        readChr->setMaxLen(64);  // buildSynchronizeData 最大约 48 字节, 留余量
+        readChr->setMaxLen(247);  // 兼容 MTU=247 下的大包 notify
         readChr->setCccdWriteCallback(gattCccdWriteCallback, true);  // 监听 iOS 订阅/取消订阅
         Serial.println("[GATT] Read characteristic created");
 
@@ -132,7 +148,13 @@ public:
         Serial.println("[GATT] BLE advertising started");
 
         isRunning = true;
-        Serial.println("[GATT] GATT Server is now running!");
+        Serial.println("[GATT] GATT Server is now running! v20250621-1");
+
+        // 创建 notify 互斥量, 防止多个任务并发调用 notify 导致 HVN 队列竞争
+        notifyMutex = xSemaphoreCreateMutex();
+        if (notifyMutex == nullptr) {
+            Serial.println("[GATT][E] Failed to create notify mutex");
+        }
     }
 
     void stop() {
@@ -228,6 +250,8 @@ public:
     }
 
     // 原始通知 (不做 CRC 修正) —— pump_simulator.h 主要走这个
+    // 直接调用 notify, 与 ESP32 版行为一致。不经过 sendNotifyLocked,
+    // 避免互斥锁在 readChr 上可能导致的死锁或 HVN 队列竞争。
     bool sendRawNotification(const uint8_t* data, size_t len) {
         if (readChr == nullptr) {
             Serial.println("[GATT][E] sendRawNotification: readChr is null");
@@ -238,28 +262,61 @@ public:
             return false;
         }
         bool ok = readChr->notify(data, len);
-        Serial.print("[GATT][I] notify sent, len=");
+        Serial.print("[GATT][I] raw notify sent, len=");
         Serial.print(len);
         Serial.print(" result=");
         Serial.println(ok ? "OK" : "FAIL");
         return ok;
     }
 
-    // 响应: 通过写特征值 notify (与 ESP32 版一致, 用于请求的即时回包)
+    // 响应: 通过写特征值 notify (Trio 只监听写特征的响应)
     bool sendResponse(const uint8_t* data, size_t len) {
-        if (writeChr == nullptr) {
-            Serial.println("[GATT][E] sendResponse: writeChr is null");
+        Serial.print("[GATT][I] sendResponse called, len=");
+        Serial.println(len);
+        return sendNotifyLocked(writeChr, "response notify", data, len);
+    }
+
+private:
+    bool sendNotifyLocked(BLECharacteristic* chr, const char* name, const uint8_t* data, size_t len) {
+        if (chr == nullptr) {
+            Serial.print("[GATT][E] ");
+            Serial.print(name);
+            Serial.println(": characteristic is null");
             return false;
         }
         if (!Bluefruit.connected()) {
-            Serial.println("[GATT][E] sendResponse: not connected");
+            Serial.print("[GATT][E] ");
+            Serial.print(name);
+            Serial.println(": not connected");
             return false;
         }
-        bool ok = writeChr->notify(data, len);
-        Serial.print("[GATT][I] response notify sent, len=");
+
+        // 加锁, 串行化 notify 调用, 避免 HVN 队列竞争
+        if (notifyMutex && xSemaphoreTake(notifyMutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+            Serial.print("[GATT][E] ");
+            Serial.print(name);
+            Serial.println(": failed to take notify mutex");
+            return false;
+        }
+
+        // Bluefruit 内部会根据当前协商的 MTU 自动在 ATT 层分片,
+        // iOS 底层会自动重组。不要应用层手动分包。
+        bool ok = false;
+        for (int retry = 0; retry < 5; retry++) {
+            ok = chr->notify(data, len);
+            if (ok) break;
+            // HVN 队列暂时满, 短暂等待后重试
+            delayMicroseconds(500);
+        }
+
+        Serial.print("[GATT][I] ");
+        Serial.print(name);
+        Serial.print(" sent, len=");
         Serial.print(len);
         Serial.print(" result=");
         Serial.println(ok ? "OK" : "FAIL");
+
+        if (notifyMutex) xSemaphoreGive(notifyMutex);
         return ok;
     }
 
@@ -268,6 +325,7 @@ private:
     BLECharacteristic* readChr;
     BLECharacteristic* writeChr;
     BLEDis* bledis;  // Device Information Service (可选, 当前未启用)
+    SemaphoreHandle_t notifyMutex;  // 串行化 notify 调用
 
     friend void gattEventCallback(ble_evt_t*);
     friend void gattWriteCallback(uint16_t, BLECharacteristic*, uint8_t*, uint16_t);
@@ -289,6 +347,7 @@ inline void gattEventCallback(ble_evt_t* evt) {
         Serial.println("[BLE] CLIENT CONNECTED!");
         Serial.println("========================================");
         Serial.println("");
+
         if (sActiveGatt->onConnect) {
             sActiveGatt->onConnect();
         }

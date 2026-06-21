@@ -171,7 +171,7 @@ class M640GPumpSimulator {
 public:
     friend void gpioDeliveryTask(void *parameter);
 
-    M640GPumpSimulator() : initialized(false), lastUpdateTime(0), updateIntervalMs(1000),
+    M640GPumpSimulator() : initialized(false), lastUpdateTime(0), updateIntervalMs(200),
         patchState(PatchState::FILLED), simulatorState(SimulatorState::INITIALIZING),
         reservoir(MAX_RESERVOIR), activeInsulin(0.0), batteryVoltage(3.8), batteryLevel(100),
         patchStartTime(0), totalElapsedTime(0), currentBolus(nullptr),
@@ -813,6 +813,11 @@ private:
     }
 
     void update() {
+        static uint32_t updateCallCount = 0;
+        updateCallCount++;
+        Serial.print("[UPDATE] called #");
+        Serial.println(updateCallCount);
+
         static uint32_t elapsedAccumulator = 0;
         elapsedAccumulator += updateIntervalMs;
         if (elapsedAccumulator >= 1000) {
@@ -945,6 +950,8 @@ private:
     void updatePrimeProgress() {
         if (patchState == PatchState::PRIMING) {
             primeProgress += 20;
+            Serial.print("[PRIME] progress=");
+            Serial.println(primeProgress);
             if (primeProgress >= 240) {
                 setPatchState(PatchState::PRIMED);
                 primeProgress = 0;
@@ -1035,6 +1042,7 @@ private:
         uint32_t now = millis();
         if (now - lastPrimeNotificationTime >= 500) {
             lastPrimeNotificationTime = now;
+            Serial.println("[PRIME] sending progress notification");
             sendSynchronizeNotification();
         }
     }
@@ -1948,8 +1956,10 @@ private:
         Logger::info("=== 预充请求 ===");
 
         if (patchState == PatchState::PRIMING) {
-            Logger::warning("已在预充中");
-            sendErrorResponse(CommandType::PRIME, BLEErrorCode::INVALID_STATE);
+            Logger::warning("已在预充中, 重置进度并继续");
+            primeProgress = 0;
+            sendResponse(CommandType::PRIME, seqNum, nullptr, 0);
+            sendStateNotification();
             return;
         }
 
