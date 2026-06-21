@@ -12,7 +12,7 @@ M640GKit 泵模拟器 - nRF52840 (Nice!Nano) Arduino 入口文件
   - 新增 InternalFS.begin(): Adafruit nRF52 的 LittleFS 持久化初始化
     (替代 ESP32 的 NVS/Preferences)
   - LED 极性: Nice!Nano 板载 LED 是低电平点亮 (ESP32 多为高电平)
-  - STEP_PIN: 默认用 P1.02 (Nice!Nano 引脚号 34)
+  - STEP_PIN: 默认用 P0.17 (Nice!Nano 引脚号 17, D2 排针)
 
 硬件要求:
   - Nice!Nano v2 (nRF52840, Pro Micro 兼容引脚)
@@ -44,8 +44,8 @@ namespace std {
 
 // ========== 引脚定义 ==========
 // STEP_PIN: 控制 TS5A3166 模拟开关, 高电平导通 = 按下泵按键。
-// 实际常量定义在 pump_simulator.h 内 (static constexpr int STEP_PIN = 34),
-// 指向 Nice!Nano 的 P1.02 (Adafruit nRF52 引脚号: P1.x = 32 + x, 故 P1.02 = 34)。
+// 实际常量定义在 pump_simulator.h 内 (static constexpr int STEP_PIN = 17),
+// 指向 Nice!Nano 的 P0.17 (D2 排针引脚)。
 // 如你接在其他引脚, 改 pump_simulator.h 的 STEP_PIN 即可。
 // (Adafruit nRF52 引脚号映射: P0.x = x; P1.x = 32 + x)
 
@@ -105,12 +105,13 @@ void setup() {
     digitalWrite(LED_BUILTIN, HIGH);  // HIGH = 灭 (active-low)
 
     // ---------- 初始化 STEP_PIN (TS5A3166 控制, 高电平导通) ----------
-    // STEP_PIN 定义在 pump_simulator.h (= 34 = P1.02 on Nice!Nano)。
+    // STEP_PIN 定义在 pump_simulator.h (= 17 = P0.17 = D2 on Nice!Nano)。
+    // D2 是 Nice!Nano 边缘排针上的引脚, 方便接线。
     // 必须先 pinMode(OUTPUT) 再 digitalWrite(LOW),
     // 确保 pinMode 切换瞬间输出寄存器默认 LOW, 开关不会误触发。
     pinMode(STEP_PIN, OUTPUT);
     digitalWrite(STEP_PIN, LOW);  // TS5A3166: LOW = 断开
-    Serial.print("STEP_PIN (P1.02=");
+    Serial.print("STEP_PIN (P0.17=");
     Serial.print(STEP_PIN);
     Serial.println(") initialized as TS5A3166 control (active-high, default LOW)");
 

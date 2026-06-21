@@ -141,10 +141,10 @@ struct TempBasalInfo {
 // ========== 队列输注系统 ==========
 static constexpr double STEP_SIZE = 0.5;
 static constexpr double CARRYOVER_MAX = 2.0;  // carryOver 硬上限: 防止撞上限时欠债无限累积, 配额恢复时一次性补打成过量
-// Nice!Nano: STEP_PIN 用 P1.02 (Adafruit nRF52 引脚号 34)。
+// Nice!Nano: STEP_PIN 用 P0.17 = D2 排针引脚 (Adafruit nRF52 引脚号 17)。
 // Nice!Nano 引脚映射: P0.x = x; P1.x = 32 + x。P1.02 = 34, 空闲数字 GPIO, 无硬件冲突。
 // PCA10056 DK 原值为 33 (P1.01), ESP32 版原值为 7 (GPIO7)。
-static constexpr int STEP_PIN = 34;
+static constexpr int STEP_PIN = 17;
 
 struct InsulinAction {
     uint32_t executeTimeMs;
