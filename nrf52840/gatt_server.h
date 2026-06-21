@@ -291,11 +291,12 @@ private:
         // Bluefruit 内部会根据当前协商的 MTU 自动在 ATT 层分片,
         // iOS 底层会自动重组。不要应用层手动分包。
         bool ok = false;
-        for (int retry = 0; retry < 10; retry++) {
+        for (int retry = 0; retry < 50; retry++) {
             ok = chr->notify(data, len);
             if (ok) break;
-            // HVN 队列暂时满, 短暂让出 CPU 后重试
-            vTaskDelay(pdMS_TO_TICKS(5));
+            // HVN 队列暂时满, 短暂让出 CPU 后重试。
+            // 每次等待 10ms, 最多 500ms, 给 iOS 足够时间清空队列。
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
 
         Serial.print("[GATT][I] ");
@@ -303,7 +304,12 @@ private:
         Serial.print(" sent, len=");
         Serial.print(len);
         Serial.print(" result=");
-        Serial.println(ok ? "OK" : "FAIL");
+        Serial.print(ok ? "OK" : "FAIL");
+        if (!ok) {
+            Serial.println(" [WARN] notify 连续失败, Trio 可能未收到响应");
+        } else {
+            Serial.println("");
+        }
 
         return ok;
     }

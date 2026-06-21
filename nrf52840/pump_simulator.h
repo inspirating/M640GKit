@@ -900,6 +900,12 @@ private:
             // 额外的通知会打乱 PRIME/ACTIVATE 流程。
         }
 
+        // 检查状态变化, 在 update() 中发送通知 (避免在 handle 中同步发送导致 HVN 队列竞争)
+        if (patchState != lastNotifiedState) {
+            sendStateNotification();
+            lastNotifiedState = patchState;
+        }
+
         sendPingHeartbeat();
         checkConnectionTimeout();
 
@@ -988,6 +994,7 @@ private:
         Serial.print(" dataLen=");
         Serial.println(syncData.size());
         sendNotificationPacket(syncData);
+        lastNotifiedState = patchState;  // 标记已通知, 避免 update() 重复发送
     }
 
     void sendPingHeartbeat() {
@@ -2407,7 +2414,9 @@ private:
             }
         }
 
-        setPatchState(PatchState::ACTIVE);
+        // 直接设置状态, 不在此处发通知 — setPatchState 会调 sendStateNotification,
+        // 紧接着 sendResponse 的 notify 会因 HVN 队列满而失败, 导致 Trio 收不到激活响应。
+        patchState = PatchState::ACTIVE;
         simulatorState = SimulatorState::RUNNING;
         everActivated = true;
         reservoir = MAX_RESERVOIR;
