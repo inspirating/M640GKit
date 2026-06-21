@@ -262,10 +262,10 @@ public:
             return false;
         }
         bool ok = readChr->notify(data, len);
-        Serial.print("[GATT][I] raw notify sent, len=");
-        Serial.print(len);
-        Serial.print(" result=");
-        Serial.println(ok ? "OK" : "FAIL");
+        // Serial.print("[GATT][I] raw notify sent, len=");
+        // Serial.print(len);
+        // Serial.print(" result=");
+        // Serial.println(ok ? "OK" : "FAIL");
         return ok;
     }
 

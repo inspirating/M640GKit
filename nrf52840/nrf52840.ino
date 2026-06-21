@@ -137,22 +137,24 @@ void loop() {
     // 运行模拟器主循环
     pumpSimulator.loop();
 
-    // LED 心跳指示器 - 快速闪烁表示正在广播
-    // nRF52840 DK 板载 LED 为低电平点亮, 故 HIGH=灭 / LOW=亮 (与 ESP32 相反)
+    // LED 指示: 未连接时快闪, 已连接时常灭
     static uint32_t lastLedToggle = 0;
     static bool ledOn = false;
     uint32_t now = millis();
 
-    uint32_t interval;
-    if (ledOn) {
-        interval = 200;  // 亮 200ms
+    if (pumpSimulator.getIsConnected()) {
+        // 已连接: LED 常灭
+        if (ledOn) {
+            ledOn = false;
+            digitalWrite(LED_BUILTIN, HIGH);  // HIGH = 灭
+        }
     } else {
-        interval = pumpSimulator.getIsConnected() ? 5000 : 200;  // 灭: 连接时5s, 广播时200ms
-    }
-
-    if (now - lastLedToggle >= interval) {
-        lastLedToggle = now;
-        ledOn = !ledOn;
-        digitalWrite(LED_BUILTIN, ledOn ? LOW : HIGH);  // LOW=亮, HIGH=灭
+        // 未连接: 快闪 (亮200ms, 灭200ms)
+        uint32_t interval = ledOn ? 200 : 200;
+        if (now - lastLedToggle >= interval) {
+            lastLedToggle = now;
+            ledOn = !ledOn;
+            digitalWrite(LED_BUILTIN, ledOn ? LOW : HIGH);  // LOW=亮, HIGH=灭
+        }
     }
 }
