@@ -144,7 +144,7 @@ static constexpr double CARRYOVER_MAX = 2.0;  // carryOver 硬上限: 防止撞�
 // Nice!Nano: STEP_PIN 用 P0.17 = D2 排针引脚 (Adafruit nRF52 引脚号 17)。
 // Nice!Nano 引脚映射: P0.x = x; P1.x = 32 + x。P1.02 = 34, 空闲数字 GPIO, 无硬件冲突。
 // PCA10056 DK 原值为 33 (P1.01), ESP32 版原值为 7 (GPIO7)。
-static constexpr int STEP_PIN = 17;
+static constexpr int STEP_PIN = 29;
 
 struct InsulinAction {
     uint32_t executeTimeMs;
@@ -2780,9 +2780,9 @@ void gpioDeliveryTask(void *parameter) {
     Serial.println(">>> [SUCCESS] 声音大剂量物理时序模拟完毕！");
 
 finish:
-    // 确保 GPIO 安全: TS5A3166 LOW = 断开
+    // 确保 GPIO 安全: LOW = 断开, 恢复高驱动输出模式
     digitalWrite(STEP_PIN, LOW);
-    pinMode(STEP_PIN, OUTPUT);
+    pinMode(STEP_PIN, OUTPUT_H0H1);
 
     // 上锁标记任务结束
     xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);

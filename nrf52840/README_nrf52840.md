@@ -12,7 +12,7 @@
 | 持久化 | `Preferences` (NVS) | `preferences_nrf52.h`:LittleFS(InternalFS) 包装类,同名同 API |
 | FreeRTOS | `<freertos/semphr.h>` | 路径 + 栈大小 8192→4096,API 不变 |
 | MAC 地址 | `esp_efuse_mac` 软件设置 | 删除——nRF52840 MAC 由 SoftDevice 器件 ID 决定 |
-| GPIO 引脚 | STEP_PIN=7 (GPIO7) | STEP_PIN=33 (P1.01,避开 P0.07 板载按钮) |
+| GPIO 引脚 | STEP_PIN=7 (GPIO7) | STEP_PIN=17 (P0.17, Nice!Nano D2) |
 | LED | 高电平点亮 | 低电平点亮(nRF52840 DK 板载 LED active-low) |
 
 ## 2. 文件清单
@@ -30,17 +30,19 @@
 
 ## 3. 硬件接线
 
-### TS5A3166 模拟开关 → nRF52840 DK
+### TS5A3166 模拟开关 / 三极管继电器 → Nice!Nano (nRF52840)
 ```
-TS5A3166    nRF52840 DK (PCA10056)
-VCC      →  VDD (3.3V)
-GND      →  GND
-IN (控制) →  P1.01  (STEP_PIN = Adafruit 引脚号 33)
+TS5A3166 / 三极管基极    Nice!Nano
+IN (控制) / Base   →  P0.17  (STEP_PIN = 17, D2 排针)
+VCC / 继电器线圈    →  外部电源
+GND / Emitter      →  GND
 NO/COM   →  并联到 M640G 泵按键两端
 ```
-- TS5A3166 是**高电平导通**(IN=HIGH 时按下泵按键),与 ESP32 版一致,无需改极性。
-- **P1.01 选择原因**:PCA10056 的 P0.07 与板载 Button 1 冲突,P1.01 空闲且已引出到 P1 header。
-- 若你接其他引脚:改 `pump_simulator.h` 第 144 行 `static constexpr int STEP_PIN = 33;` 即可。
+- TS5A3166 是**高电平导通**(IN=HIGH 时按下泵按键), 三极管继电器同理。
+- **P0.17 选择原因**: Nice!Nano 的 D2 排针引脚, 方便接线, 无硬件冲突。
+- 若你接其他引脚: 改 `pump_simulator.h` 第 147 行 `static constexpr int STEP_PIN = 17;` 即可。
+- **重要**: Arduino IDE 选板必须选 **"PCA10056 nRF52840 DK"** (1:1 引脚映射, P0.x = x)。
+  不要选 "Feather nRF52840 Express" — 其 g_ADigitalPinMap 非 1:1, 会导致 STEP_PIN=17 实际操作 P0.28 而非 P0.17!
 
 ### nRF52840 DK 供电
 - USB 接 micro-USB(板载 SEGGER J-Link),或外部 3.3V。

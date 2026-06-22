@@ -17,7 +17,9 @@ M640GKit 泵模拟器 - nRF52840 (Nice!Nano) Arduino 入口文件
 硬件要求:
   - Nice!Nano v2 (nRF52840, Pro Micro 兼容引脚)
   - Arduino IDE + Adafruit nRF52 板卡包 (Board Manager 安装)
-  - 选板: "Adafruit Feather nRF52840 Express" 或 "Nice!Nano" (如有)
+  -// 选板: "PCA10056 nRF52840 DK" (引脚 1:1 映射, P0.x = x, P1.x = 32+x)
+// 不要选 "Feather nRF52840 Express" — Feather 变体的 g_ADigitalPinMap 不是 1:1,
+// 会导致 STEP_PIN=17 实际操作 P0.28 而非 P0.17, 三极管继电器电路无法驱动。
 
 使用方法:
   1. Arduino IDE -> 工具 -> 开发板 -> Adafruit nRF52 -> 选对应板
@@ -103,11 +105,13 @@ void setup() {
     // D2 是 Nice!Nano 边缘排针上的引脚, 方便接线。
     // 必须先 pinMode(OUTPUT) 再 digitalWrite(LOW),
     // 确保 pinMode 切换瞬间输出寄存器默认 LOW, 开关不会误触发。
-    pinMode(STEP_PIN, OUTPUT);
-    digitalWrite(STEP_PIN, LOW);  // TS5A3166: LOW = 断开
+    // OUTPUT_H0H1 = 高驱动强度 (~5mA), 足以驱动三极管基极饱和导通。
+    // 默认 OUTPUT (S0S1 ~0.5mA) 只能驱动 TS5A3166 CMOS 输入, 无法驱动三极管+继电器。
+    pinMode(STEP_PIN, OUTPUT_H0H1);
+    digitalWrite(STEP_PIN, LOW);  // TS5A3166 / 三极管: LOW = 断开
     Serial.print("STEP_PIN (P0.17=");
     Serial.print(STEP_PIN);
-    Serial.println(") initialized as TS5A3166 control (active-high, default LOW)");
+    Serial.println(") initialized as OUTPUT_H0H1 (high-drive), active-high, default LOW)");
 
     // 设置全局实例指针 (用于回调)
     gSimulator = &pumpSimulator;
