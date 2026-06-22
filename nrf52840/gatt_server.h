@@ -16,9 +16,11 @@ sendRawNotification/sendResponse + 4 个回调指针 + advertisingSuspended 成�
   - Bluefruit.setConnectCallback / setDisconnectCallback / chr.setWriteCallback
 
 与 ESP32 版的关键差异:
-  - 删除 esp_efuse_mac_get_default / esp_base_mac_addr_set: nRF52840 的 MAC 由
-    SoftDevice 器件 ID 决定, 跨重启天然稳定 (比 ESP32 更可靠), 但与 ESP32 不同,
-    故 Trio 首次需重新配对一次 (见 README)。
+  - MAC 地址: 使用 nRF52840 FICR 硬件唯一器件地址 (DEVICEADDR[0]+[1]) 派生
+    随机静态地址, 跨重启天然稳定, 不依赖 LittleFS/InternalFS。
+    与 ESP32 版 MAC 不同, 故 Trio 首次需重新配对一次 (见 README)。
+  - Bonding: 启用 Just Works 配对, 使 iOS 保存 IRK 支持快速重连。
+  - 广告间隔: 优化到 20ms/30ms (原 62.5ms/187.5ms), 加快 iOS 扫描发现速度。
   - 回调模型: ESP32 用继承 BLE*Callbacks; Adafruit 用全局静态函数回调 + 一个
     静态 gattServer 指针转发到实例 (Bluefruit 回调不支持用户数据传参)。
 ================================================================================
@@ -94,6 +96,41 @@ public:
 
         // 初始化 Bluefruit: maxPrph=1 (Peripheral 角色, 作为 GATT Server 广播), maxCentral=0
         Bluefruit.begin(1, 0);
+
+        // ---------- 固定 BLE MAC 地址 (基于 FICR 硬件 ID) ----------
+        // nRF52840 的 FICR 中有唯一的 64-bit 器件地址, 取其低 48-bit 作为 BLE 随机静态地址。
+        // 随机静态地址要求高 2 bit = 11, 故 mac[0] |= 0xC0。
+        // 跨重启天然稳定, 不依赖 LittleFS/InternalFS, iOS Trio 缓存的 peripheral UUID 不会失效。
+        {
+            uint32_t addr0 = NRF_FICR->DEVICEADDR[0];
+            uint32_t addr1 = NRF_FICR->DEVICEADDR[1];
+            uint8_t mac[6];
+            mac[0] = ((uint8_t)(addr0 & 0xFF)) | 0xC0;  // 随机静态地址标志位
+            mac[1] = (uint8_t)((addr0 >> 8) & 0xFF);
+            mac[2] = (uint8_t)((addr0 >> 16) & 0xFF);
+            mac[3] = (uint8_t)((addr0 >> 24) & 0xFF);
+            mac[4] = (uint8_t)(addr1 & 0xFF);
+            mac[5] = (uint8_t)((addr1 >> 8) & 0xFF);
+
+            ble_gap_addr_t gap_addr;
+            gap_addr.addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC;
+            memcpy(gap_addr.addr, mac, 6);
+            if (Bluefruit.setAddr(&gap_addr)) {
+                Serial.printf("[GATT] BLE MAC set (FICR, persistent): %02X:%02X:%02X:%02X:%02X:%02X\n",
+                              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+            } else {
+                Serial.println("[GATT] WARN: setAddr failed, using SoftDevice default");
+            }
+        }
+
+        // ---------- 启用 BLE Bonding (Just Works) ----------
+        // Bonding 使 iOS 保存 IRK, 支持跨重启快速重连。
+        // Bluefruit 默认 sec_param.bond=1, 但显式配置确保启用。
+        // IO_CAPS_NONE = Just Works 配对 (无 PIN/无 MITM), 不影响 Medtrum 协议层加密(AUTH_REQ)。
+        Bluefruit.Security.setIOCaps(false, false, false);  // 无显示/无YN/无键盘 = Just Works
+        Bluefruit.Security.setMITM(false);
+        Serial.println("[GATT] BLE Bonding enabled (Just Works, bond=1)");
+
         // 最大功率 (+8 dBm), 保证连接稳定
         Bluefruit.setTxPower(8);
         // 设备名 (iOS 扫描显示 + 用于广播包)
@@ -202,8 +239,10 @@ public:
         }
         Serial.println("");
 
-        // 广告间隔: 默认快速模式 (62.5ms / 187.5ms), 让 iOS 容易发现设备。
-        Bluefruit.Advertising.setInterval(100, 300);  // 62.5ms / 187.5ms
+        // 广告间隔: 快速模式 (20ms / 30ms), 加快 iOS 扫描发现速度。
+        // 原值 100/300 (62.5ms/187.5ms) 对 iOS 后台扫描较慢;
+        // 降到 32/48 (20ms/30ms) 接近 BLE 最小间隔, iOS 能更快发现设备。
+        Bluefruit.Advertising.setInterval(32, 48);  // 20ms / 30ms
         Bluefruit.Advertising.setFastTimeout(0);      // 0 = 永久快速广播
 
         // 将 Service UUID 加入 Scan Response (扫描响应包),
