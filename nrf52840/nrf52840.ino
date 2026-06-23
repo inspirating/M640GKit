@@ -53,9 +53,7 @@ namespace std {
 
 // LED 引脚: Nice!Nano 板载蓝色 LED 在 P0.15, Adafruit nRF52 核心已定义为 LED_BUILTIN。
 // 板载 LED 为低电平点亮 (active-low), 与 ESP32 相反。
-#ifndef LED_BUILTIN
-  #define LED_BUILTIN 15  // Nice!Nano: LED = P0.15
-#endif
+#define LED_BUILTIN 15  // Nice!Nano: LED = P0.15
 
 // 全局模拟器实例
 M640GPumpSimulator pumpSimulator;
