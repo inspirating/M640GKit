@@ -87,15 +87,22 @@ public:
 
         Serial.println("[GATT] Initializing Bluefruit BLE...");
 
-        // 配置 Peripheral 连接参数: MTU=247 支持 244 字节有效 notify 数据,
-        // 这样 SYNCHRONIZE 响应 46 字节可一次性发送, iOS 能正确解析。
+        // 配置 Peripheral 连接参数
+        // configPrphConn(mtu_max, event_len, hvn_qsize, wrcmd_qsize)
+        // mtu_max=247: ATT MTU 最大值, 支持大包一次性发送 (SYNCHRONIZE 46字节)
+        // event_len=BLE_GAP_EVENT_LENGTH_DEFAULT: 使用默认事件长度
         Bluefruit.configPrphConn(247, BLE_GAP_EVENT_LENGTH_DEFAULT,
                                  BLE_GATTS_HVN_TX_QUEUE_SIZE_DEFAULT,
                                  BLE_GATTC_WRITE_CMD_TX_QUEUE_SIZE_DEFAULT);
-        Serial.println("[GATT] Peripheral MTU configured to 247");
+        Serial.println("[GATT] Peripheral MTU = 247");
 
         // 初始化 Bluefruit: maxPrph=1 (Peripheral 角色, 作为 GATT Server 广播), maxCentral=0
         Bluefruit.begin(1, 0);
+
+        // 清除 nRF52 端所有旧配对数据 (一次性, 配对成功后注释掉)
+        // 解决 iOS 缓存旧密钥导致前几次连接失败的问题
+        Bluefruit.Periph.clearBonds();
+        Serial.println("[GATT] Peripheral bonds cleared (one-time, remove after pairing)");
 
         // ---------- 固定 BLE MAC 地址 (基于 FICR 硬件 ID) ----------
         // nRF52840 的 FICR 中有唯一的 64-bit 器件地址, 取其低 48-bit 作为 BLE 随机静态地址。
@@ -135,9 +142,9 @@ public:
         Bluefruit.setTxPower(8);
         // 设备名 (iOS 扫描显示 + 用于广播包)
         Bluefruit.setName("MT");
-        // 设置连接参数: 较长间隔提高稳定性, iOS 接受范围 15ms - 4s
-        // min=24 (30ms), max=40 (50ms), slave_latency=0, timeout=400 (4s)
-        Bluefruit.Periph.setConnInterval(24, 40);
+        // 设置连接参数: 间隔越小响应越快, iOS 接受范围 15ms - 4s
+        // min=6 (7.5ms), max=12 (15ms), slave_latency=0, timeout=400 (4s)
+        Bluefruit.Periph.setConnInterval(6, 12);
         Bluefruit.Periph.setConnSlaveLatency(0);
         Bluefruit.Periph.setConnSupervisionTimeout(400);
         Serial.println("[GATT] Bluefruit initialized with name 'MT'");
@@ -381,12 +388,34 @@ inline void gattEventCallback(ble_evt_t* evt) {
         Serial.println("========================================");
         Serial.println("");
 
+        // 连接后立即请求 MTU 交换, 提高数据传输速率
+        // iOS 默认 MTU=23, 协商成 247 后大包可一次性发送
+        uint16_t conn_handle = evt->evt.gap_evt.conn_handle;
+        BLEConnection* conn = Bluefruit.Connection(conn_handle);
+        if (conn) {
+            uint16_t currentMtu = conn->getMtu();
+            Serial.print("[BLE] Current MTU: ");
+            Serial.print(currentMtu);
+            Serial.println(", requesting 247...");
+            conn->requestMtuExchange(247);
+            // 等待 MTU 交换完成 (最多 100ms)
+            delay(100);
+            uint16_t negotiatedMtu = conn->getMtu();
+            Serial.print("[BLE] MTU exchange result: OK, negotiated MTU: ");
+            Serial.println(negotiatedMtu);
+        }
+
         Serial.println("[BLE] Calling onConnect callback...");
         if (sActiveGatt->onConnect) {
             sActiveGatt->onConnect();
         }
         Serial.println("[BLE] onConnect callback returned");
     } else if (evt->header.evt_id == BLE_GAP_EVT_DISCONNECTED) {
+        // 打印断开原因, 帮助诊断连接失败
+        uint8_t reason = evt->evt.gap_evt.params.disconnected.reason;
+        Serial.print("[BLE] Disconnect reason: 0x");
+        Serial.println(reason, HEX);
+
         Serial.println("");
         Serial.println("========================================");
         Serial.println("[BLE] CLIENT DISCONNECTED!");

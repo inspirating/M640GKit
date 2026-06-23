@@ -954,7 +954,7 @@ private:
 
     void updatePrimeProgress() {
         if (patchState == PatchState::PRIMING) {
-            primeProgress += 20;
+            primeProgress += 40;
             Serial.print("[PRIME] progress=");
             Serial.println(primeProgress);
             if (primeProgress >= 240) {
@@ -2759,6 +2759,18 @@ void gpioDeliveryTask(void *parameter) {
         safeDelay(500);               // 按下维持 500ms
         digitalWrite(STEP_PIN, LOW);  // 低电平：松开
         safeDelay(500);               // 松开维持 500ms
+
+        // 每完成一步, 更新 currentBolus->delivered 进度, 让 iOS 看到进度变化
+        // 否则进度一直卡在 0.00, iOS 会超时断开连接
+        xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);
+        if (simulator->currentBolus != nullptr) {
+            double newDelivered = i * STEP_SIZE;
+            if (newDelivered > simulator->currentBolus->amount) {
+                newDelivered = simulator->currentBolus->amount;
+            }
+            simulator->currentBolus->delivered = newDelivered;
+        }
+        xSemaphoreGive(simulator->xSemaphore);
     }
     safeDelay(2000); // 步数输完后，稳一稳，准备确认
 
