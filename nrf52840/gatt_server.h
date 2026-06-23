@@ -97,11 +97,6 @@ public:
         // 初始化 Bluefruit: maxPrph=1 (Peripheral 角色, 作为 GATT Server 广播), maxCentral=0
         Bluefruit.begin(1, 0);
 
-        // 禁用 Bluefruit 内置 LED 自动控制 (广告时快闪)。
-        // setConnLedInterval(0) 只是把定时器周期设为 0, 反而导致更快闪烁!
-        // autoConnLed(false) 才是真正禁用: _led_conn=false 后 _startConnLed/_setConnLed 都变空操作。
-        Bluefruit.autoConnLed(false);
-
         // ---------- 固定 BLE MAC 地址 (基于 FICR 硬件 ID) ----------
         // nRF52840 的 FICR 中有唯一的 64-bit 器件地址, 取其低 48-bit 作为 BLE 随机静态地址。
         // 随机静态地址要求高 2 bit = 11, 故 mac[0] |= 0xC0。
