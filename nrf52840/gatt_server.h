@@ -388,21 +388,13 @@ inline void gattEventCallback(ble_evt_t* evt) {
         Serial.println("========================================");
         Serial.println("");
 
-        // 连接后立即请求 MTU 交换, 提高数据传输速率
-        // iOS 默认 MTU=23, 协商成 247 后大包可一次性发送
+        // 请求 MTU 交换 (非阻塞, 不用 delay 等待结果)
+        // delay() 在 BLE 回调里会阻塞 SoftDevice 事件处理, 导致 iOS 配对请求超时 → 0x8 断开
         uint16_t conn_handle = evt->evt.gap_evt.conn_handle;
         BLEConnection* conn = Bluefruit.Connection(conn_handle);
         if (conn) {
-            uint16_t currentMtu = conn->getMtu();
-            Serial.print("[BLE] Current MTU: ");
-            Serial.print(currentMtu);
-            Serial.println(", requesting 247...");
             conn->requestMtuExchange(247);
-            // 等待 MTU 交换完成 (最多 100ms)
-            delay(100);
-            uint16_t negotiatedMtu = conn->getMtu();
-            Serial.print("[BLE] MTU exchange result: OK, negotiated MTU: ");
-            Serial.println(negotiatedMtu);
+            Serial.println("[BLE] MTU exchange requested (247)");
         }
 
         Serial.println("[BLE] Calling onConnect callback...");
