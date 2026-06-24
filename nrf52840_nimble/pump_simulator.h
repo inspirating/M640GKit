@@ -41,11 +41,11 @@ M640GKit ESP32 泵模拟器核心 (C++ 版本)
 #include "misc_packet.h"
 #include "gatt_server.h"
 #include "connection_tracker.h"
-// nRF52840 (Adafruit nRF52): FreeRTOS 由板卡包自带。
-// ESP32 用 <freertos/semphr.h>(带子目录前缀), Adafruit nRF52 的头文件布局不同——
-// 它把 FreeRTOS 头平铺在 core 里, 正确入口是 <rtos.h>, 一次性引入
-// FreeRTOS.h / task.h / semphr.h 等。直接 <freertos/semphr.h> 会找不到文件。
-#include <rtos.h>
+// nRF52840 (n-able-Arduino + NimBLE): FreeRTOS 由核心自带。
+// n-able-Arduino 核心的 FreeRTOS 头在 freertos/ 子目录下。
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/semphr.h>
 
 namespace M640GKit {
 
@@ -2793,8 +2793,10 @@ void gpioDeliveryTask(void *parameter) {
 
 finish:
     // 确保 GPIO 安全: LOW = 断开, 恢复高驱动输出模式
+    // (n-able-Arduino 核心无 OUTPUT_H0H1; 高驱动由 .ino 的 stepPinSetHighDrive 配置
+    //  PIN_CNF 寄存器, 此处保持 OUTPUT 即可, 寄存器级别的 DRIVE 字段跨 pinMode 仍保留。)
     digitalWrite(STEP_PIN, LOW);
-    pinMode(STEP_PIN, OUTPUT_H0H1);
+    pinMode(STEP_PIN, OUTPUT);
 
     // 上锁标记任务结束
     xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);

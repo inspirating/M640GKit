@@ -1,6 +1,6 @@
 /*
 ================================================================================
-Preferences 兼容包装层 (nRF52840 / Adafruit nRF52)
+Preferences 兼容包装层 (nRF52840 / n-able-Arduino + NimBLE)
 ================================================================================
 
 目的: 让 ESP32 版的 pump_simulator.h 在 nRF52840 上零改动复用。
@@ -14,8 +14,7 @@ ESP32 用 Preferences(NVS) 持久化, 调用模式为:
     prefs.remove("key");
     prefs.end();
 
-本包装类提供同名同签名的 Preferences 类, 背后用 Adafruit nRF52 内置的
-InternalFS (LittleFS)。每个命名空间对应一个文件:
+本包装类提供同名同签名的 Preferences 类。每个命名空间对应一个逻辑文件路径:
     "pump"      -> /prefs_pump
     "pumpStats" -> /prefs_pumpStats
     "pumpMeta"  -> /prefs_pumpMeta
@@ -30,8 +29,17 @@ PumpMetaNS)。每次 put* 整体覆盖写文件; get* 读整个文件再取对�
 注意: clear() 删整个命名空间文件 (等价 NVS clear); remove(key) 把对应字段
 清零后整体写回 (NVS 的 remove 是删键, 这里语义上等价——未激活字段读出来是 0/默认)。
 
-闪存寿命: persistStats() 每次注射后调用, 写一个 ~48 字节文件。LittleFS 在写
-新版本时会触发页擦除, 频繁注射(>100次/天)长期运行需评估 flash 磨损。
+================================================================================
+【平台迁移: Adafruit nRF52 → n-able-Arduino (NimBLE)】
+
+原 Adafruit nRF52 版用 InternalFS (LittleFS) 做持久化。但运行时写 flash 会
+触发断言崩溃 (pcache->block == 0xffffffff), 故持久化早已被禁用为空操作 stub
+(readFile 始终返回 false, writeFile 始终返回 true 但不写盘)。
+
+迁移到 n-able-Arduino 核心后, 删除了对 Adafruit_LittleFS / InternalFileSystem
+头文件的依赖。持久化行为保持与原版一致 —— 仍是空操作 stub, 每次重启从 FILLED
+状态开始, 不依赖任何文件系统。如需启用真正的持久化, 后续可接入 n-able 核心提供
+的 flash 抽象, 但当前不需要。
 ================================================================================
 */
 
@@ -39,10 +47,6 @@ PumpMetaNS)。每次 put* 整体覆盖写文件; get* 读整个文件再取对�
 #define M640G_PREFERENCES_NRF52_H
 
 #include <Arduino.h>
-#include <Adafruit_LittleFS.h>
-#include <InternalFileSystem.h>
-
-using namespace Adafruit_LittleFS_Namespace;
 
 // ========== 三个命名空间的固定结构体 ==========
 

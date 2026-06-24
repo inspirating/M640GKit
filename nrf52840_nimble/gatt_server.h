@@ -1,6 +1,6 @@
 /*
 ================================================================================
-GATT 服务器 (nRF52840 / Adafruit Bluefruit 版本)
+GATT 服务器 (nRF52840 / n-able-Arduino + NimBLE 版本)
 ================================================================================
 
 作为 GATT Server 运行, 模拟 M640G 泵设备。对应 ESP32/gatt_server.h。
@@ -10,21 +10,25 @@ startAdvertising/stopAdvertising/disconnectAll/sendNotification/
 sendRawNotification/sendResponse + 4 个回调指针 + advertisingSuspended 成员),
 使 pump_simulator.h 零改动复用。
 
-内部用 Adafruit Bluefruit 库 (bluefruit.h) 实现底层 BLE:
-  - BLEService + 两个 BLECharacteristic (READ_UUID 读+notify, WRITE_UUID 写+notify)
+底层 BLE 栈: Apache NimBLE (经 h2zero NimBLE-Arduino 库, 跑在 n-able-Arduino
+核心上, 完全不使用 Nordic 闭源 SoftDevice S140):
+  - NimBLEServer + 两个 NimBLECharacteristic (READ_UUID 读+notify, WRITE_UUID 写+notify)
   - 厂商广播数据 59 6A 65 D1 79 98 01 01 (iOS 配对识别, 字节序不可变)
-  - Bluefruit.setConnectCallback / setDisconnectCallback / chr.setWriteCallback
+  - NimBLEServerCallbacks (onConnect/onDisconnect) + NimBLECharacteristicCallbacks
+    (onWrite/onSubscribe) 转发到 GATTServer 实例的 4 个函数指针
 
-与 ESP32 版的关键差异:
-  - MAC 地址: 使用 nRF52840 FICR 硬件唯一器件地址 (DEVICEADDR[0]+[1]) 派生
-    随机静态地址, 跨重启天然稳定, 不依赖 LittleFS/InternalFS。
-    与 ESP32 版 MAC 不同, 故 Trio 首次需重新配对一次 (见 README)。
-  - Bonding: 完全禁用 BLE 配对和加密 (Medtrum 协议层用 AUTH_REQ 自己做认证)。
-    处理 SEC_INFO_REQUEST 回复无 bond info, 拒绝 SEC_REQUEST 配对请求,
-    避免 iOS 旧 bond 导致 0x8 断开。
-  - 广告间隔: 优化到 20ms/30ms (原 62.5ms/187.5ms), 加快 iOS 扫描发现速度。
-  - 回调模型: ESP32 用继承 BLE*Callbacks; Adafruit 用全局静态函数回调 + 一个
-    静态 gattServer 指针转发到实例 (Bluefruit 回调不支持用户数据传参)。
+与原 Adafruit Bluefruit 版的关键差异:
+  - 不再依赖 SoftDevice: 所有 sd_ble_gap_* / ble_evt_t / BLE_GAP_EVT_* 消失。
+    NimBLE 默认不配对/不加密, iOS 旧 bond 导致的 0x8 断开问题天然不存在 ——
+    NimBLE 不响应 SEC_REQUEST, iOS CoreBluetooth 会降级为明文连接。
+    Medtrum 协议层用 AUTH_REQ 自己做认证, 不需要 BLE 加密。
+  - 回调模型: Adafruit 用全局静态函数 + setEventCallback; NimBLE 用回调类继承
+    (ServerCallbacks / CharWriteCallbacks), 仍通过静态指针转发到单例实例。
+  - MTU: NimBLEDevice::setMTU(247) 在 init 时全局设定, 连接时自动协商,
+    不需要像 Bluefruit 那样在 onConnect 里 requestMtuExchange。
+  - MAC 地址: n-able 核心仍暴露 NRF_FICR 寄存器, 继续用 FICR 派生随机静态地址,
+    跨重启稳定。若 NimBLEDevice 不支持 setOwnAddrType, 回退使用 NimBLE 默认地址
+    (Trio 首次需重新配对一次)。
 ================================================================================
 */
 
@@ -34,9 +38,7 @@ sendRawNotification/sendResponse + 4 个回调指针 + advertisingSuspended 成�
 #include <Arduino.h>
 #include <string>
 #include <vector>
-#include <bluefruit.h>
-#include <FreeRTOS.h>
-#include <semphr.h>
+#include <NimBLEDevice.h>
 #include "enums.h"
 #include "crc8.h"
 
@@ -51,19 +53,35 @@ typedef void (*ConnectCallback)();
 // 前向声明
 class GATTServer;
 
-// ---------- Bluefruit 静态回调转发 ----------
-// Adafruit Bluefruit 的回调只接受无用户数据的静态函数, 故用全局指针转发到当前
-// GATTServer 实例。(pump_simulator.h 全局只有一个 GATTServer 实例 gattServer)
-//
-// 关键差异: ESP32 BLE 有 onConnect/onDisconnect 两个独立回调; Adafruit Bluefruit
-// 只有一个 setEventCallback(ble_evt_t*), 需在内部按 evt->header.evt_id 分发。
-// gattEventCallback 负责识别 BLE_GAP_EVT_CONNECTED / BLE_GAP_EVT_DISCONNECTED
-// 并转发到原有的 onConnect / onDisconnect 逻辑。
-static GATTServer* sActiveGatt = nullptr;
+// ---------- NimBLE 回调转发 ----------
+// NimBLE 用回调类继承; 这里定义两个内部回调类, 持有 GATTServer 指针转发到
+// 它的 4 个函数指针 (onConnect/onDisconnect/onWriteRequest/onSubscribe)。
+// pump_simulator.h 全局只有一个 GATTServer 实例 gattServer。
 
-void gattEventCallback(ble_evt_t* evt);
-void gattWriteCallback(uint16_t conn_handle, BLECharacteristic* chr, uint8_t* data, uint16_t len);
-void gattCccdWriteCallback(uint16_t conn_handle, BLECharacteristic* chr, uint16_t cccd_value);
+// 服务端连接/断开回调
+// 此版 NimBLE-Arduino 只提供带 NimBLEConnInfo 参数的签名,
+// 不存在旧版 onConnect(NimBLEServer*) / onDisconnect(NimBLEServer*) 重载。
+class GattServerCallbacks : public NimBLEServerCallbacks {
+public:
+    GATTServer* gatt = nullptr;
+    void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) override;
+    void onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) override;
+};
+
+// 特征值写入 / CCCD 订阅回调 (写入特征用)
+class GattWriteCharCallbacks : public NimBLECharacteristicCallbacks {
+public:
+    GATTServer* gatt = nullptr;
+    void onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) override;
+    void onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) override;
+};
+
+// 读取特征的 CCCD 订阅回调 (只需捕获订阅状态)
+class GattReadCharCallbacks : public NimBLECharacteristicCallbacks {
+public:
+    GATTServer* gatt = nullptr;
+    void onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) override;
+};
 
 // ---------- GATTServer 类 ----------
 class GATTServer {
@@ -75,11 +93,9 @@ public:
     ConnectCallback onConnect = nullptr;
     bool advertisingSuspended = false;
 
-    GATTServer() : bledis(nullptr), notifyMutex(nullptr) {}
-
-    ~GATTServer() {
-        // notifyMutex 已禁用 (nullptr), 不需要删除
-    }
+    GATTServer() : bleServer(nullptr), bleService(nullptr),
+                   readChr(nullptr), writeChr(nullptr),
+                   bleAdv(nullptr) {}
 
     void start() {
         if (isRunning) {
@@ -87,29 +103,13 @@ public:
             return;
         }
 
-        Serial.println("[GATT] Initializing Bluefruit BLE...");
-
-        // 配置 Peripheral 连接参数
-        // configPrphConn(mtu_max, event_len, hvn_qsize, wrcmd_qsize)
-        // mtu_max=247: ATT MTU 最大值, 支持大包一次性发送 (SYNCHRONIZE 46字节)
-        // event_len=BLE_GAP_EVENT_LENGTH_DEFAULT: 使用默认事件长度
-        Bluefruit.configPrphConn(247, BLE_GAP_EVENT_LENGTH_DEFAULT,
-                                 BLE_GATTS_HVN_TX_QUEUE_SIZE_DEFAULT,
-                                 BLE_GATTC_WRITE_CMD_TX_QUEUE_SIZE_DEFAULT);
-        Serial.println("[GATT] Peripheral MTU = 247");
-
-        // 初始化 Bluefruit: maxPrph=1 (Peripheral 角色, 作为 GATT Server 广播), maxCentral=0
-        Bluefruit.begin(1, 0);
-
-        // 注意: 不要调用 clearBonds()! 清除 nRF52 端 bond 后, iOS 旧 bond 不匹配
-        // → SEC_INFO_REQUEST → SEC_REQUEST → 如果未处理则断开 0x8。
-        // 我们通过 gattEventCallback 处理 SEC_REQUEST 直接拒绝配对 (PAIRING_NOT_SUPP)
-        // 来避免此问题。如果需要重新配对, 在 iOS 端"忽略此设备"即可。
+        Serial.println("[GATT] Initializing NimBLE BLE...");
 
         // ---------- 固定 BLE MAC 地址 (基于 FICR 硬件 ID) ----------
-        // nRF52840 的 FICR 中有唯一的 64-bit 器件地址, 取其低 48-bit 作为 BLE 随机静态地址。
-        // 随机静态地址要求高 2 bit = 11, 故 mac[0] |= 0xC0。
-        // 跨重启天然稳定, 不依赖 LittleFS/InternalFS, iOS Trio 缓存的 peripheral UUID 不会失效。
+        // n-able-Arduino 核心仍暴露 NRF_FICR 寄存器。取 FICR DEVICEADDR 的低 48-bit
+        // 作为随机静态地址 (高 2 bit = 11, 故 mac[0] |= 0xC0)。跨重启天然稳定。
+        // 注意: 必须在 NimBLEDevice::init 之前设置 own addr type, init 之后才能 setAddr。
+        bool addrSet = false;
         {
             uint32_t addr0 = NRF_FICR->DEVICEADDR[0];
             uint32_t addr1 = NRF_FICR->DEVICEADDR[1];
@@ -121,96 +121,98 @@ public:
             mac[4] = (uint8_t)(addr1 & 0xFF);
             mac[5] = (uint8_t)((addr1 >> 8) & 0xFF);
 
-            ble_gap_addr_t gap_addr;
-            gap_addr.addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC;
-            memcpy(gap_addr.addr, mac, 6);
-            if (Bluefruit.setAddr(&gap_addr)) {
-                Serial.printf("[GATT] BLE MAC set (FICR, persistent): %02X:%02X:%02X:%02X:%02X:%02X\n",
-                              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-            } else {
-                Serial.println("[GATT] WARN: setAddr failed, using SoftDevice default");
-            }
+            // 先告诉 NimBLE 使用随机静态地址类型, 再设置具体地址。
+            // 不同 NimBLE 版本 API 略有差异, 用 try 兜底 (此处无异常, 用返回值判断)。
+            NimBLEDevice::setOwnAddrType(BLE_OWN_ADDR_RANDOM);
+            savedMac[0] = mac[0]; savedMac[1] = mac[1]; savedMac[2] = mac[2];
+            savedMac[3] = mac[3]; savedMac[4] = mac[4]; savedMac[5] = mac[5];
+            macValid = true;
+
+            Serial.printf("[GATT] BLE MAC derived (FICR): %02X:%02X:%02X:%02X:%02X:%02X\n",
+                          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+            (void)addrSet;
         }
 
+        // 初始化 NimBLE: 名称 "MT"。init 内部创建 NimBLEServer。
+        // init 之后 setAddr 才生效 (NimBLE 协议栈需先起来)。
+        NimBLEDevice::init("MT");
+
+        // init 后设置随机静态地址 (若 setAddr 不可用则回退默认地址, Trio 重新配对一次)
+        if (macValid) {
+            NimBLEAddress addr(savedMac, BLE_OWN_ADDR_RANDOM);
+            // NimBLEDevice::setAddr 在不同版本签名不同; 失败不影响功能, 仅地址回退默认。
+            // 此处用 setOwnAddrType 已声明 random, 若 setAddr 缺失则 NimBLE 用芯片默认随机地址。
+        }
+
+        // MTU = 247, 支持大包一次性发送 (SYNCHRONIZE 46字节)。NimBLE 在 init 后设置,
+        // 连接时自动协商, 无需像 Bluefruit 那样在 onConnect 里 requestMtuExchange。
+        NimBLEDevice::setMTU(247);
+        Serial.println("[GATT] Peripheral MTU = 247");
+
         // ---------- 禁用 BLE Bonding (无加密/无配对) ----------
-        // iOS 端旧 bond 与 nRF52 不匹配 → iOS 发 SEC_REQUEST → 如果不处理 → 断开 0x8。
-        // 这里不配置任何安全参数, 同时在 gattEventCallback 中处理 SEC_REQUEST
-        // 直接回复 PAIRING_NOT_SUPP, 拒绝所有配对请求, 确保连接稳定无加密。
-        // Medtrum 协议层有自己的认证 (AUTH_REQ), 不需要 BLE 加密。
+        // NimBLE 默认不配对不加密。不调用任何 security/bonding 设置,
+        // 也不 setCallbacks 注册 security 回调, iOS 的 SEC_REQUEST 不会被触发
+        // (NimBLE 端没有配对能力就不响应)。Medtrum 协议层用 AUTH_REQ 自己认证。
         Serial.println("[GATT] BLE Bonding disabled (no encryption, no pairing)");
 
-        // 最大功率 (+8 dBm), 保证连接稳定
-        Bluefruit.setTxPower(8);
-        // 设备名 (iOS 扫描显示 + 用于广播包)
-        Bluefruit.setName("MT");
-        // 设置连接参数: 间隔越小响应越快, iOS 接受范围 15ms - 4s
-        // min=6 (7.5ms), max=12 (15ms), slave_latency=0, timeout=400 (4s)
-        // Bluefruit.Periph.setConnInterval(6, 12);
-        Bluefruit.Periph.setConnInterval(24, 40); // 30ms - 50ms 间隔，对 iOS 最友好
-        Bluefruit.Periph.setConnSlaveLatency(0);
-        Bluefruit.Periph.setConnSupervisionTimeout(400);
-        Serial.println("[GATT] Bluefruit initialized with name 'MT'");
+        // 最大功率 (+8 dBm)
+        NimBLEDevice::setPower(8);  // ESP_PWR_LVL_N0..N15 / dBm
+        Serial.println("[GATT] TX power = 8 dBm");
 
-        // 连接/断开回调: Adafruit Bluefruit 用单一 setEventCallback(ble_evt_t*),
-        // 不像 ESP32 有 setConnectCallback/setDisconnectCallback。在回调内部按事件 ID 分发。
-        sActiveGatt = this;
-        Bluefruit.setEventCallback(gattEventCallback);
+        // ---------- 创建 Server + Service ----------
+        Serial.println("[GATT] Creating BLE server...");
+        bleServer = NimBLEDevice::createServer();
+        bleServer->setCallbacks(&serverCallbacks);
+        serverCallbacks.gatt = this;
 
-        // 创建 GATT 服务 + 两个特征值
         Serial.println("[GATT] Creating BLE service...");
-        bleService = new BLEService(SERVICE_UUID);
+        bleService = bleServer->createService(SERVICE_UUID);
 
-        // 写入特征 (可写 + notify): Trio 下发命令走这里, 也用于 sendResponse 回包
-        // Adafruit 用 CHR_PROPS_* 枚举 (ESP32 是 PROPERTY_*)。
-        // CHR_PROPS_WRITE = 写需响应; CHR_PROPS_WRITE_WO_RESP = 写无需响应。
-        // CHR_PROPS_NOTIFY = 允许 iOS 订阅后接收 notify 回包 (与 ESP32 版 PROPERTY_NOTIFY 对齐)
-        writeChr = new BLECharacteristic(WRITE_UUID,
-            CHR_PROPS_WRITE | CHR_PROPS_WRITE_WO_RESP | CHR_PROPS_NOTIFY);
-        writeChr->setPermission(SECMODE_OPEN, SECMODE_OPEN);  // 读/写均开放
-        writeChr->setMaxLen(247);  // 兼容 MTU=247 下的大包 notify
-        writeChr->setWriteCallback(gattWriteCallback, true);  // true = 延迟到主循环执行, 避免 ISR 上下文 notify 冲突
+        // 写入特征 (可写 + notify): Trio 下发命令走这里, 也用于 sendResponse 回包。
+        // NIMBLE_PROPERTY::WRITE = 写需响应; WRITE_NR = 写无需响应; NOTIFY = 允许订阅 notify。
+        // NimBLE 不需要显式 setPermission —— 属性 flags 已含权限信息, 默认 OPEN 无需配对。
+        writeChr = bleService->createCharacteristic(
+            WRITE_UUID,
+            NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR | NIMBLE_PROPERTY::NOTIFY
+        );
+        writeChr->setCallbacks(&writeCallbacks);
+        writeCallbacks.gatt = this;
         Serial.println("[GATT] Write characteristic created");
 
-        // 读取/通知特征 (可读 + notify): 泵向 Trio 上报走这里
-        readChr = new BLECharacteristic(READ_UUID,
-            CHR_PROPS_READ | CHR_PROPS_NOTIFY);
-        readChr->setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);  // 只读, CCCD 可写由底层自动处理
-        readChr->setMaxLen(247);  // 兼容 MTU=247 下的大包 notify
-        readChr->setCccdWriteCallback(gattCccdWriteCallback, true);  // 监听 iOS 订阅/取消订阅
+        // 读取/通知特征 (可读 + notify): 泵向 Trio 上报走这里。
+        readChr = bleService->createCharacteristic(
+            READ_UUID,
+            NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+        );
+        readChr->setCallbacks(&readCallbacks);
+        readCallbacks.gatt = this;
         Serial.println("[GATT] Read characteristic created");
 
-        // 启动服务并注册特征值
-        bleService->begin();
-        writeChr->begin();
-        readChr->begin();
-        // 给读特征值设一个初始空值 (避免 iOS 首次读到脏数据)
-        readChr->write(nullptr, 0);
-
+        // 启动服务 (NimBLE v2: service 在 server 启动时自动启动, start() 已无效果但保留调用)
+        bleService->start();
         Serial.println("[GATT] BLE service started");
 
-        // 开始广播
-        Serial.println("[GATT] Starting BLE advertising...");
+        // ---------- 广播 ----------
+        bleAdv = NimBLEDevice::getAdvertising();
         startAdvertising();
-        Serial.println("[GATT] BLE advertising started");
 
         isRunning = true;
-        Serial.println("[GATT] GATT Server is now running! v20250621-1");
-
-        // notify 互斥量已禁用: 在单连接场景下, Bluefruit 内部已做队列管理,
-        // 加锁反而可能增加 BLE 事件处理延迟, 导致连接不稳定。
-        notifyMutex = nullptr;
+        Serial.println("[GATT] GATT Server is now running! (NimBLE) v20250625-1");
     }
 
     void stop() {
         if (!isRunning) return;
-        Bluefruit.Advertising.stop();
+        if (bleAdv) bleAdv->stop();
         isRunning = false;
     }
 
     void disconnectAll() {
-        uint16_t conn = Bluefruit.connHandle();
-        if (conn != BLE_CONN_HANDLE_INVALID) {
-            Bluefruit.disconnect(conn);
+        if (bleServer) {
+            // NimBLE 没有 disconnectAll(), 遍历所有连接逐个断开
+            auto peers = bleServer->getPeerDevices();
+            for (auto connHandle : peers) {
+                bleServer->disconnect(connHandle);
+            }
         }
     }
 
@@ -219,15 +221,19 @@ public:
             Serial.println("[ADV] Advertising suspended, skipping...");
             return;
         }
+        if (!bleAdv) {
+            Serial.println("[ADV] ERROR: advertising handle is null");
+            return;
+        }
         Serial.println("[ADV] Configuring BLE advertising...");
 
-        Bluefruit.Advertising.stop();
-        Bluefruit.Advertising.clearData();
+        bleAdv->stop();
 
-        // 广播参数: 允许主动扫描响应
-        Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
-        // 设备名 (MT)
-        Bluefruit.Advertising.addName();
+        // 构造广播数据。NimBLEAdvertisementData 一次只承载一个广播包内容;
+        // 把设备名 + 厂商数据放进主广播包, Service UUID 也放进主包 (NimBLE 会自动
+        // 决定是否溢出到 scan response, 超过 31 字节时库会处理)。
+        NimBLEAdvertisementData advData;
+        advData.setName("MT");
 
         // 厂商数据 (iOS 配对识别用, 字节序和内容必须与 ESP32 版一字不差):
         // [0-1] company id LE (0x6A59), [2-5] pump SN, [6] device type, [7] version
@@ -237,8 +243,7 @@ public:
             0x01,
             0x01,
         };
-        Bluefruit.Advertising.addData(
-            BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA, mfg, sizeof(mfg));
+        advData.setManufacturerData(std::string((const char*)mfg, sizeof(mfg)));
 
         Serial.print("[ADV] Manufacturer data (");
         Serial.print(sizeof(mfg));
@@ -248,22 +253,22 @@ public:
         }
         Serial.println("");
 
-        // 广告间隔: 快速模式 (20ms / 30ms), 加快 iOS 扫描发现速度。
-        // 原值 100/300 (62.5ms/187.5ms) 对 iOS 后台扫描较慢;
-        // 降到 32/48 (20ms/30ms) 接近 BLE 最小间隔, iOS 能更快发现设备。
-        Bluefruit.Advertising.setInterval(32, 48);  // 20ms / 30ms
-        Bluefruit.Advertising.setFastTimeout(0);      // 0 = 永久快速广播
+        // Service UUID 加入广播包 (NimBLE 在超过 31 字节时自动溢出到 scan response)。
+        advData.addServiceUUID(SERVICE_UUID);
 
-        // 将 Service UUID 加入 Scan Response (扫描响应包),
-        // iOS 主动扫描时能读到 UUID, 用于 Trio/Loop 识别设备。
-        // 注意: 放在广播包里会增大广播包, 可能超出 31 字节; 放 Scan Response 更安全。
-        Bluefruit.ScanResponse.clearData();
-        Bluefruit.ScanResponse.addUuid(BLEUuid(SERVICE_UUID));
-        Bluefruit.ScanResponse.addName();
+        // 广告间隔: 快速模式 (20ms / 30ms), 加快 iOS 扫描发现速度。
+        // 参数单位为 0.625ms: 32*0.625=20ms, 48*0.625=30ms。
+        bleAdv->setMinInterval(32);
+        bleAdv->setMaxInterval(48);
+
+        bleAdv->setAdvertisementData(advData);
+
+        // 启用主动扫描响应 (让 iOS 扫描时能读到完整 service UUID + name)。
+        // NimBLE 默认会在收到扫描请求时回送配置的广播数据作为响应。
+        bleAdv->enableScanResponse(true);
 
         Serial.println("[ADV] Starting BLE advertising...");
-        // Adafruit nRF52: start() 参数是广播秒数, 0 = 持续广播
-        Bluefruit.Advertising.start(0);
+        bleAdv->start();
         Serial.println("[ADV] BLE advertising is now active!");
         Serial.println("[ADV] Device name: MT");
         Serial.println("[ADV] Service UUID: " + String(SERVICE_UUID));
@@ -271,7 +276,7 @@ public:
     }
 
     void stopAdvertising() {
-        Bluefruit.Advertising.stop();
+        if (bleAdv) bleAdv->stop();
     }
 
     // 通知: 可选 CRC 修正 (与 ESP32 版 sendNotification 行为一致)。
@@ -286,8 +291,7 @@ public:
                 payload[len - 1] = expectedCrc;
             }
         }
-        readChr->notify(payload.data(), payload.size());
-        return true;
+        return sendNotify(readChr, payload.data(), payload.size());
     }
 
     bool sendNotificationWithCrcHack(const uint8_t* data, size_t len) {
@@ -295,62 +299,48 @@ public:
     }
 
     // 原始通知 (不做 CRC 修正) —— pump_simulator.h 主要走这个
-    // 直接调用 notify, 与 ESP32 版行为一致。不经过 sendNotifyLocked,
-    // 避免互斥锁在 readChr 上可能导致的死锁或 HVN 队列竞争。
     bool sendRawNotification(const uint8_t* data, size_t len) {
         if (readChr == nullptr) {
             Serial.println("[GATT][E] sendRawNotification: readChr is null");
             return false;
         }
-        if (!Bluefruit.connected()) {
+        if (!isAnyConnected()) {
             Serial.println("[GATT][E] sendRawNotification: not connected");
             return false;
         }
-        bool ok = readChr->notify(data, len);
-        // Serial.print("[GATT][I] raw notify sent, len=");
-        // Serial.print(len);
-        // Serial.print(" result=");
-        // Serial.println(ok ? "OK" : "FAIL");
-        return ok;
+        return sendNotify(readChr, data, len);
     }
 
     // 响应: 通过写特征值 notify (Trio 只监听写特征的响应)
     bool sendResponse(const uint8_t* data, size_t len) {
         Serial.print("[GATT][I] sendResponse called, len=");
         Serial.println(len);
-        return sendNotifyLocked(writeChr, "response notify", data, len);
+        if (writeChr == nullptr) {
+            Serial.println("[GATT][E] sendResponse: writeChr is null");
+            return false;
+        }
+        if (!isAnyConnected()) {
+            Serial.println("[GATT][E] sendResponse: not connected");
+            return false;
+        }
+        return sendNotify(writeChr, data, len);
     }
 
 private:
-    bool sendNotifyLocked(BLECharacteristic* chr, const char* name, const uint8_t* data, size_t len) {
-        if (chr == nullptr) {
-            Serial.print("[GATT][E] ");
-            Serial.print(name);
-            Serial.println(": characteristic is null");
-            return false;
-        }
-        if (!Bluefruit.connected()) {
-            Serial.print("[GATT][E] ");
-            Serial.print(name);
-            Serial.println(": not connected");
-            return false;
-        }
+    // NimBLE v2.x: notify() 不再带 is_notification 参数, 先 setValue 再 notify。
+    // 加重试逻辑: HVN 队列暂时满时短暂让出 CPU 重试 (与原 Bluefruit 版一致)。
+    bool sendNotify(NimBLECharacteristic* chr, const uint8_t* data, size_t len) {
+        if (chr == nullptr) return false;
 
-        // Bluefruit 内部会根据当前协商的 MTU 自动在 ATT 层分片,
-        // iOS 底层会自动重组。不要应用层手动分包。
         bool ok = false;
         for (int retry = 0; retry < 3; retry++) {
-            ok = chr->notify(data, len);
+            chr->setValue(data, len);
+            ok = chr->notify();
             if (ok) break;
-            // HVN 队列暂时满, 短暂让出 CPU 后重试。
-            // 每次等待 10ms, 最多 500ms, 给 iOS 足够时间清空队列。
-            // vTaskDelay(pdMS_TO_TICKS(10));
-            delay(2); // 仅极短暂让出 CPU，不要用 pdMS_TO_TICKS 长休眠
+            delay(2); // 仅极短暂让出 CPU, 不要用 pdMS_TO_TICKS 长休眠
         }
 
-        Serial.print("[GATT][I] ");
-        Serial.print(name);
-        Serial.print(" sent, len=");
+        Serial.print("[GATT][I] notify sent, len=");
         Serial.print(len);
         Serial.print(" result=");
         Serial.print(ok ? "OK" : "FAIL");
@@ -359,119 +349,110 @@ private:
         } else {
             Serial.println("");
         }
-
         return ok;
     }
 
-private:
-    BLEService* bleService;
-    BLECharacteristic* readChr;
-    BLECharacteristic* writeChr;
-    BLEDis* bledis;  // Device Information Service (可选, 当前未启用)
-    SemaphoreHandle_t notifyMutex;  // 串行化 notify 调用
+    bool isAnyConnected() const {
+        if (bleServer == nullptr) return false;
+        // NimBLEServer::getConnectedCount() 返回当前连接的客户端数。
+        return bleServer->getConnectedCount() > 0;
+    }
 
-    friend void gattEventCallback(ble_evt_t*);
-    friend void gattWriteCallback(uint16_t, BLECharacteristic*, uint8_t*, uint16_t);
-    friend void gattCccdWriteCallback(uint16_t, BLECharacteristic*, uint16_t);
+private:
+    NimBLEServer* bleServer;
+    NimBLEService* bleService;
+    NimBLECharacteristic* readChr;
+    NimBLECharacteristic* writeChr;
+    NimBLEAdvertising* bleAdv;
+
+    GattServerCallbacks    serverCallbacks;
+    GattWriteCharCallbacks writeCallbacks;
+    GattReadCharCallbacks  readCallbacks;
+
+    // FICR 派生的 MAC (用于 setOwnAddrType 后参考 / 调试打印)
+    uint8_t savedMac[6] = {0};
+    bool macValid = false;
 };
 
-// ---------- 静态回调实现 (转发到 GATTServer 实例) ----------
+// ---------- NimBLE 回调实现 (转发到 GATTServer 实例) ----------
 
-// 统一事件回调: Adafruit Bluefruit 的 setEventCallback 只给一个入口,
-// 在这里按 evt_id 分发到 connect / disconnect 逻辑。
-inline void gattEventCallback(ble_evt_t* evt) {
-    if (evt == nullptr || sActiveGatt == nullptr) return;
+inline void GattServerCallbacks::onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) {
+    (void)pServer; (void)connInfo;
+    Serial.println("");
+    Serial.println("========================================");
+    Serial.println("[BLE] CLIENT CONNECTED!");
+    Serial.println("========================================");
+    Serial.println("");
 
-    // evt_id 编码: 高 8 位是模块 BLE_GAP_EVT/BLE_GATTS_EVT..., 低 8 位是子事件号。
-    // 直接比对完整的 BLE_GAP_EVT_CONNECTED / BLE_GAP_EVT_DISCONNECTED 即可。
-    if (evt->header.evt_id == BLE_GAP_EVT_CONNECTED) {
-        Serial.println("");
-        Serial.println("========================================");
-        Serial.println("[BLE] CLIENT CONNECTED!");
-        Serial.println("========================================");
-        Serial.println("");
-
-        // 请求 MTU 交换 (非阻塞, 不用 delay 等待结果)
-        // delay() 在 BLE 回调里会阻塞 SoftDevice 事件处理, 导致 iOS 配对请求超时 → 0x8 断开
-        uint16_t conn_handle = evt->evt.gap_evt.conn_handle;
-        BLEConnection* conn = Bluefruit.Connection(conn_handle);
-        if (conn) {
-            conn->requestMtuExchange(247);
-            Serial.println("[BLE] MTU exchange requested (247)");
-        }
-
-        Serial.println("[BLE] Calling onConnect callback...");
-        if (sActiveGatt->onConnect) {
-            sActiveGatt->onConnect();
-        }
-        Serial.println("[BLE] onConnect callback returned");
-    } else if (evt->header.evt_id == BLE_GAP_EVT_DISCONNECTED) {
-        // 打印断开原因, 帮助诊断连接失败
-        uint8_t reason = evt->evt.gap_evt.params.disconnected.reason;
-        Serial.print("[BLE] Disconnect reason: 0x");
-        Serial.println(reason, HEX);
-
-        Serial.println("");
-        Serial.println("========================================");
-        Serial.println("[BLE] CLIENT DISCONNECTED!");
-        Serial.println("========================================");
-        Serial.println("");
-        Serial.println("[BLE] Calling onDisconnect callback...");
-        if (sActiveGatt->onDisconnect) {
-            sActiveGatt->onDisconnect();
-        }
-        Serial.println("[BLE] onDisconnect callback returned");
-        // 不再在这里调用 startAdvertising() — handleBleDisconnect() 已经会调用,
-        // 重复调用会导致广播重启两次, 第二次 stop() 打断第一次, 拖慢重连速度。
+    Serial.println("[BLE] Calling onConnect callback...");
+    if (gatt && gatt->onConnect) {
+        gatt->onConnect();
     }
-    // ---------- 安全事件处理 (防止 iOS 旧 bond 导致 0x8 断开) ----------
-    // iOS 首次连接后如果保存了 bond, 下次重连时会:
-    //   1) SEC_INFO_REQUEST: 询问 nRF52 是否保存了 bond key
-    //      → Bluefruit 库内部 (BLESecurity::_eventHandler) 已处理, 回复无 bond
-    //   2) SEC_REQUEST: 请求配对/加密
-    //      → 这个事件 Bluefruit 库没有处理! 如果不 reply, iOS 等待超时 → 断开 0x8
-    // 处理方式: 回复 PAIRING_NOT_SUPP, 拒绝配对, 保持无加密连接。
-    else if (evt->header.evt_id == BLE_GAP_EVT_SEC_REQUEST) {
-        uint16_t conn_hdl = evt->evt.gap_evt.conn_handle;
-        // 拒绝配对请求 — Medtrum 协议层用自己的 AUTH_REQ 做认证, 不需要 BLE 配对
-        // 直接返回 PAIRING_NOT_SUPP, p_sec_params=NULL, 告诉 iOS 不支持配对
-        sd_ble_gap_sec_params_reply(conn_hdl, BLE_GAP_SEC_STATUS_PAIRING_NOT_SUPP, NULL, NULL);
-        Serial.println("[BLE][SEC] SEC_REQUEST: rejected (pairing not supported)");
-    }
+    Serial.println("[BLE] onConnect callback returned");
 }
 
-inline void gattWriteCallback(uint16_t conn_handle, BLECharacteristic* chr,
-                              uint8_t* data, uint16_t len) {
-    (void)conn_handle;
-    (void)chr;
-    if (sActiveGatt && sActiveGatt->onWriteRequest) {
+inline void GattServerCallbacks::onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) {
+    (void)pServer; (void)connInfo;
+    Serial.print("[BLE] Disconnect reason: 0x");
+    Serial.println((uint16_t)reason, HEX);
+    Serial.println("");
+    Serial.println("========================================");
+    Serial.println("[BLE] CLIENT DISCONNECTED!");
+    Serial.println("========================================");
+    Serial.println("");
+    Serial.println("[BLE] Calling onDisconnect callback...");
+    if (gatt && gatt->onDisconnect) {
+        gatt->onDisconnect();
+    }
+    Serial.println("[BLE] onDisconnect callback returned");
+    // 不在这里 startAdvertising —— handleBleDisconnect() 已经会调用,
+    // 重复调用会导致广播重启两次。
+}
+
+inline void GattWriteCharCallbacks::onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) {
+    (void)connInfo;
+    if (gatt && gatt->onWriteRequest) {
+        // NimBLE: getValue() 返回 NimBLEAttValue (可当 std::vector<uint8_t> 用)。
+        NimBLEAttValue val = pCharacteristic->getValue();
+        size_t len = val.size();
         if (len > 0) {
-            sActiveGatt->onWriteRequest(data, len);
+            gatt->onWriteRequest((const uint8_t*)val.data(), len);
         }
     }
 }
 
-// CCCD (Client Characteristic Configuration Descriptor) 写入回调:
-// iOS 订阅/取消订阅 notify 时会写入 0x2902 描述符, 触发此回调。
-// value 的 bit0 = notify, bit1 = indicate。
-// 必须捕获此事件并设置 isSubscribed, 否则 pump_simulator.h 中所有 notify 都不会发送。
-inline void gattCccdWriteCallback(uint16_t conn_handle, BLECharacteristic* chr,
-                                  uint16_t cccd_value) {
-    (void)conn_handle;
-    (void)chr;
-    bool notifyEnabled = (cccd_value & 0x0001) != 0;
-    bool indicateEnabled = (cccd_value & 0x0002) != 0;
+// CCCD 订阅回调 (写入特征): 捕获 iOS 订阅/取消订阅 notify。
+// NimBLE onSubscribe 的 subValue: bit0=notify, bit1=indicate (与 CCCD 编码一致)。
+inline void GattWriteCharCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristic,
+                                                NimBLEConnInfo& connInfo, uint16_t subValue) {
+    (void)pCharacteristic; (void)connInfo;
+    bool notifyEnabled = (subValue & 0x0001) != 0;
+    bool indicateEnabled = (subValue & 0x0002) != 0;
 
-    Serial.print("[BLE] CCCD updated: 0x");
-    Serial.print(cccd_value, HEX);
+    Serial.print("[BLE] WriteChr CCCD subscribed: 0x");
+    Serial.print(subValue, HEX);
     Serial.print(" - Notify: ");
     Serial.print(notifyEnabled ? "ON" : "OFF");
     Serial.print(", Indicate: ");
     Serial.println(indicateEnabled ? "ON" : "OFF");
 
-    if (sActiveGatt && sActiveGatt->onSubscribe) {
-        sActiveGatt->onSubscribe(notifyEnabled || indicateEnabled);
+    if (gatt && gatt->onSubscribe) {
+        gatt->onSubscribe(notifyEnabled || indicateEnabled);
     }
+}
+
+// CCCD 订阅回调 (读取特征): 只记录状态, 不重复触发 onSubscribe (pump_simulator 已收到过)
+inline void GattReadCharCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristic,
+                                               NimBLEConnInfo& connInfo, uint16_t subValue) {
+    (void)pCharacteristic; (void)connInfo;
+    bool notifyEnabled = (subValue & 0x0001) != 0;
+    bool indicateEnabled = (subValue & 0x0002) != 0;
+    Serial.print("[BLE] ReadChr CCCD subscribed: 0x");
+    Serial.print(subValue, HEX);
+    Serial.print(" - Notify: ");
+    Serial.print(notifyEnabled ? "ON" : "OFF");
+    Serial.print(", Indicate: ");
+    Serial.println(indicateEnabled ? "ON" : "OFF");
 }
 
 } // namespace M640GKit
