@@ -22,6 +22,7 @@ M640GKit ESP32 泵模拟器 - Arduino 入口文件
 */
 
 #include "pump_simulator.h"
+#include "esp_wifi.h"
 
 // 使用 M640GKit 命名空间
 using namespace M640GKit;
@@ -35,7 +36,17 @@ using namespace M640GKit;
 // 全局模拟器实例
 M640GPumpSimulator pumpSimulator;
 
+void power_manager_init() {
+    // 强制关闭所有射频并卸载驱动
+    esp_wifi_stop();
+    esp_wifi_deinit();
+    // 显式关掉 Wi-Fi 模组供电
+    esp_wifi_set_mode(WIFI_MODE_NULL);
+}
+
 void setup() {
+    power_manager_init();
+    
     // 初始化串口
     Serial.begin(115200);
     

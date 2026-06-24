@@ -2735,7 +2735,7 @@ finish:
     xSemaphoreTake(simulator->xSemaphore, portMAX_DELAY);
     simulator->isDeliveryTaskRunning = false;
     xSemaphoreGive(simulator->xSemaphore);
-
+    
     vTaskDelete(NULL);
 }
 
