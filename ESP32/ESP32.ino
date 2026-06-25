@@ -23,8 +23,8 @@ M640GKit ESP32 泵模拟器 - Arduino 入口文件
 
 #include "pump_simulator.h"
 #include "esp_wifi.h"
-#include "esp_bt_main.h"
 #include "esp_pm.h"
+#include <WiFi.h>
 
 // 使用 M640GKit 命名空间
 using namespace M640GKit;
@@ -49,7 +49,7 @@ void power_manager_init() {
     // 2. 动态调频 (DVFS): 空闲时自动降至 10MHz, BLE/中断时自动升至 80MHz
     //    固定频率不能低于 80MHz (BLE 不稳定), 但 DVFS 可以安全地动态降频
     esp_pm_config_t pm_config = {
-        .max_freq_mhz = 40,
+        .max_freq_mhz = 80,
         .min_freq_mhz = 10,
         .light_sleep_enable = false  // light sleep 需要 menuconfig 启用 TICKLESS_IDLE
     };
@@ -134,7 +134,7 @@ void loop() {
         }
     } else {
         // 未连接: 短脉冲闪烁 (亮50ms/灭2s)
-        uint32_t interval = ledState ? 50 : 2000;
+        uint32_t interval = ledState ? 50 : 1000;
         if (now - lastLedToggle >= interval) {
             lastLedToggle = now;
             ledState = !ledState;
@@ -143,7 +143,7 @@ void loop() {
     }
 
     // 让出 CPU 进入低功耗: FreeRTOS idle → light sleep (如果已启用)
-    delay(1);
+    delay(2);
 }
 
 // 如果你的ESP32-C3 LED不亮，尝试修改 LED_BUILTIN 为以下值之一:
