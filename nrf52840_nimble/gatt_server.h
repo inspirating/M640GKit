@@ -125,8 +125,8 @@ public:
         }
         // CCCD 描述符回调 (用于订阅通知)
         descCallbacks.server = this;
-        NimBLE2902* p2902 = readCharacteristic->create2902();
-        p2902->setCallbacks(&descCallbacks);
+        NimBLE2904* p2904 = readCharacteristic->create2904();
+        p2904->setCallbacks(&descCallbacks);
         Serial.println("[GATT] Read characteristic created");
 
         // 启动服务
@@ -147,8 +147,8 @@ public:
         if (!isRunning) return;
 
         NimBLEDevice::stopAdvertising();
-        if (pService) {
-            pService->stop();
+        if (pServer) {
+            pServer->removeService(pService);
         }
         isRunning = false;
     }
