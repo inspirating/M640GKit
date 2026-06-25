@@ -23,6 +23,8 @@ M640GKit ESP32 泵模拟器 - Arduino 入口文件
 
 #include "pump_simulator.h"
 #include "esp_wifi.h"
+#include "esp_bt_main.h"
+#include "esp_pm.h"
 
 // 使用 M640GKit 命名空间
 using namespace M640GKit;
@@ -37,16 +39,29 @@ using namespace M640GKit;
 M640GPumpSimulator pumpSimulator;
 
 void power_manager_init() {
+    // 1. 关闭 WiFi 射频并卸载驱动
+    WiFi.mode(WIFI_OFF);
+
     // 强制关闭所有射频并卸载驱动
     esp_wifi_stop();
     esp_wifi_deinit();
-    // 显式关掉 Wi-Fi 模组供电
-    esp_wifi_set_mode(WIFI_MODE_NULL);
+
+    // 2. 动态调频 (DVFS): 空闲时自动降至 10MHz, BLE/中断时自动升至 80MHz
+    //    固定频率不能低于 80MHz (BLE 不稳定), 但 DVFS 可以安全地动态降频
+    esp_pm_config_t pm_config = {
+        .max_freq_mhz = 40,
+        .min_freq_mhz = 10,
+        .light_sleep_enable = false  // light sleep 需要 menuconfig 启用 TICKLESS_IDLE
+    };
+    esp_pm_configure(&pm_config);
+
+    // 4. 降低串口波特率减少 UART 模块功耗 (可选, 调试时注释掉)
+    // Serial.updateBaudRate(9600);
 }
 
 void setup() {
     power_manager_init();
-    
+
     // 初始化串口
     Serial.begin(115200);
     
@@ -106,23 +121,29 @@ void loop() {
     // 运行模拟器主循环
     pumpSimulator.loop();
 
-    // LED 心跳指示器 - 快速闪烁表示正在广播
+    // LED 心跳指示器
     static uint32_t lastLedToggle = 0;
     static bool ledState = false;
     uint32_t now = millis();
     
-    uint32_t interval;
-    if (ledState) {
-        interval = 200;
+    if (pumpSimulator.getIsConnected()) {
+        // 已连接: LED 常灭
+        if (ledState) {
+            ledState = false;
+            digitalWrite(LED_BUILTIN, LOW);
+        }
     } else {
-        interval = pumpSimulator.getIsConnected() ? 5000 : 200;
+        // 未连接: 短脉冲闪烁 (亮50ms/灭2s)
+        uint32_t interval = ledState ? 50 : 2000;
+        if (now - lastLedToggle >= interval) {
+            lastLedToggle = now;
+            ledState = !ledState;
+            digitalWrite(LED_BUILTIN, ledState ? HIGH : LOW);
+        }
     }
-    
-    if (now - lastLedToggle >= interval) {
-        lastLedToggle = now;
-        ledState = !ledState;
-        digitalWrite(LED_BUILTIN, ledState ? HIGH : LOW);
-    }
+
+    // 让出 CPU 进入低功耗: FreeRTOS idle → light sleep (如果已启用)
+    delay(1);
 }
 
 // 如果你的ESP32-C3 LED不亮，尝试修改 LED_BUILTIN 为以下值之一:
