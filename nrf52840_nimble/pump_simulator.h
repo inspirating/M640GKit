@@ -1339,12 +1339,9 @@ private:
      */
     void processDeliveryQueues() {
         uint32_t now = millis();
-        Logger::info("[DEBUG] processDeliveryQueues called, patchState=" + String(getStateName(patchState)) + 
-                     ", currentBolus=" + String(currentBolus ? "yes" : "null") + 
-                     ", bolusQueue.size=" + String(bolusQueue.size()));
 
         if (patchState != PatchState::ACTIVE && patchState != PatchState::ACTIVE_ALT) {
-            Logger::info("[DEBUG] patchState not ACTIVE, skipping delivery");
+            // Logger::info("[DEBUG] patchState not ACTIVE, skipping delivery");
             return;
         }
 
@@ -1354,6 +1351,9 @@ private:
             return;
         }
         lastDeliveryScanTime = now;
+        Logger::info("[DEBUG] processDeliveryQueues called, patchState=" + String(getStateName(patchState)) + 
+                     ", currentBolus=" + String(currentBolus ? "yes" : "null") + 
+                     ", bolusQueue.size=" + String(bolusQueue.size()));
 
         // GPIO 输注线程在运行中时，跳过队列处理（等待输注完成后由下次扫描执行）
         if (isDeliveryTaskRunning) {
@@ -1689,8 +1689,8 @@ private:
         connectionTracker.onDisconnect("BLE 断开");
 
         gattServer.advertisingSuspended = true;
-        advertisingResumeTime = millis() + 10000;
-        Logger::info("BLE广播已暂停10秒, 防止客户端自动重连");
+        advertisingResumeTime = millis() + 2000;
+        Logger::info("BLE广播已暂停2秒, 防止客户端自动重连");
     }
 
     void processCompleteCommand(const uint8_t* data, uint8_t len) {

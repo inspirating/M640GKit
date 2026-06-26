@@ -191,6 +191,8 @@ public:
         advData.setManufacturerData(std::string(reinterpret_cast<const char*>(mfg), sizeof(mfg)));
 
         pAdvertising->setAdvertisementData(advData);
+
+        // Scan response: 空，与 ESP32 原版行为一致
         pAdvertising->setScanResponseData(NimBLEAdvertisementData());
 
         Serial.println("[ADV] Starting BLE advertising...");
