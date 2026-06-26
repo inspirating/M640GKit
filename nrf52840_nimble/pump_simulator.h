@@ -287,6 +287,7 @@ public:
         gattServer.onWriteRequest = handleWriteRequestStatic;
         gattServer.onConnect = handleConnectStatic;
         gattServer.onDisconnect = handleDisconnectStatic;
+        gattServer.onSubscribe = handleSubscribeStatic;
         
         Serial.println("[PUMP] Starting GATT server...");
         gattServer.start();
@@ -1512,6 +1513,13 @@ private:
         extern M640GPumpSimulator* gSimulator;
         if (gSimulator) {
             gSimulator->handleBleDisconnect();
+        }
+    }
+
+    static void handleSubscribeStatic(bool subscribed) {
+        extern M640GPumpSimulator* gSimulator;
+        if (gSimulator) {
+            gSimulator->handleSubscribe(subscribed);
         }
     }
 

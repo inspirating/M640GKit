@@ -45,18 +45,13 @@ public:
     GATTServer* server = nullptr;
     NimBLECharacteristic* writeChar = nullptr;
     void onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) override;
-};
-
-// ========== CCCD 描述符回调 ==========
-class DescCallbacks : public NimBLEDescriptorCallbacks {
-public:
-    GATTServer* server = nullptr;
-    void onWrite(NimBLEDescriptor* pDescriptor, NimBLEConnInfo& connInfo) override;
+    void onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) override;
 };
 
 class GATTServer {
 public:
     bool isRunning = false;
+    bool clientSubscribed = false;  // 客户端是否已订阅通知
     WriteRequestCallback onWriteRequest = nullptr;
     SubscribeCallback onSubscribe = nullptr;
     DisconnectCallback onDisconnect = nullptr;
@@ -123,11 +118,9 @@ public:
             Serial.println("[GATT] ERROR: Failed to create read characteristic!");
             return;
         }
-        // CCCD 描述符回调 (用于订阅通知)
-        descCallbacks.server = this;
-        NimBLE2904* p2904 = readCharacteristic->create2904();
-        p2904->setCallbacks(&descCallbacks);
-        Serial.println("[GATT] Read characteristic created");
+        // 订阅回调绑定到 read characteristic (iOS 订阅通知时触发)
+        readCharacteristic->setCallbacks(&charCallbacks);
+        Serial.println("[GATT] Read characteristic created with subscribe callback");
 
         // 启动服务
         Serial.println("[GATT] Starting BLE service...");
@@ -210,6 +203,7 @@ public:
 
     bool sendNotification(const uint8_t* data, size_t len, bool useCrcHack = true) {
         if (readCharacteristic == nullptr) return false;
+        if (!clientSubscribed) return false;
 
         std::vector<uint8_t> payload(data, data + len);
 
@@ -231,6 +225,7 @@ public:
 
     bool sendRawNotification(const uint8_t* data, size_t len) {
         if (readCharacteristic == nullptr) return false;
+        if (!clientSubscribed) return false;
         readCharacteristic->setValue(data, len);
         readCharacteristic->notify();
         return true;
@@ -238,6 +233,7 @@ public:
 
     bool sendResponse(const uint8_t* data, size_t len) {
         if (writeCharacteristic == nullptr) return false;
+        if (!clientSubscribed) return false;
         writeCharacteristic->setValue(data, len);
         writeCharacteristic->notify();
         return true;
@@ -250,11 +246,9 @@ private:
     NimBLECharacteristic* writeCharacteristic;
     ServerCallbacks serverCallbacks;
     CharCallbacks charCallbacks;
-    DescCallbacks descCallbacks;
 
     friend class ServerCallbacks;
     friend class CharCallbacks;
-    friend class DescCallbacks;
 };
 
 // ========== 回调实现 ==========
@@ -282,6 +276,9 @@ inline void ServerCallbacks::onDisconnect(NimBLEServer* pServer, NimBLEConnInfo&
     Serial.println("========================================");
     Serial.println("");
 
+    if (server) {
+        server->clientSubscribed = false;
+    }
     if (server && server->onDisconnect) {
         server->onDisconnect();
     }
@@ -300,30 +297,20 @@ inline void CharCallbacks::onWrite(NimBLECharacteristic* pCharacteristic, NimBLE
     }
 }
 
-inline void DescCallbacks::onWrite(NimBLEDescriptor* pDescriptor, NimBLEConnInfo& connInfo) {
-    Serial.println("[BLE] Descriptor write callback triggered");
+inline void CharCallbacks::onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue) {
+    bool subscribed = (subValue & 0x0001) != 0;  // 0x0001 = notifications enabled
+    Serial.print("[BLE] onSubscribe: ");
+    Serial.print(subscribed ? "SUBSCRIBED" : "UNSUBSCRIBED");
+    Serial.print(" (subValue=0x");
+    Serial.print(subValue, HEX);
+    Serial.println(")");
 
-    // CCCD UUID = 0x2902
-    if (pDescriptor->getUUID().equals(NimBLEUUID((uint16_t)0x2902))) {
-        Serial.println("[BLE] CCCD descriptor write detected");
+    if (server) {
+        server->clientSubscribed = subscribed;
+    }
 
-        auto val = pDescriptor->getValue();
-        if (val.size() >= 2) {
-            uint16_t cccdValue = val[0] | (val[1] << 8);
-            bool notifyEnabled = (cccdValue & 0x0001) != 0;
-            bool indicateEnabled = (cccdValue & 0x0002) != 0;
-
-            Serial.print("[BLE] CCCD value: 0x");
-            Serial.print(cccdValue, HEX);
-            Serial.print(" - Notify: ");
-            Serial.print(notifyEnabled ? "ON" : "OFF");
-            Serial.print(", Indicate: ");
-            Serial.println(indicateEnabled ? "ON" : "OFF");
-
-            if (server && server->onSubscribe) {
-                server->onSubscribe(notifyEnabled || indicateEnabled);
-            }
-        }
+    if (server && server->onSubscribe) {
+        server->onSubscribe(subscribed);
     }
 }
 
