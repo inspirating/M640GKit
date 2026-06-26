@@ -70,7 +70,12 @@ public:
 
         // 初始化 NimBLE
         NimBLEDevice::init("MT");
-        NimBLEDevice::setMTU(512);
+
+        // 禁用隐私地址(RPA)，使用静态地址，确保 iOS 能稳定识别设备
+        NimBLEDevice::enablePrivacy(false);
+
+        // 禁用 bonding，避免配对流程导致连接超时
+        NimBLEDevice::setSecurityAuth(false, false, false);
 
         Serial.println("[GATT] NimBLE device initialized with name 'MT'");
 
@@ -205,7 +210,6 @@ public:
 
     bool sendNotification(const uint8_t* data, size_t len, bool useCrcHack = true) {
         if (readCharacteristic == nullptr) return false;
-        if (!clientSubscribed) return false;
 
         std::vector<uint8_t> payload(data, data + len);
 
@@ -227,7 +231,6 @@ public:
 
     bool sendRawNotification(const uint8_t* data, size_t len) {
         if (readCharacteristic == nullptr) return false;
-        if (!clientSubscribed) return false;
         readCharacteristic->setValue(data, len);
         readCharacteristic->notify();
         return true;
@@ -235,7 +238,6 @@ public:
 
     bool sendResponse(const uint8_t* data, size_t len) {
         if (writeCharacteristic == nullptr) return false;
-        if (!clientSubscribed) return false;
         writeCharacteristic->setValue(data, len);
         writeCharacteristic->notify();
         return true;
@@ -263,6 +265,10 @@ inline void ServerCallbacks::onConnect(NimBLEServer* pServer, NimBLEConnInfo& co
     Serial.println(pServer->getConnectedCount());
     Serial.println("========================================");
     Serial.println("");
+
+    // 更新连接参数，确保 iOS 稳定连接
+    // interval: 15ms (12*1.25ms), latency: 0, timeout: 4s (400*10ms)
+    pServer->updateConnParams(connInfo.getConnHandle(), 12, 24, 0, 400);
 
     if (server && server->onConnect) {
         server->onConnect();
