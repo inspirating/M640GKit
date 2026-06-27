@@ -215,6 +215,7 @@ public:
         if (savedStartTime > 0) {
             patchStartTime = savedStartTime;
             totalElapsedTime = savedElapsedTime;
+            timeSyncPending = true;  // 重启后标记时间需要重新同步
             if (savedPatchState > 0) {
                 patchState = static_cast<PatchState>(savedPatchState);
             } else {
@@ -1878,11 +1879,37 @@ private:
         if (len >= 9) {
             uint8_t prefix = data[4];
             uint32_t newTime = data[5] | (data[6] << 8) | (data[7] << 16) | (data[8] << 24);
-            patchStartTime = newTime;
-            totalElapsedTime = 0;
+
+            bool alreadyActive = (patchState == PatchState::ACTIVE || patchState == PatchState::ACTIVE_ALT ||
+                                  patchState == PatchState::SUSPENDED || patchState == PatchState::PAUSED);
+
+            if (alreadyActive && patchStartTime > 0) {
+                // 已激活状态下同步时间：保持patchStartTime不变，只调整totalElapsedTime
+                // newTime是Swift端的当前M640G时间，patchStartTime + totalElapsedTime是ESP32的当前M640G时间
+                uint32_t espCurrentTime = patchStartTime + totalElapsedTime;
+                if (newTime >= espCurrentTime) {
+                    uint32_t drift = newTime - espCurrentTime;
+                    totalElapsedTime += drift;
+                    Logger::info("时间校准: drift=+" + String(drift) + "s totalElapsed=" + String(totalElapsedTime));
+                } else {
+                    uint32_t drift = espCurrentTime - newTime;
+                    if (totalElapsedTime >= drift) {
+                        totalElapsedTime -= drift;
+                    } else {
+                        totalElapsedTime = 0;
+                    }
+                    Logger::info("时间校准: drift=-" + String(drift) + "s totalElapsed=" + String(totalElapsedTime));
+                }
+            } else {
+                // 首次激活：正常设置时间
+                patchStartTime = newTime;
+                totalElapsedTime = 0;
+                Logger::info("首次设置时间: time=" + String(newTime));
+            }
+
             timeSyncPending = false;
             patchStateDirty = true;
-            Logger::info("时间已同步: prefix=" + String(prefix) + " time=" + String(newTime));
+            Logger::info("时间已同步: prefix=" + String(prefix) + " patchStart=" + String(patchStartTime) + " elapsed=" + String(totalElapsedTime));
         }
         sendResponse(CommandType::SET_TIME, seqNum, nullptr, 0);
     }
@@ -1894,10 +1921,34 @@ private:
             int16_t tzOffset = static_cast<int16_t>(tzOffsetRaw);
             pumpTimezone = tzOffset;
             uint32_t timeVal = data[6] | (data[7] << 8) | (data[8] << 16) | (data[9] << 24);
-            patchStartTime = timeVal;
-            totalElapsedTime = 0;
+
+            bool alreadyActive = (patchState == PatchState::ACTIVE || patchState == PatchState::ACTIVE_ALT ||
+                                  patchState == PatchState::SUSPENDED || patchState == PatchState::PAUSED);
+
+            if (alreadyActive && patchStartTime > 0) {
+                // 已激活状态下同步时区：保持patchStartTime不变，只调整totalElapsedTime
+                uint32_t espCurrentTime = patchStartTime + totalElapsedTime;
+                if (timeVal >= espCurrentTime) {
+                    uint32_t drift = timeVal - espCurrentTime;
+                    totalElapsedTime += drift;
+                    Logger::info("时区同步校准: drift=+" + String(drift) + "s totalElapsed=" + String(totalElapsedTime));
+                } else {
+                    uint32_t drift = espCurrentTime - timeVal;
+                    if (totalElapsedTime >= drift) {
+                        totalElapsedTime -= drift;
+                    } else {
+                        totalElapsedTime = 0;
+                    }
+                    Logger::info("时区同步校准: drift=-" + String(drift) + "s totalElapsed=" + String(totalElapsedTime));
+                }
+            } else {
+                // 首次激活：正常设置
+                patchStartTime = timeVal;
+                totalElapsedTime = 0;
+            }
+
             patchStateDirty = true;
-            Logger::info("时区偏移: " + String(tzOffset) + " 分钟, 时间: " + String(timeVal));
+            Logger::info("时区偏移: " + String(tzOffset) + " 分钟, patchStart=" + String(patchStartTime) + " elapsed=" + String(totalElapsedTime));
         }
         sendResponse(CommandType::SET_TIME_ZONE, seqNum, nullptr, 0);
     }
