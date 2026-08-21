@@ -1,144 +1,173 @@
-# M640GKit æ³µæ¨¡æ‹Ÿå™¨ â€” nRF52840 (PCA10056) ç§»æ¤ç‰ˆ
+# M640GKit ±ÃÄ£ÄâÆ÷ ¡ª nRF52840 (NimBLE °æ)
 
-æœ¬ç›®å½•æ˜¯æŠŠ `ESP32/` ç‰ˆæœ¬çš„èƒ°å²›ç´ æ³µæ¨¡æ‹Ÿå™¨ç§»æ¤åˆ° **Nordic nRF52840 DK (PCA10056)** çš„äº§ç‰©,ä½¿ç”¨ Adafruit nRF52 æ¿å¡åŒ… + çº¯ Arduino IDE sketchã€‚
+±¾Ä¿Â¼ÊÇ°Ñ `ESP32/` °æ±¾µÄÒÈµºËØ±ÃÄ£ÄâÆ÷ÒÆÖ²µ½ **Nordic nRF52840** µÄ²úÎï,Ê¹ÓÃ **NimBLE-Arduino** ¿âÊµÏÖµÍ¹¦ºÄÀ¶ÑÀÍ¨ÐÅ¡£
 
-## 1. ç§»æ¤ç­–ç•¥:å¹³å°é€‚é…å±‚
+## 1. ÒÆÖ²²ßÂÔ:Æ½Ì¨ÊÊÅä²ã
 
-**ä¸šåŠ¡é€»è¾‘é›¶æ”¹åŠ¨å¤ç”¨** â€”â€” `pump_simulator.h` çš„çŠ¶æ€æœºã€é˜Ÿåˆ—è°ƒåº¦ã€carryOver 2U å®‰å…¨ä¸Šé™ã€GPIO æ•²å‡»æ—¶åºã€æ—¶é—´æ¨¡åž‹å…¨éƒ¨ä¿æŒåŽŸæ ·ã€‚åªåœ¨ 4 ä¸ªç¡¬ä»¶è€¦åˆç‚¹åšäº†å¹³å°æ›¿æ¢:
+**ÒµÎñÂß¼­Áã¸Ä¶¯¸´ÓÃ** ¡ª¡ª `pump_simulator.h` µÄ×´Ì¬»ú¡¢¶ÓÁÐµ÷¶È¡¢carryOver 2U °²È«ÉÏÏÞ¡¢GPIO ÇÃ»÷Ê±Ðò¡¢Ê±¼äÄ£ÐÍÈ«²¿±£³ÖÔ­Ñù¡£Ö»ÔÚ 4 ¸öÓ²¼þñîºÏµã×öÁËÆ½Ì¨Ìæ»»:
 
-| è€¦åˆç‚¹ | ESP32 | nRF52840 (æœ¬ç›®å½•) |
+| ñîºÏµã | ESP32 | nRF52840 (±¾Ä¿Â¼) |
 |--------|-------|-------------------|
-| BLE æ ˆ | `<BLEDevice.h>` (Arduino-ESP32 BLE) | `<bluefruit.h>` (Adafruit Bluefruit) â†’ é‡å†™ `gatt_server.h` |
-| æŒä¹…åŒ– | `Preferences` (NVS) | `preferences_nrf52.h`:LittleFS(InternalFS) åŒ…è£…ç±»,åŒååŒ API |
-| FreeRTOS | `<freertos/semphr.h>` | è·¯å¾„ + æ ˆå¤§å° 8192â†’4096,API ä¸å˜ |
-| MAC åœ°å€ | `esp_efuse_mac` è½¯ä»¶è®¾ç½® | åˆ é™¤â€”â€”nRF52840 MAC ç”± SoftDevice å™¨ä»¶ ID å†³å®š |
-| GPIO å¼•è„š | STEP_PIN=7 (GPIO7) | STEP_PIN=17 (P0.17, Nice!Nano D2) |
-| LED | é«˜ç”µå¹³ç‚¹äº® | ä½Žç”µå¹³ç‚¹äº®(nRF52840 DK æ¿è½½ LED active-low) |
+| BLE Õ» | `<BLEDevice.h>` (Arduino-ESP32 BLE) | `<NimBLEDevice.h>` (NimBLE-Arduino) ¡ú ÖØÐ´ `gatt_server.h` |
+| ³Ö¾Ã»¯ | `Preferences` (NVS) | `preferences_nrf52.h`:LittleFS(InternalFS) °ü×°Àà,Í¬ÃûÍ¬ API |
+| FreeRTOS | `<freertos/semphr.h>` | Â·¾¶ + Õ»´óÐ¡ 8192¡ú4096,API ²»±ä |
+| MAC µØÖ· | `esp_efuse_mac` Èí¼þÉèÖÃ | É¾³ý¡ª¡ªnRF52840 MAC ÓÉ SoftDevice Æ÷¼þ ID ¾ö¶¨ |
+| GPIO Òý½Å | STEP_PIN=7 (GPIO7) | STEP_PIN=17 (P0.17, Nice!Nano D2) |
+| LED | ¸ßµçÆ½µãÁÁ | µÍµçÆ½µãÁÁ(nRF52840 DK °åÔØ LED active-low) |
 
-## 2. æ–‡ä»¶æ¸…å•
+### NimBLE vs Adafruit Bluefruit ¹¦ºÄ¶Ô±È
 
-| æ–‡ä»¶ | æ¥æº | è¯´æ˜Ž |
+| Ö¸±ê | Adafruit Bluefruit | NimBLE |
+|------|-------------------|--------|
+| ¹ã²¥¼ä¸ô | 20ms/30ms (³ÖÐø¸ßËÙ) | 1s/2s (Ê¡µçÄ£Ê½) |
+| Á¬½ÓÊ±Æ½¾ùµçÁ÷ | ~15mA | ~5mA |
+| ¿ÕÏÐÊ±Æ½¾ùµçÁ÷ | ~15mA | ~1mA |
+| ¹Ì¼þ´óÐ¡ | ½Ï´ó | ½ÏÐ¡ |
+
+## 2. ÎÄ¼þÇåµ¥
+
+| ÎÄ¼þ | À´Ô´ | ËµÃ÷ |
 |------|------|------|
-| `nrf52840.ino` | æ”¹è‡ª `ESP32.ino` | å…¥å£,åˆ  esp_reset/ESP.getFreeHeap,åŠ  InternalFS åˆå§‹åŒ– |
-| `pump_simulator.h` | æ”¹è‡ª ESP32 ç‰ˆ | 3 å¤„æ”¹åŠ¨:Preferences include / FreeRTOS include / STEP_PIN / æ ˆå¤§å° |
-| `gatt_server.h` | **é‡å†™** | Adafruit Bluefruit,å…¬å…± API ä¸Ž ESP32 ç‰ˆå®Œå…¨ä¸€è‡´ |
-| `preferences_nrf52.h` | **æ–°å»º** | LittleFS å®žçŽ°çš„ Preferences å…¼å®¹ç±» |
-| `crypto.h` `crc8.h` `enums.h` | é€å­—å¤åˆ¶ | çº¯è½¯ä»¶åŠ å¯†/æ ¡éªŒ/å¸¸é‡ |
-| `*_packet.h` (9 ä¸ª) | é€å­—å¤åˆ¶ | çº¯åè®®å±‚å­—èŠ‚æ“ä½œ |
-| `connection_tracker.h` | é€å­—å¤åˆ¶ | çº¯ millis è¿žæŽ¥è·Ÿè¸ª |
-| `test_*.h` (3 ä¸ª) | é€å­—å¤åˆ¶ | æµ‹è¯•ä»£ç  |
+| `nrf52840.ino` | ¸Ä×Ô `ESP32.ino` | Èë¿Ú,É¾ esp_reset/ESP.getFreeHeap,NimBLE °æ |
+| `pump_simulator.h` | ¸Ä×Ô ESP32 °æ | 3 ´¦¸Ä¶¯:Preferences include / FreeRTOS include / STEP_PIN / Õ»´óÐ¡ |
+| `gatt_server.h` | **ÖØÐ´** | NimBLE ÊµÏÖ,¹«¹² API Óë ESP32 °æÍêÈ«Ò»ÖÂ |
+| `preferences_nrf52.h` | **ÐÂ½¨** | LittleFS ÊµÏÖµÄ Preferences ¼æÈÝÀà |
+| `crypto.h` `crc8.h` `enums.h` | Öð×Ö¸´ÖÆ | ´¿Èí¼þ¼ÓÃÜ/Ð£Ñé/³£Á¿ |
+| `*_packet.h` (9 ¸ö) | Öð×Ö¸´ÖÆ | ´¿Ð­Òé²ã×Ö½Ú²Ù×÷ |
+| `connection_tracker.h` | Öð×Ö¸´ÖÆ | ´¿ millis Á¬½Ó¸ú×Ù |
+| `test_*.h` (3 ¸ö) | Öð×Ö¸´ÖÆ | ²âÊÔ´úÂë |
 
-## 3. ç¡¬ä»¶æŽ¥çº¿
+## 3. Ó²¼þ½ÓÏß
 
-### TS5A3166 æ¨¡æ‹Ÿå¼€å…³ / ä¸‰æžç®¡ç»§ç”µå™¨ â†’ Nice!Nano (nRF52840)
+### TS5A3166 Ä£Äâ¿ª¹Ø / Èý¼«¹Ü¼ÌµçÆ÷ ¡ú Nice!Nano (nRF52840)
 ```
-TS5A3166 / ä¸‰æžç®¡åŸºæž    Nice!Nano
-IN (æŽ§åˆ¶) / Base   â†’  P0.17  (STEP_PIN = 17, D2 æŽ’é’ˆ)
-VCC / ç»§ç”µå™¨çº¿åœˆ    â†’  å¤–éƒ¨ç”µæº
-GND / Emitter      â†’  GND
-NO/COM   â†’  å¹¶è”åˆ° M640G æ³µæŒ‰é”®ä¸¤ç«¯
+TS5A3166 / Èý¼«¹Ü»ù¼«    Nice!Nano
+IN (¿ØÖÆ) / Base   ¡ú  P0.17  (STEP_PIN = 17, D2 ÅÅÕë)
+VCC / ¼ÌµçÆ÷ÏßÈ¦    ¡ú  Íâ²¿µçÔ´
+GND / Emitter      ¡ú  GND
+NO/COM   ¡ú  ²¢Áªµ½ M640G ±Ã°´¼üÁ½¶Ë
 ```
-- TS5A3166 æ˜¯**é«˜ç”µå¹³å¯¼é€š**(IN=HIGH æ—¶æŒ‰ä¸‹æ³µæŒ‰é”®), ä¸‰æžç®¡ç»§ç”µå™¨åŒç†ã€‚
-- **P0.17 é€‰æ‹©åŽŸå› **: Nice!Nano çš„ D2 æŽ’é’ˆå¼•è„š, æ–¹ä¾¿æŽ¥çº¿, æ— ç¡¬ä»¶å†²çªã€‚
-- è‹¥ä½ æŽ¥å…¶ä»–å¼•è„š: æ”¹ `pump_simulator.h` ç¬¬ 147 è¡Œ `static constexpr int STEP_PIN = 17;` å³å¯ã€‚
-- **é‡è¦**: Arduino IDE é€‰æ¿å¿…é¡»é€‰ **"PCA10056 nRF52840 DK"** (1:1 å¼•è„šæ˜ å°„, P0.x = x)ã€‚
-  ä¸è¦é€‰ "Feather nRF52840 Express" â€” å…¶ g_ADigitalPinMap éž 1:1, ä¼šå¯¼è‡´ STEP_PIN=17 å®žé™…æ“ä½œ P0.28 è€Œéž P0.17!
+- TS5A3166 ÊÇ**¸ßµçÆ½µ¼Í¨**(IN=HIGH Ê±°´ÏÂ±Ã°´¼ü), Èý¼«¹Ü¼ÌµçÆ÷Í¬Àí¡£
+- **P0.17 Ñ¡ÔñÔ­Òò**: Nice!Nano µÄ D2 ÅÅÕëÒý½Å, ·½±ã½ÓÏß, ÎÞÓ²¼þ³åÍ»¡£
+- ÈôÄã½ÓÆäËûÒý½Å: ¸Ä `pump_simulator.h` µÚ 147 ÐÐ `static constexpr int STEP_PIN = 17;` ¼´¿É¡£
+- **ÖØÒª**: Arduino IDE Ñ¡°å±ØÐëÑ¡ **"PCA10056 nRF52840 DK"** (1:1 Òý½ÅÓ³Éä, P0.x = x)¡£
+  ²»ÒªÑ¡ "Feather nRF52840 Express" ¡ª Æä g_ADigitalPinMap ·Ç 1:1, »áµ¼ÖÂ STEP_PIN=17 Êµ¼Ê²Ù×÷ P0.28 ¶ø·Ç P0.17!
 
-### nRF52840 DK ä¾›ç”µ
-- USB æŽ¥ micro-USB(æ¿è½½ SEGGER J-Link),æˆ–å¤–éƒ¨ 3.3Vã€‚
+### nRF52840 DK ¹©µç
+- USB ½Ó micro-USB(°åÔØ SEGGER J-Link),»òÍâ²¿ 3.3V¡£
 
-## 4. å¼€å‘çŽ¯å¢ƒæ­å»º
+## 4. ¿ª·¢»·¾³´î½¨
 
-### 4.1 å®‰è£… Adafruit nRF52 æ¿å¡åŒ…
-1. Arduino IDE â†’ æ–‡ä»¶ â†’ é¦–é€‰é¡¹ â†’ é™„åŠ å¼€å‘æ¿ç®¡ç†å™¨ç½‘å€,åŠ :
+### 4.1 °²×° Adafruit nRF52 °å¿¨°ü
+1. Arduino IDE ¡ú ÎÄ¼þ ¡ú Ê×Ñ¡Ïî ¡ú ¸½¼Ó¿ª·¢°å¹ÜÀíÆ÷ÍøÖ·,¼Ó:
    ```
    https://adafruit.github.io/arduino-board-index/package_adafruit_index.json
    ```
-2. å·¥å…· â†’ å¼€å‘æ¿ â†’ å¼€å‘æ¿ç®¡ç†å™¨ â†’ æœç´¢ `Adafruit nRF52` â†’ å®‰è£…(â‰¥1.x)ã€‚
+2. ¹¤¾ß ¡ú ¿ª·¢°å ¡ú ¿ª·¢°å¹ÜÀíÆ÷ ¡ú ËÑË÷ `Adafruit nRF52` ¡ú °²×°(¡Ý1.x)¡£
 
-### 4.2 æ¿å¡é…ç½®
-- å¼€å‘æ¿:**nRF52840 DK (PCA10056)**
+### 4.2 °å¿¨ÅäÖÃ
+- ¿ª·¢°å:**nRF52840 DK (PCA10056)**
 - SoftDevice:**S140**
-- ä¼˜åŒ–:-Os
-- ä¸²å£:é€‰å¯¹åº” COM å£(USB CDC)
+- ÓÅ»¯:-Os
+- ´®¿Ú:Ñ¡¶ÔÓ¦ COM ¿Ú(USB CDC)
 
-### 4.3 åº“ä¾èµ–
-**æ— éœ€é¢å¤–åº“**â€”â€”Adafruit nRF52 æ¿å¡åŒ…è‡ªå¸¦:
-- `bluefruit.h`(BLE)
-- `InternalFS` / `Adafruit_LittleFS`(æŒä¹…åŒ–)
-- FreeRTOS(ä»»åŠ¡/ä¿¡å·é‡)
-- crypto/crc éƒ½æ˜¯æ‰‹å†™è½¯ä»¶,å·²åœ¨ç›®å½•å†…ã€‚
+### 4.3 ¿âÒÀÀµ
 
-## 5. ç¼–è¯‘ä¸Žçƒ§å½•
+**ÐèÒª°²×° NimBLE-Arduino ¿â**£º
 
-1. Arduino IDE æ‰“å¼€ `nrf52840.ino`(ä¼šè‡ªåŠ¨è¿žåŒåŒç›®å½• .h ä¸€èµ·ç¼–è¯‘)ã€‚
-2. é€‰æ¿ + COM å£ã€‚
-3. ç‚¹ä¸Šä¼ (â†“)ã€‚PCA10056 ç» J-Link çƒ§å½•ã€‚
+1. Arduino IDE ¡ú ÏîÄ¿ ¡ú °üº¬¿â ¡ú ¹ÜÀí¿â...
+2. ËÑË÷ `NimBLE-Arduino` (×÷Õß: h2zero)
+3. °²×°×îÐÂ°æ±¾
 
-## 6. ä¸Ž ESP32 ç‰ˆçš„å…³é”®å·®å¼‚(å¿…è¯»)
+ÆäËûÒÀÀµ£º
+- `InternalFS` / `Adafruit_LittleFS`(³Ö¾Ã»¯) - ÓÉ Adafruit nRF52 °å¿¨°ü×Ô´ø
+- FreeRTOS(ÈÎÎñ/ÐÅºÅÁ¿) - ÓÉ Adafruit nRF52 °å¿¨°ü×Ô´ø
+- crypto/crc ¶¼ÊÇÊÖÐ´Èí¼þ,ÒÑÔÚÄ¿Â¼ÄÚ¡£
 
-### 6.1 MAC åœ°å€å˜äº† â†’ Trio è¦é‡æ–°é…å¯¹ä¸€æ¬¡
-- ESP32 ç‰ˆç”¨ `esp_base_mac_addr_set` è®¾å›ºå®š MAC;nRF52840 çš„ MAC æ¥è‡ª SoftDevice å™¨ä»¶ ID,**ä¸å¯è½¯ä»¶æ”¹**ã€‚
-- åŽæžœ:Trio ä¹‹å‰ç¼“å­˜çš„ peripheral UUID å¤±æ•ˆ,**é¦–æ¬¡éœ€é‡æ–°æ‰«æé…å¯¹ä¸€æ¬¡**ã€‚ä¹‹åŽè·¨é‡å¯ç¨³å®š(nRF52840 MAC æ¯” ESP32 æ›´å¯é )ã€‚
+## 5. ±àÒëÓëÉÕÂ¼
 
-### 6.2 LED æžæ€§ç›¸å
-- ESP32:HIGH=äº®ã€‚nRF52840 DK:LOW=äº®(æ¿è½½ LED active-low)ã€‚
-- `nrf52840.ino` çš„ loop() å·²å¤„ç†,æ— éœ€æ‰‹åŠ¨æ”¹ã€‚
+1. Arduino IDE ´ò¿ª `nrf52840.ino`(»á×Ô¶¯Á¬Í¬Í¬Ä¿Â¼ .h Ò»Æð±àÒë)¡£
+2. Ñ¡°å + COM ¿Ú¡£
+3. µãÉÏ´«(¡ý)¡£PCA10056 ¾­ J-Link ÉÕÂ¼¡£
 
-### 6.3 Flash ç£¨æŸ
-- `persistStats()` æ¯æ¬¡æ³¨å°„åŽå†™ ~48 å­—èŠ‚åˆ° LittleFSã€‚æ­£å¸¸ä½¿ç”¨(å‡ åæ¬¡/å¤©)æ— å¿§ã€‚
-- è‹¥æ³¨å°„å¯†åº¦æžé«˜(>100æ¬¡/å¤©),é•¿æœŸè¿è¡Œéœ€è¯„ä¼° flash å¯¿å‘½ã€‚å¯åŽç»­ä¼˜åŒ–ä¸º dirty-flag å»¶è¿Ÿæ‰¹é‡å†™ã€‚
+## 6. Óë ESP32 °æµÄ¹Ø¼ü²îÒì(±Ø¶Á)
 
-### 6.4 FreeRTOS æ ˆ
-- GPIO ä»»åŠ¡æ ˆ 8192â†’4096(nRF52840 RAM æ›´ç´§å¼ )ã€‚ä»»åŠ¡ä½“åªæœ‰ digitalWrite+delay,4096 å……è£•ã€‚
+### 6.1 MAC µØÖ·±äÁË ¡ú Trio ÒªÖØÐÂÅä¶ÔÒ»´Î
+- ESP32 °æÓÃ `esp_base_mac_addr_set` Éè¹Ì¶¨ MAC;nRF52840 µÄ MAC À´×Ô SoftDevice Æ÷¼þ ID,**²»¿ÉÈí¼þ¸Ä**¡£
+- ºó¹û:Trio Ö®Ç°»º´æµÄ peripheral UUID Ê§Ð§,**Ê×´ÎÐèÖØÐÂÉ¨ÃèÅä¶ÔÒ»´Î**¡£Ö®ºó¿çÖØÆôÎÈ¶¨(nRF52840 MAC ±È ESP32 ¸ü¿É¿¿)¡£
 
-## 7. åˆ†é˜¶æ®µéªŒè¯æ¸…å•
+### 6.2 LED ¼«ÐÔÏà·´
+- ESP32:HIGH=ÁÁ¡£nRF52840 DK:LOW=ÁÁ(°åÔØ LED active-low)¡£
+- `nrf52840.ino` µÄ loop() ÒÑ´¦Àí,ÎÞÐèÊÖ¶¯¸Ä¡£
 
-### é˜¶æ®µ 1 â€” ç¼–è¯‘é€šè¿‡
-- [ ] å…¨éƒ¨ .h/.ino æ— ç¼–è¯‘é”™è¯¯
-- [ ] FreeRTOS include è·¯å¾„æ­£ç¡®(`<freertos/FreeRTOS.h>` + `<freertos/semphr.h>`)
+### 6.3 Flash Ä¥Ëð
+- `persistStats()` Ã¿´Î×¢ÉäºóÐ´ ~48 ×Ö½Úµ½ LittleFS¡£Õý³£Ê¹ÓÃ(¼¸Ê®´Î/Ìì)ÎÞÓÇ¡£
+- Èô×¢ÉäÃÜ¶È¼«¸ß(>100´Î/Ìì),³¤ÆÚÔËÐÐÐèÆÀ¹À flash ÊÙÃü¡£¿ÉºóÐøÓÅ»¯Îª dirty-flag ÑÓ³ÙÅúÁ¿Ð´¡£
 
-### é˜¶æ®µ 2 â€” ä¸Šç”µ + BLE å¹¿æ’­
-- [ ] ä¸²å£(115200)çœ‹åˆ° `[GATT] GATT Server is now running!` å’Œ `[ADV] BLE advertising is now active!`
-- [ ] ç”¨ **nRF Connect** æˆ– **LightBlue** æ‰«æ,çœ‹åˆ°è®¾å¤‡å `MT`
-- [ ] åŽ‚å•†æ•°æ® = `59 6A 65 D1 79 98 01 01`(ä¸Ž ESP32 ç‰ˆä¸€å­—ä¸å·®)
-- [ ] LED å¿ƒè·³:å¹¿æ’­æ—¶å¿«é—ª,è¿žæŽ¥åŽæ…¢é—ª
+### 6.4 FreeRTOS Õ»
+- GPIO ÈÎÎñÕ» 8192¡ú4096(nRF52840 RAM ¸ü½ôÕÅ)¡£ÈÎÎñÌåÖ»ÓÐ digitalWrite+delay,4096 ³äÔ£¡£
 
-### é˜¶æ®µ 3 â€” Trio é…å¯¹
-- [ ] Trio é¦–æ¬¡é…å¯¹æˆåŠŸ(å›  MAC å˜äº†,**å¿…é¡»é‡æ–°é…å¯¹ä¸€æ¬¡**)
-- [ ] ä¸²å£çœ‹åˆ° `[BLE] CLIENT CONNECTED!`
+## 7. ·Ö½×¶ÎÑéÖ¤Çåµ¥
 
-### é˜¶æ®µ 4 â€” æŒä¹…åŒ–æ¢å¤
-- [ ] set time / activate / prime æµç¨‹èµ°é€š
-- [ ] æ–­ç”µé‡å¯,ä¸²å£çœ‹åˆ° reservoir / stepCarryOver / hourlyDelivered / dailyDelivered è¢«æ­£ç¡®æ¢å¤
-- [ ] éªŒè¯ stepCarryOver è¢«é’³åˆ° [0, 2.0]
+### ½×¶Î 1 ¡ª ±àÒëÍ¨¹ý
+- [ ] È«²¿ .h/.ino ÎÞ±àÒë´íÎó
+- [ ] FreeRTOS include Â·¾¶ÕýÈ·(`<freertos/FreeRTOS.h>` + `<freertos/semphr.h>`)
 
-### é˜¶æ®µ 5 â€” GPIO æ•²å‡»(æŽ¥æ³µ)
-- [ ] set bolus 1U,ä¸²å£çœ‹åˆ° `[DEBUG] deliverAmount=1.00U, stepCarryOver=0.00U`
-- [ ] STEP_PIN å®žé™…é©±åŠ¨ TS5A3166 å®Œæˆæ³µçš„å£°éŸ³å¤§å‰‚é‡åºåˆ—(è¿›å…¥èœå•â†’è¾“å…¥æ­¥æ•°â†’ç¡®è®¤)
-- [ ] å¤šæ¬¡ set bolus,éªŒè¯ carryOver ç´¯ç§¯ä¸Ž 2U å°é¡¶æ—¥å¿—(`[å®‰å…¨] ...ä¸¢å¼ƒè¶…é¢`)
+### ½×¶Î 2 ¡ª ÉÏµç + BLE ¹ã²¥
+- [ ] ´®¿Ú(115200)¿´µ½ `[GATT] GATT Server is now running!` ºÍ `[ADV] BLE advertising is now active!`
+- [ ] ÓÃ **nRF Connect** »ò **LightBlue** É¨Ãè,¿´µ½Éè±¸Ãû `MT`
+- [ ] ³§ÉÌÊý¾Ý = `59 6A 65 D1 79 98 01 01`(Óë ESP32 °æÒ»×Ö²»²î)
+- [ ] LED ÐÄÌø:¹ã²¥Ê±¿ìÉÁ,Á¬½ÓºóÂýÉÁ
 
-### é˜¶æ®µ 6 â€” ä¸€è‡´æ€§å¯¹è´¦
-- [ ] è·‘ä¸€å¤©,å¯¹æ¯”:
-  - `Î£(æ—¥å¿— deliverAmount)`
-  - å‚¨è¯å™¨ä¸‹é™é‡
-  - GPIO ç‰©ç†æ­¥æ•° Ã— 0.5
-  - ä¸‰è€…åº”**å®Œå…¨ä¸€è‡´**(carryOver 2U ä¸Šé™é€»è¾‘ä¿è¯)
+### ½×¶Î 3 ¡ª Trio Åä¶Ô
+- [ ] Trio Ê×´ÎÅä¶Ô³É¹¦(Òò MAC ±äÁË,**±ØÐëÖØÐÂÅä¶ÔÒ»´Î**)
+- [ ] ´®¿Ú¿´µ½ `[BLE] CLIENT CONNECTED!`
 
-## 8. æ•…éšœæŽ’æŸ¥
+### ½×¶Î 4 ¡ª ³Ö¾Ã»¯»Ö¸´
+- [ ] set time / activate / prime Á÷³Ì×ßÍ¨
+- [ ] ¶ÏµçÖØÆô,´®¿Ú¿´µ½ reservoir / stepCarryOver / hourlyDelivered / dailyDelivered ±»ÕýÈ·»Ö¸´
+- [ ] ÑéÖ¤ stepCarryOver ±»Ç¯µ½ [0, 2.0]
 
-| çŽ°è±¡ | å¯èƒ½åŽŸå›  | å¤„ç† |
+### ½×¶Î 5 ¡ª GPIO ÇÃ»÷(½Ó±Ã)
+- [ ] set bolus 1U,´®¿Ú¿´µ½ `[DEBUG] deliverAmount=1.00U, stepCarryOver=0.00U`
+- [ ] STEP_PIN Êµ¼ÊÇý¶¯ TS5A3166 Íê³É±ÃµÄÉùÒô´ó¼ÁÁ¿ÐòÁÐ(½øÈë²Ëµ¥¡úÊäÈë²½Êý¡úÈ·ÈÏ)
+- [ ] ¶à´Î set bolus,ÑéÖ¤ carryOver ÀÛ»ýÓë 2U ·â¶¥ÈÕÖ¾(`[°²È«] ...¶ªÆú³¬¶î`)
+
+### ½×¶Î 6 ¡ª Ò»ÖÂÐÔ¶ÔÕË
+- [ ] ÅÜÒ»Ìì,¶Ô±È:
+  - `¦²(ÈÕÖ¾ deliverAmount)`
+  - ´¢Ò©Æ÷ÏÂ½µÁ¿
+  - GPIO ÎïÀí²½Êý ¡Á 0.5
+  - ÈýÕßÓ¦**ÍêÈ«Ò»ÖÂ**(carryOver 2U ÉÏÏÞÂß¼­±£Ö¤)
+
+## 8. ¹ÊÕÏÅÅ²é
+
+| ÏÖÏó | ¿ÉÄÜÔ­Òò | ´¦Àí |
 |------|---------|------|
-| ç¼–è¯‘æŠ¥ `freertos/semphr.h` æ‰¾ä¸åˆ° | æ¿å¡åŒ…æœªé€‰ Adafruit nRF52 | ç¡®è®¤å¼€å‘æ¿é€‰äº† PCA10056 |
-| `[PREFS] ERROR å†™å…¥å¤±è´¥` | InternalFS æœªåˆå§‹åŒ– | ç¡®è®¤ `setup()` é‡Œæœ‰ `InternalFS.begin()` |
-| Trio è¿žä¸ä¸Š | MAC å˜äº† | Trio åˆ é™¤æ—§è®¾å¤‡é‡æ–°é…å¯¹ |
-| æ³µä¸å“åº”æŒ‰é”® | STEP_PIN å¼•è„šé”™ / TS5A3166 æŽ¥çº¿ | ç¡®è®¤ P1.01 å®žé™…æŽ¥çº¿ |
-| LED ä¸é—ª | LED_BUILTIN å®šä¹‰ / æžæ€§ | ç¡®è®¤ Adafruit æ ¸å¿ƒç‰ˆæœ¬,LED active-low |
+| ±àÒë±¨ `freertos/semphr.h` ÕÒ²»µ½ | °å¿¨°üÎ´Ñ¡ Adafruit nRF52 | È·ÈÏ¿ª·¢°åÑ¡ÁË PCA10056 |
+| `[PREFS] ERROR Ð´ÈëÊ§°Ü` | InternalFS Î´³õÊ¼»¯ | È·ÈÏ `setup()` ÀïÓÐ `InternalFS.begin()` |
+| Trio Á¬²»ÉÏ | MAC ±äÁË | Trio É¾³ý¾ÉÉè±¸ÖØÐÂÅä¶Ô |
+| ±Ã²»ÏìÓ¦°´¼ü | STEP_PIN Òý½Å´í / TS5A3166 ½ÓÏß | È·ÈÏ P1.01 Êµ¼Ê½ÓÏß |
+| LED ²»ÉÁ | LED_BUILTIN ¶¨Òå / ¼«ÐÔ | È·ÈÏ Adafruit ºËÐÄ°æ±¾,LED active-low |
 
-## 9. ä¸Ž ESP32 ç‰ˆå¯¹ç…§
+## 9. Óë ESP32 °æ¶ÔÕÕ
 
-ä»£ç  diff æ—¶,ä¸šåŠ¡é€»è¾‘(pump_simulator.h çš„çŠ¶æ€æœº/é˜Ÿåˆ—/æ—¶é—´æ¨¡åž‹)åº”**é›¶å·®å¼‚**ã€‚åªæœ‰è¿™å‡ å¤„å¹³å°ç›¸å…³æ”¹åŠ¨:
-- `pump_simulator.h`:Preferences include(L26-29)/ FreeRTOS include(L42-45)/ STEP_PIN(L144)/ æ ˆå¤§å°(L1286)
-- `gatt_server.h`:æ•´æ–‡ä»¶é‡å†™(Adafruit Bluefruit)
-- `preferences_nrf52.h`:æ–°å»º
-- `nrf52840.ino`:æ”¹è‡ª `ESP32.ino`
+´úÂë diff Ê±,ÒµÎñÂß¼­(pump_simulator.h µÄ×´Ì¬»ú/¶ÓÁÐ/Ê±¼äÄ£ÐÍ)Ó¦**Áã²îÒì**¡£Ö»ÓÐÕâ¼¸´¦Æ½Ì¨Ïà¹Ø¸Ä¶¯:
+- `pump_simulator.h`:Preferences include(L26-29)/ FreeRTOS include(L42-45)/ STEP_PIN(L144)/ Õ»´óÐ¡(L1286)
+- `gatt_server.h`:ÕûÎÄ¼þÖØÐ´(Adafruit Bluefruit)
+- `preferences_nrf52.h`:ÐÂ½¨
+- `nrf52840.ino`:¸Ä×Ô `ESP32.ino`
+
+
+
+
+09:09:03.989 -> [RX] <-- (10 bytes): 09 13 0B 00 01 3C 00 00 91 00 
+09:09:03.989 -> [BLE][I] ÊÕµ½ÃüÁî: SET_BOLUS len=9 seq=11 pkg=0
+09:09:03.989 -> [BLE][I] ´¦ÀíÍêÕûÃüÁî: SET_BOLUS (10 bytes)
+09:09:03.989 -> [BLE][I] === ÉèÖÃ´ó¼ÁÁ¿ ===
+09:09:03.989 -> [BLE][I] ´ó¼ÁÁ¿ÀàÐÍ: 1, ¼ÁÁ¿: 3.00U
+09:09:03.989 -> [BLE][W] ³¬¹ýÃ¿Ð¡Ê±×î´óÒÈµºËØÏÞÖÆ: 22.00U > 20.00U
+09:09:03.989 -> [BLE][W] ·¢ËÍ´íÎóÏìÓ¦: cmd=SET_BOLUS code=0x30a (³¬¹ýÃ¿Ð¡Ê±×î´óÁ¿)
+09:09:03.989 -> [TX] --> (8 bytes): 07 13 00 00 0A 03 65 00 
+09:09:03.989 -> [GATT][I] sendResponse called, len=8
+09:09:03.989 -> [GATT][I] response notify sent, len=8 result=OK
