@@ -35,6 +35,11 @@ BLE 栈: NimBLE-Arduino (替代 Adafruit Bluefruit, 更低功耗)
 ================================================================================
 */
 
+// n-able core 没有 Adafruit 的 OUTPUT_H0H1 驱动强度宏，映射为普通 OUTPUT。
+#ifndef OUTPUT_H0H1
+#define OUTPUT_H0H1 OUTPUT
+#endif
+
 #include "pump_simulator.h"
 
 // 使用 M640GKit 命名空间
@@ -42,9 +47,10 @@ using namespace M640GKit;
 
 // Adafruit nRF52 用 -fno-exceptions 编译, 标准库 <vector> 引用了
 // std::__throw_length_error 但没有实现, 链接时报 undefined reference。
-// 提供空实现: 实际触发时挂起 (嵌入式无异常支持, 不应到达此处)。
+// n-able-Arduino core 链接完整的 libstdc++_nano, 已有该符号。
+// 使用 weak 属性: 若链接器能找到强定义则用它, 否则回退到这个实现。
 namespace std {
-    void __throw_length_error(const char*) { while (1) delay(1); }
+    __attribute__((weak)) void __throw_length_error(const char*) { while (1) delay(1); }
 }
 
 // ========== 引脚定义 ==========

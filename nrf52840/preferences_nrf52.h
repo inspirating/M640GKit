@@ -1,11 +1,11 @@
 /*
 ================================================================================
-Preferences å…¼å®¹åŒ…è£…å±‚ (nRF52840 / Adafruit nRF52)
+Preferences ¼æÈİ°ü×°²ã (nRF52840 / Adafruit nRF52)
 ================================================================================
 
-ç›®çš„: è®© ESP32 ç‰ˆçš„ pump_simulator.h åœ¨ nRF52840 ä¸Šé›¶æ”¹åŠ¨å¤ç”¨ã€‚
+Ä¿µÄ: ÈÃ ESP32 °æµÄ pump_simulator.h ÔÚ nRF52840 ÉÏÁã¸Ä¶¯¸´ÓÃ¡£
 
-ESP32 ç”¨ Preferences(NVS) æŒä¹…åŒ–, è°ƒç”¨æ¨¡å¼ä¸º:
+ESP32 ÓÃ Preferences(NVS) ³Ö¾Ã»¯, µ÷ÓÃÄ£Ê½Îª:
     Preferences prefs;
     prefs.begin("namespace", false);
     prefs.putDouble("key", value);
@@ -14,24 +14,24 @@ ESP32 ç”¨ Preferences(NVS) æŒä¹…åŒ–, è°ƒç”¨æ¨¡å¼ä¸º:
     prefs.remove("key");
     prefs.end();
 
-æœ¬åŒ…è£…ç±»æä¾›åŒååŒç­¾åçš„ Preferences ç±», èƒŒåç”¨ Adafruit nRF52 å†…ç½®çš„
-InternalFS (LittleFS)ã€‚æ¯ä¸ªå‘½åç©ºé—´å¯¹åº”ä¸€ä¸ªæ–‡ä»¶:
+±¾°ü×°ÀàÌá¹©Í¬ÃûÍ¬Ç©ÃûµÄ Preferences Àà, ±³ºóÓÃ Adafruit nRF52 ÄÚÖÃµÄ
+InternalFS (LittleFS)¡£Ã¿¸öÃüÃû¿Õ¼ä¶ÔÓ¦Ò»¸öÎÄ¼ş:
     "pump"      -> /prefs_pump
     "pumpStats" -> /prefs_pumpStats
     "pumpMeta"  -> /prefs_pumpMeta
 
-æ–‡ä»¶å†…å®¹æ˜¯è¯¥å‘½åç©ºé—´ç”¨åˆ°çš„å…¨éƒ¨é”®çš„å›ºå®šç»“æ„ä½“ (è§ä¸‹æ–¹ PumpNS / PumpStatsNS /
-PumpMetaNS)ã€‚æ¯æ¬¡ put* æ•´ä½“è¦†ç›–å†™æ–‡ä»¶; get* è¯»æ•´ä¸ªæ–‡ä»¶å†å–å¯¹åº”å­—æ®µã€‚
+ÎÄ¼şÄÚÈİÊÇ¸ÃÃüÃû¿Õ¼äÓÃµ½µÄÈ«²¿¼üµÄ¹Ì¶¨½á¹¹Ìå (¼ûÏÂ·½ PumpNS / PumpStatsNS /
+PumpMetaNS)¡£Ã¿´Î put* ÕûÌå¸²¸ÇĞ´ÎÄ¼ş; get* ¶ÁÕû¸öÎÄ¼şÔÙÈ¡¶ÔÓ¦×Ö¶Î¡£
 
-è°ƒç”¨ç‚¹ (pump_simulator.h å…± 11 å¤„) ä¸éœ€è¦ä»»ä½•ä¿®æ”¹:
+µ÷ÓÃµã (pump_simulator.h ¹² 11 ´¦) ²»ĞèÒªÈÎºÎĞŞ¸Ä:
   - getUInt/getUChar/getDouble/putUInt/putUChar/putDouble
   - begin(name, readOnly) / end() / clear() / remove(key)
 
-æ³¨æ„: clear() åˆ æ•´ä¸ªå‘½åç©ºé—´æ–‡ä»¶ (ç­‰ä»· NVS clear); remove(key) æŠŠå¯¹åº”å­—æ®µ
-æ¸…é›¶åæ•´ä½“å†™å› (NVS çš„ remove æ˜¯åˆ é”®, è¿™é‡Œè¯­ä¹‰ä¸Šç­‰ä»·â€”â€”æœªæ¿€æ´»å­—æ®µè¯»å‡ºæ¥æ˜¯ 0/é»˜è®¤)ã€‚
+×¢Òâ: clear() É¾Õû¸öÃüÃû¿Õ¼äÎÄ¼ş (µÈ¼Û NVS clear); remove(key) °Ñ¶ÔÓ¦×Ö¶Î
+ÇåÁãºóÕûÌåĞ´»Ø (NVS µÄ remove ÊÇÉ¾¼ü, ÕâÀïÓïÒåÉÏµÈ¼Û¡ª¡ªÎ´¼¤»î×Ö¶Î¶Á³öÀ´ÊÇ 0/Ä¬ÈÏ)¡£
 
-é—ªå­˜å¯¿å‘½: persistStats() æ¯æ¬¡æ³¨å°„åè°ƒç”¨, å†™ä¸€ä¸ª ~48 å­—èŠ‚æ–‡ä»¶ã€‚LittleFS åœ¨å†™
-æ–°ç‰ˆæœ¬æ—¶ä¼šè§¦å‘é¡µæ“¦é™¤, é¢‘ç¹æ³¨å°„(>100æ¬¡/å¤©)é•¿æœŸè¿è¡Œéœ€è¯„ä¼° flash ç£¨æŸã€‚
+ÉÁ´æÊÙÃü: persistStats() Ã¿´Î×¢Éäºóµ÷ÓÃ, Ğ´Ò»¸ö ~48 ×Ö½ÚÎÄ¼ş¡£LittleFS ÔÚĞ´
+ĞÂ°æ±¾Ê±»á´¥·¢Ò³²Á³ı, Æµ·±×¢Éä(>100´Î/Ìì)³¤ÆÚÔËĞĞĞèÆÀ¹À flash Ä¥Ëğ¡£
 ================================================================================
 */
 
@@ -39,21 +39,21 @@ PumpMetaNS)ã€‚æ¯æ¬¡ put* æ•´ä½“è¦†ç›–å†™æ–‡ä»¶; get* è¯»æ•´ä¸ªæ–‡ä»¶å†å–å¯¹åº
 #define M640G_PREFERENCES_NRF52_H
 
 #include <Arduino.h>
-#include <Adafruit_LittleFS.h>
-#include <InternalFileSystem.h>
+// #include <Adafruit_LittleFS.h>
+// #include <InternalFileSystem.h>
+// using namespace Adafruit_LittleFS_Namespace;
+// ×¢£º³Ö¾Ã»¯ÒÑ½ûÓÃ£¨readFile/writeFile ·µ»Ø false/true£©£¬²»ĞèÒªÎÄ¼şÏµÍ³Í·ÎÄ¼ş¡£
 
-using namespace Adafruit_LittleFS_Namespace;
+// ========== Èı¸öÃüÃû¿Õ¼äµÄ¹Ì¶¨½á¹¹Ìå ==========
 
-// ========== ä¸‰ä¸ªå‘½åç©ºé—´çš„å›ºå®šç»“æ„ä½“ ==========
-
-// å‘½åç©ºé—´ "pump": è¡¥ä¸ç”Ÿå‘½å‘¨æœŸ
+// ÃüÃû¿Õ¼ä "pump": ²¹¶¡ÉúÃüÖÜÆÚ
 struct PumpNS {
     uint32_t patchStart;    // getUInt("patchStart") / putUInt
     uint8_t  patchState;    // getUChar("patchState") / putUChar
     uint32_t elapsedTime;   // getUInt("elapsedTime") / putUInt
 };
 
-// å‘½åç©ºé—´ "pumpStats": æ³¨å°„ç»Ÿè®¡ (æ–­ç”µåå¿…é¡»æ¢å¤)
+// ÃüÃû¿Õ¼ä "pumpStats": ×¢ÉäÍ³¼Æ (¶Ïµçºó±ØĞë»Ö¸´)
 struct PumpStatsNS {
     double   hourlyDel;     // getDouble("hourlyDel")
     double   dailyDel;      // getDouble("dailyDel")
@@ -63,25 +63,25 @@ struct PumpStatsNS {
     uint32_t lastDayRst;    // getUInt("lastDayRst")
 };
 
-// å‘½åç©ºé—´ "pumpMeta": ä¸€æ¬¡æ€§æ¿€æ´»æ ‡è®°
+// ÃüÃû¿Õ¼ä "pumpMeta": Ò»´ÎĞÔ¼¤»î±ê¼Ç
 struct PumpMetaNS {
     uint8_t  activated;     // getUChar("activated") / putUChar
 };
 
-// ========== Preferences åŒ…è£…ç±» (API ä¸ ESP32 å®Œå…¨ä¸€è‡´) ==========
+// ========== Preferences °ü×°Àà (API Óë ESP32 ÍêÈ«Ò»ÖÂ) ==========
 
 class Preferences {
 public:
     Preferences() : ns(nullptr), readOnly(false), nsType(NS_UNKNOWN) {}
 
-    // å¼€å§‹ä¸€ä¸ªå‘½åç©ºé—´ã€‚å‘½åç©ºé—´åæ˜ å°„åˆ°æ–‡ä»¶ /prefs_<name>ã€‚
-    // å®é™… pump_simulator.h åªç”¨åˆ°ä¸‰ä¸ª: "pump" / "pumpStats" / "pumpMeta"ã€‚
+    // ¿ªÊ¼Ò»¸öÃüÃû¿Õ¼ä¡£ÃüÃû¿Õ¼äÃûÓ³Éäµ½ÎÄ¼ş /prefs_<name>¡£
+    // Êµ¼Ê pump_simulator.h Ö»ÓÃµ½Èı¸ö: "pump" / "pumpStats" / "pumpMeta"¡£
     bool begin(const char* name, bool readOnly = false) {
         this->ns = name;
         this->readOnly = readOnly;
 
-        // InternalFS å¿…é¡»å…ˆ init (ç”± .ino è°ƒç”¨ InternalFS.begin()), è¿™é‡Œä¸é‡å¤ initã€‚
-        // ç¡®å®šå‘½åç©ºé—´ç±»å‹
+        // InternalFS ±ØĞëÏÈ init (ÓÉ .ino µ÷ÓÃ InternalFS.begin()), ÕâÀï²»ÖØ¸´ init¡£
+        // È·¶¨ÃüÃû¿Õ¼äÀàĞÍ
         if (strcmp(name, "pump") == 0) {
             nsType = NS_PUMP;
             strncpy(filePath, "/prefs_pump", sizeof(filePath));
@@ -92,7 +92,7 @@ public:
             nsType = NS_PUMPMETA;
             strncpy(filePath, "/prefs_pumpMeta", sizeof(filePath));
         } else {
-            Serial.print("[PREFS] ERROR æœªçŸ¥å‘½åç©ºé—´: ");
+            Serial.print("[PREFS] ERROR Î´ÖªÃüÃû¿Õ¼ä: ");
             Serial.println(name);
             nsType = NS_UNKNOWN;
             return false;
@@ -105,7 +105,7 @@ public:
         nsType = NS_UNKNOWN;
     }
 
-    // ---- get ç³»: è¯»æ•´ä¸ªæ–‡ä»¶, å–å¯¹åº”å­—æ®µ ----
+    // ---- get Ïµ: ¶ÁÕû¸öÎÄ¼ş, È¡¶ÔÓ¦×Ö¶Î ----
     double getDouble(const char* key, double defaultValue) const {
         uint8_t buf[NS_MAX_SIZE];
         if (!readFile(buf)) return defaultValue;
@@ -163,11 +163,11 @@ public:
         return defaultValue;
     }
 
-    // ---- put ç³»: è¯»ç°æœ‰å†…å®¹(æˆ–å…¨é›¶), æ”¹å¯¹åº”å­—æ®µ, æ•´ä½“å†™å› ----
+    // ---- put Ïµ: ¶ÁÏÖÓĞÄÚÈİ(»òÈ«Áã), ¸Ä¶ÔÓ¦×Ö¶Î, ÕûÌåĞ´»Ø ----
     size_t putDouble(const char* key, double value) {
         if (readOnly) return 0;
         uint8_t buf[NS_MAX_SIZE] = {0};
-        readFile(buf);  // è¯»ç°æœ‰å€¼(ä¸å­˜åœ¨åˆ™å…¨é›¶)
+        readFile(buf);  // ¶ÁÏÖÓĞÖµ(²»´æÔÚÔòÈ«Áã)
         switch (nsType) {
             case NS_PUMPSTATS: {
                 PumpStatsNS* s = reinterpret_cast<PumpStatsNS*>(buf);
@@ -229,26 +229,26 @@ public:
         return writeFile(buf, nsStructSize()) ? sizeof(uint8_t) : 0;
     }
 
-    // åˆ é™¤æ•´ä¸ªå‘½åç©ºé—´æ–‡ä»¶ (ç­‰ä»· NVS clear())
+    // É¾³ıÕû¸öÃüÃû¿Õ¼äÎÄ¼ş (µÈ¼Û NVS clear())
     void clear() {
         if (readOnly) return;
-        // ç¦ç”¨ LittleFS å†™å…¥, ä¸åšä»»ä½•æ“ä½œ
+        // ½ûÓÃ LittleFS Ğ´Èë, ²»×öÈÎºÎ²Ù×÷
     }
 
-    // åˆ å•ä¸ªé”®: è¯­ä¹‰ä¸Š NVS remove(key) è®©è¯¥é”®è¯»é»˜è®¤å€¼ã€‚
-    // è¿™é‡ŒæŠŠè¯¥å­—æ®µæ¸…é›¶(== é»˜è®¤å€¼åœºæ™¯)åæ•´ä½“å†™å›ã€‚æ³¨æ„: å¯¹ pumpStats ç­‰è‹¥æ–‡ä»¶
-    // æœ¬å°±å­˜åœ¨, æ¸…é›¶ä¸ä¼šè®© getXxx èµ°é»˜è®¤åˆ†æ”¯(å› ä¸º readFile ä»æˆåŠŸ)â€”â€”æ‰€ä»¥æˆ‘ä»¬å¯¹
-    // pump å‘½åç©ºé—´(å”¯ä¸€ç”¨åˆ° remove çš„åœ°æ–¹)æ”¹ä¸ºåˆ æ•´ä¸ªæ–‡ä»¶, æ›´è´´åˆåŸè¯­ä¹‰ã€‚
+    // É¾µ¥¸ö¼ü: ÓïÒåÉÏ NVS remove(key) ÈÃ¸Ã¼ü¶ÁÄ¬ÈÏÖµ¡£
+    // ÕâÀï°Ñ¸Ã×Ö¶ÎÇåÁã(== Ä¬ÈÏÖµ³¡¾°)ºóÕûÌåĞ´»Ø¡£×¢Òâ: ¶Ô pumpStats µÈÈôÎÄ¼ş
+    // ±¾¾Í´æÔÚ, ÇåÁã²»»áÈÃ getXxx ×ßÄ¬ÈÏ·ÖÖ§(ÒòÎª readFile ÈÔ³É¹¦)¡ª¡ªËùÒÔÎÒÃÇ¶Ô
+    // pump ÃüÃû¿Õ¼ä(Î¨Ò»ÓÃµ½ remove µÄµØ·½)¸ÄÎªÉ¾Õû¸öÎÄ¼ş, ¸üÌùºÏÔ­ÓïÒå¡£
     bool remove(const char* key) {
         if (readOnly) return false;
-        (void)key;  // pump_simulator.h åªå¯¹ "pump" å‘½åç©ºé—´è°ƒ remove, åˆ æ•´ä¸ªæ–‡ä»¶å³å¯
+        (void)key;  // pump_simulator.h Ö»¶Ô "pump" ÃüÃû¿Õ¼äµ÷ remove, É¾Õû¸öÎÄ¼ş¼´¿É
         clear();
         return true;
     }
 
 private:
     enum NsType { NS_UNKNOWN, NS_PUMP, NS_PUMPSTATS, NS_PUMPMETA };
-    static constexpr size_t NS_MAX_SIZE = 64;  // è¶³å¤Ÿè£…ä¸‹æœ€å¤§çš„ç»“æ„ä½“(PumpStatsNS)
+    static constexpr size_t NS_MAX_SIZE = 64;  // ×ã¹»×°ÏÂ×î´óµÄ½á¹¹Ìå(PumpStatsNS)
 
     const char* ns;
     bool readOnly;
@@ -264,19 +264,19 @@ private:
         }
     }
 
-    // è¯»æ–‡ä»¶åˆ° buf (åªè¯» nsStructSize() å­—èŠ‚)ã€‚è¿”å› false è¡¨ç¤ºæ–‡ä»¶ä¸å­˜åœ¨/è¯»å¤±è´¥ã€‚
-    // æŒä¹…åŒ–å·²ç¦ç”¨, å§‹ç»ˆè¿”å› false è®©è°ƒç”¨æ–¹ä½¿ç”¨é»˜è®¤å€¼ã€‚
+    // ¶ÁÎÄ¼şµ½ buf (Ö»¶Á nsStructSize() ×Ö½Ú)¡£·µ»Ø false ±íÊ¾ÎÄ¼ş²»´æÔÚ/¶ÁÊ§°Ü¡£
+    // ³Ö¾Ã»¯ÒÑ½ûÓÃ, Ê¼ÖÕ·µ»Ø false ÈÃµ÷ÓÃ·½Ê¹ÓÃÄ¬ÈÏÖµ¡£
     bool readFile(uint8_t* buf) const {
         (void)buf;
-        return false;  // æ–‡ä»¶ä¸å­˜åœ¨, èµ°é»˜è®¤å€¼
+        return false;  // ÎÄ¼ş²»´æÔÚ, ×ßÄ¬ÈÏÖµ
     }
 
-    // æŠŠ buf çš„ sz å­—èŠ‚æ•´ä½“è¦†ç›–å†™å›æ–‡ä»¶ã€‚
-    // !! nRF52840 LittleFS åœ¨è¿è¡Œæ—¶å†™å…¥ä¼šè§¦å‘æ–­è¨€å´©æºƒ (pcache->block == 0xffffffff)ã€‚
-    // !! æ¨¡æ‹Ÿå™¨ä¸éœ€è¦æ–­ç”µæŒä¹…åŒ–, ç¦ç”¨å†™å…¥, æ¯æ¬¡é‡å¯ä» FILLED çŠ¶æ€å¼€å§‹ã€‚
+    // °Ñ buf µÄ sz ×Ö½ÚÕûÌå¸²¸ÇĞ´»ØÎÄ¼ş¡£
+    // !! nRF52840 LittleFS ÔÚÔËĞĞÊ±Ğ´Èë»á´¥·¢¶ÏÑÔ±ÀÀ£ (pcache->block == 0xffffffff)¡£
+    // !! Ä£ÄâÆ÷²»ĞèÒª¶Ïµç³Ö¾Ã»¯, ½ûÓÃĞ´Èë, Ã¿´ÎÖØÆô´Ó FILLED ×´Ì¬¿ªÊ¼¡£
     bool writeFile(const uint8_t* buf, size_t sz) {
         (void)buf; (void)sz;
-        return true;  // å‡è£…å†™å…¥æˆåŠŸ, å®é™…ä¸å†™ flash
+        return true;  // ¼Ù×°Ğ´Èë³É¹¦, Êµ¼Ê²»Ğ´ flash
     }
 };
 

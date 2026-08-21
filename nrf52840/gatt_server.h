@@ -29,8 +29,8 @@ sendRawNotification/sendResponse + 4 个回调指针 + advertisingSuspended 成员),
 #include <string>
 #include <vector>
 #include <NimBLEDevice.h>
-#include <FreeRTOS.h>
-#include <semphr.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 #include "enums.h"
 #include "crc8.h"
 
@@ -42,33 +42,75 @@ typedef void (*SubscribeCallback)(bool subscribed);
 typedef void (*DisconnectCallback)();
 typedef void (*ConnectCallback)();
 
-// 前向声明
-class GATTServer;
+// 前向声明回调类 (完整定义在 GATTServer 之后)
+class PumpServerCallbacks;
+class PumpCharacteristicCallbacks;
+
+// ---------- GATTServer 类 ----------
+class GATTServer {
+public:
+    bool isRunning = false;
+    WriteRequestCallback onWriteRequest = nullptr;
+    SubscribeCallback onSubscribe = nullptr;
+    DisconnectCallback onDisconnect = nullptr;
+    ConnectCallback onConnect = nullptr;
+    bool advertisingSuspended = false;
+
+    GATTServer();
+    ~GATTServer();
+
+    void start();
+    void stop();
+    void disconnectAll();
+    void startAdvertising();
+    void stopAdvertising();
+
+    // 通知: 可选 CRC 修正 (与原版 sendNotification 行为一致)
+    bool sendNotification(const uint8_t* data, size_t len, bool useCrcHack = true);
+    bool sendNotificationWithCrcHack(const uint8_t* data, size_t len);
+    bool sendRawNotification(const uint8_t* data, size_t len);
+    bool sendResponse(const uint8_t* data, size_t len);
+
+private:
+    bool sendNotifyWithRetry(NimBLECharacteristic* chr, const char* name,
+                              const uint8_t* data, size_t len);
+
+private:
+    NimBLEServer* server;
+    NimBLEService* service;
+    NimBLECharacteristic* readChr;
+    NimBLECharacteristic* writeChr;
+    PumpServerCallbacks* pServerCallbacks;
+    PumpCharacteristicCallbacks* pChrCallbacks;
+
+    // 让回调类可以访问回调指针
+    friend class PumpServerCallbacks;
+    friend class PumpCharacteristicCallbacks;
+};
 
 // ---------- NimBLE 静态回调转发 ----------
 static GATTServer* sActiveGatt = nullptr;
 
 // NimBLE 服务器回调 (处理连接/断开)
 class PumpServerCallbacks : public NimBLEServerCallbacks {
-    void onConnect(NimBLEServer* pServer) override {
+    void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) override {
+        (void)pServer;
+        (void)connInfo;
         Serial.println("");
         Serial.println("========================================");
         Serial.println("[BLE] CLIENT CONNECTED!");
         Serial.println("========================================");
         Serial.println("");
 
-        // 请求 MTU 交换
-        if (pServer) {
-            pServer->setMTU(247);
-            Serial.println("[BLE] MTU exchange requested (247)");
-        }
-
         if (sActiveGatt && sActiveGatt->onConnect) {
             sActiveGatt->onConnect();
         }
     }
 
-    void onDisconnect(NimBLEServer* pServer) override {
+    void onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) override {
+        (void)pServer;
+        (void)connInfo;
+        (void)reason;
         Serial.println("");
         Serial.println("========================================");
         Serial.println("[BLE] CLIENT DISCONNECTED!");
@@ -79,11 +121,18 @@ class PumpServerCallbacks : public NimBLEServerCallbacks {
             sActiveGatt->onDisconnect();
         }
     }
+
+    void onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) override {
+        (void)connInfo;
+        Serial.print("[BLE] MTU changed to: ");
+        Serial.println(MTU);
+    }
 };
 
 // NimBLE 特征值回调 (处理写入/CCCD)
 class PumpCharacteristicCallbacks : public NimBLECharacteristicCallbacks {
-    void onWrite(NimBLECharacteristic* pCharacteristic) override {
+    void onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) override {
+        (void)connInfo;
         if (sActiveGatt && sActiveGatt->onWriteRequest) {
             std::string value = pCharacteristic->getValue();
             if (!value.empty()) {
@@ -96,15 +145,15 @@ class PumpCharacteristicCallbacks : public NimBLECharacteristicCallbacks {
     }
 
     void onSubscribe(NimBLECharacteristic* pCharacteristic,
-                      ble_gap_conn_desc* desc,
-                      uint16_t cccd_value) override {
+                      NimBLEConnInfo& connInfo,
+                      uint16_t subValue) override {
         (void)pCharacteristic;
-        (void)desc;
-        bool notifyEnabled = (cccd_value & 0x0001) != 0;
-        bool indicateEnabled = (cccd_value & 0x0002) != 0;
+        (void)connInfo;
+        bool notifyEnabled = (subValue & 0x0001) != 0;
+        bool indicateEnabled = (subValue & 0x0002) != 0;
 
         Serial.print("[BLE] CCCD updated: 0x");
-        Serial.print(cccd_value, HEX);
+        Serial.print(subValue, HEX);
         Serial.print(" - Notify: ");
         Serial.print(notifyEnabled ? "ON" : "OFF");
         Serial.print(", Indicate: ");
@@ -116,255 +165,233 @@ class PumpCharacteristicCallbacks : public NimBLECharacteristicCallbacks {
     }
 };
 
-// ---------- GATTServer 类 ----------
-class GATTServer {
-public:
-    bool isRunning = false;
-    WriteRequestCallback onWriteRequest = nullptr;
-    SubscribeCallback onSubscribe = nullptr;
-    DisconnectCallback onDisconnect = nullptr;
-    ConnectCallback onConnect = nullptr;
-    bool advertisingSuspended = false;
+// ---------- GATTServer 方法实现 ----------
+inline GATTServer::GATTServer()
+    : server(nullptr), service(nullptr), readChr(nullptr),
+      writeChr(nullptr), pServerCallbacks(nullptr),
+      pChrCallbacks(nullptr) {}
 
-    GATTServer() : server(nullptr), service(nullptr), readChr(nullptr),
-                   writeChr(nullptr), pServerCallbacks(nullptr),
-                   pChrCallbacks(nullptr) {}
+inline GATTServer::~GATTServer() {
+    stop();
+}
 
-    ~GATTServer() {
-        stop();
+inline void GATTServer::start() {
+    if (isRunning) {
+        Serial.println("[GATT] Server already running");
+        return;
     }
 
-    void start() {
-        if (isRunning) {
-            Serial.println("[GATT] Server already running");
-            return;
-        }
+    Serial.println("[GATT] Initializing NimBLE...");
 
-        Serial.println("[GATT] Initializing NimBLE...");
+    // 初始化 NimBLE 设备
+    NimBLEDevice::init("MT");
 
-        // 初始化 NimBLE 设备
-        NimBLEDevice::init("MT");
+    // 创建服务器
+    server = NimBLEDevice::createServer();
+    pServerCallbacks = new PumpServerCallbacks();
+    server->setCallbacks(pServerCallbacks);
 
-        // 创建服务器
-        server = NimBLEDevice::createServer();
-        pServerCallbacks = new PumpServerCallbacks();
-        server->setCallbacks(pServerCallbacks);
+    // 创建服务
+    service = server->createService(SERVICE_UUID);
 
-        // 创建服务
-        service = server->createService(SERVICE_UUID);
+    // 创建写入特征 (可写 + notify)
+    writeChr = service->createCharacteristic(
+        WRITE_UUID,
+        NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR | NIMBLE_PROPERTY::NOTIFY,
+        247
+    );
+    pChrCallbacks = new PumpCharacteristicCallbacks();
+    writeChr->setCallbacks(pChrCallbacks);
+    Serial.println("[GATT] Write characteristic created");
 
-        // 创建写入特征 (可写 + notify)
-        writeChr = service->createCharacteristic(
-            WRITE_UUID,
-            NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR | NIMBLE_PROPERTY::NOTIFY
-        );
-        writeChr->setMaxLen(247);
-        pChrCallbacks = new PumpCharacteristicCallbacks();
-        writeChr->setCallbacks(pChrCallbacks);
-        Serial.println("[GATT] Write characteristic created");
+    // 创建读取/通知特征 (可读 + notify)
+    readChr = service->createCharacteristic(
+        READ_UUID,
+        NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY,
+        247
+    );
+    readChr->setCallbacks(pChrCallbacks);
+    // 设置初始值为空
+    readChr->setValue(nullptr, 0);
+    Serial.println("[GATT] Read characteristic created");
 
-        // 创建读取/通知特征 (可读 + notify)
-        readChr = service->createCharacteristic(
-            READ_UUID,
-            NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-        );
-        readChr->setMaxLen(247);
-        readChr->setCallbacks(pChrCallbacks);
-        // 设置初始值为空
-        readChr->setValue(nullptr, 0);
-        Serial.println("[GATT] Read characteristic created");
+    // 启动服务
+    service->start();
 
-        // 启动服务
-        service->start();
+    Serial.println("[GATT] NimBLE initialized with name 'MT'");
 
-        // 配置连接参数 (在 startAdvertising 前设置)
-        server->setMTU(247);
-        Serial.println("[GATT] NimBLE initialized with name 'MT'");
+    // 获取广播对象并配置
+    startAdvertising();
 
-        // 获取广播对象并配置
-        startAdvertising();
+    isRunning = true;
+    Serial.println("[GATT] GATT Server is now running! (NimBLE)");
+}
 
-        isRunning = true;
-        Serial.println("[GATT] GATT Server is now running! (NimBLE)");
-    }
-
-    void stop() {
+inline void GATTServer::stop() {
         if (!isRunning) return;
 
         Serial.println("[GATT] Stopping NimBLE...");
 
         stopAdvertising();
+        disconnectAll();
 
-        if (server) {
-            server->startAdvertising();  // 确保停止广播
-        }
-
+        // NimBLE-Arduino 在 nRF52 (n-able core) 上未实现 nimble_port_stop/deinit,
+        // 调用 deinit 会链接失败。ESP32 上可用且需要释放资源。
+#if defined(ESP_PLATFORM)
         NimBLEDevice::deinit(true);
+#endif
         isRunning = false;
 
         Serial.println("[GATT] GATT Server stopped");
     }
 
-    void disconnectAll() {
-        if (server) {
-            // 断开所有连接
-            int count = server->getConnectedCount();
-            for (int i = 0; i < count; i++) {
-                server->disconnect(i);
-            }
-            Serial.print("[GATT] Disconnected ");
-            Serial.print(count);
-            Serial.println(" connections");
+inline void GATTServer::disconnectAll() {
+    if (server) {
+        // 断开所有连接
+        int count = server->getConnectedCount();
+        for (int i = 0; i < count; i++) {
+            NimBLEConnInfo info = server->getPeerInfo(i);
+            server->disconnect(info);
+        }
+        Serial.print("[GATT] Disconnected ");
+        Serial.print(count);
+        Serial.println(" connections");
+    }
+}
+
+inline void GATTServer::startAdvertising() {
+    if (advertisingSuspended) {
+        Serial.println("[ADV] Advertising suspended, skipping...");
+        return;
+    }
+    Serial.println("[ADV] Configuring BLE advertising...");
+
+    NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
+    adv->reset();
+
+    // 设置广播参数 - 使用省电间隔 (1s/2s)
+    // 范围: 32 (20ms) - 16384 (10.24s)
+    // 使用 1600 (1s) / 3200 (2s) 平衡发现速度和功耗
+    adv->setMinInterval(1600);
+    adv->setMaxInterval(3200);
+
+    // 添加服务 UUID 到广播包
+    adv->addServiceUUID(SERVICE_UUID);
+
+    // 添加设备名
+    adv->setName("MT");
+
+    // 添加厂商数据 (iOS 配对识别用, 字节序和内容必须与原版本一字不差)
+    const uint8_t mfg[] = {
+        0x59, 0x6A,  // company id LE (0x6A59)
+        0x65, 0xD1, 0x79, 0x98,  // pump SN
+        0x01,  // device type
+        0x01   // version
+    };
+    adv->setManufacturerData(mfg, sizeof(mfg));
+
+    Serial.print("[ADV] Manufacturer data (");
+    Serial.print(sizeof(mfg));
+    Serial.print(" bytes): ");
+    for (size_t i = 0; i < sizeof(mfg); i++) {
+        Serial.printf("%02X ", mfg[i]);
+    }
+    Serial.println("");
+
+    // 开始广播 (参数 0 表示持续广播)
+    if (!adv->start(0)) {
+        Serial.println("[ADV] ERROR: Failed to start advertising!");
+    } else {
+        Serial.println("[ADV] BLE advertising started");
+        Serial.println("[ADV] Device name: MT");
+        Serial.println("[ADV] Service UUID: " + String(SERVICE_UUID));
+        Serial.println("[ADV] Waiting for mobile device to connect...");
+    }
+}
+
+inline void GATTServer::stopAdvertising() {
+    NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
+    if (adv) {
+        adv->stop();
+        Serial.println("[ADV] BLE advertising stopped");
+    }
+}
+
+inline bool GATTServer::sendNotification(const uint8_t* data, size_t len, bool useCrcHack) {
+    if (readChr == nullptr) return false;
+    if (!server || server->getConnectedCount() == 0) return false;
+
+    std::vector<uint8_t> payload(data, data + len);
+    if (useCrcHack && len > 0 && len >= 6 && data[1] != 0x00) {
+        uint8_t expectedCrc = crc8Calculate(data, len - 1);
+        if (payload[len - 1] != expectedCrc) {
+            payload[len - 1] = expectedCrc;
         }
     }
+    readChr->notify(payload.data(), payload.size());
+    return true;
+}
 
-    void startAdvertising() {
-        if (advertisingSuspended) {
-            Serial.println("[ADV] Advertising suspended, skipping...");
-            return;
-        }
-        Serial.println("[ADV] Configuring BLE advertising...");
+inline bool GATTServer::sendNotificationWithCrcHack(const uint8_t* data, size_t len) {
+    return sendNotification(data, len, true);
+}
 
-        NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
-        adv->reset();
-
-        // 设置广播参数 - 使用省电间隔 (1s/2s)
-        // 范围: 32 (20ms) - 16384 (10.24s)
-        // 使用 1600 (1s) / 3200 (2s) 平衡发现速度和功耗
-        adv->setMinInterval(1600);
-        adv->setMaxInterval(3200);
-        adv->setDuration(0);  // 持续广播
-
-        // 添加服务 UUID 到广播包
-        adv->addServiceUUID(SERVICE_UUID);
-
-        // 添加设备名
-        adv->setName("MT");
-
-        // 添加厂商数据 (iOS 配对识别用, 字节序和内容必须与原版本一字不差)
-        const uint8_t mfg[] = {
-            0x59, 0x6A,  // company id LE (0x6A59)
-            0x65, 0xD1, 0x79, 0x98,  // pump SN
-            0x01,  // device type
-            0x01   // version
-        };
-        adv->setManufacturerData((const char*)mfg, sizeof(mfg));
-
-        Serial.print("[ADV] Manufacturer data (");
-        Serial.print(sizeof(mfg));
-        Serial.print(" bytes): ");
-        for (size_t i = 0; i < sizeof(mfg); i++) {
-            Serial.printf("%02X ", mfg[i]);
-        }
-        Serial.println("");
-
-        // 开始广播
-        if (!adv->start()) {
-            Serial.println("[ADV] ERROR: Failed to start advertising!");
-        } else {
-            Serial.println("[ADV] BLE advertising started");
-            Serial.println("[ADV] Device name: MT");
-            Serial.println("[ADV] Service UUID: " + String(SERVICE_UUID));
-            Serial.println("[ADV] Waiting for mobile device to connect...");
-        }
+inline bool GATTServer::sendRawNotification(const uint8_t* data, size_t len) {
+    if (readChr == nullptr) {
+        Serial.println("[GATT][E] sendRawNotification: readChr is null");
+        return false;
     }
-
-    void stopAdvertising() {
-        NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
-        if (adv) {
-            adv->stop();
-            Serial.println("[ADV] BLE advertising stopped");
-        }
+    if (!server || server->getConnectedCount() == 0) {
+        Serial.println("[GATT][E] sendRawNotification: not connected");
+        return false;
     }
+    bool ok = readChr->notify(data, len);
+    return ok;
+}
 
-    // 通知: 可选 CRC 修正 (与原版 sendNotification 行为一致)
-    bool sendNotification(const uint8_t* data, size_t len, bool useCrcHack = true) {
-        if (readChr == nullptr) return false;
-        if (!server || server->getConnectedCount() == 0) return false;
+inline bool GATTServer::sendResponse(const uint8_t* data, size_t len) {
+    Serial.print("[GATT][I] sendResponse called, len=");
+    Serial.println(len);
+    return sendNotifyWithRetry(writeChr, "response notify", data, len);
+}
 
-        std::vector<uint8_t> payload(data, data + len);
-        if (useCrcHack && len > 0 && len >= 6 && data[1] != 0x00) {
-            uint8_t expectedCrc = crc8Calculate(data, len - 1);
-            if (payload[len - 1] != expectedCrc) {
-                payload[len - 1] = expectedCrc;
-            }
-        }
-        readChr->notify(payload.data(), payload.size());
-        return true;
-    }
-
-    bool sendNotificationWithCrcHack(const uint8_t* data, size_t len) {
-        return sendNotification(data, len, true);
-    }
-
-    // 原始通知 (不做 CRC 修正) — pump_simulator.h 主要走这个
-    bool sendRawNotification(const uint8_t* data, size_t len) {
-        if (readChr == nullptr) {
-            Serial.println("[GATT][E] sendRawNotification: readChr is null");
-            return false;
-        }
-        if (!server || server->getConnectedCount() == 0) {
-            Serial.println("[GATT][E] sendRawNotification: not connected");
-            return false;
-        }
-        bool ok = readChr->notify(data, len);
-        return ok;
-    }
-
-    // 响应: 通过写特征值 notify
-    bool sendResponse(const uint8_t* data, size_t len) {
-        Serial.print("[GATT][I] sendResponse called, len=");
-        Serial.println(len);
-        return sendNotifyWithRetry(writeChr, "response notify", data, len);
-    }
-
-private:
-    bool sendNotifyWithRetry(NimBLECharacteristic* chr, const char* name,
-                              const uint8_t* data, size_t len) {
-        if (chr == nullptr) {
-            Serial.print("[GATT][E] ");
-            Serial.print(name);
-            Serial.println(": characteristic is null");
-            return false;
-        }
-        if (!server || server->getConnectedCount() == 0) {
-            Serial.print("[GATT][E] ");
-            Serial.print(name);
-            Serial.println(": not connected");
-            return false;
-        }
-
-        // 重试机制: HVN 队列满时等待
-        bool ok = false;
-        for (int retry = 0; retry < 50; retry++) {
-            ok = chr->notify(data, len);
-            if (ok) break;
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
-
-        Serial.print("[GATT][I] ");
+inline bool GATTServer::sendNotifyWithRetry(NimBLECharacteristic* chr, const char* name,
+                                             const uint8_t* data, size_t len) {
+    if (chr == nullptr) {
+        Serial.print("[GATT][E] ");
         Serial.print(name);
-        Serial.print(" sent, len=");
-        Serial.print(len);
-        Serial.print(" result=");
-        Serial.print(ok ? "OK" : "FAIL");
-        if (!ok) {
-            Serial.println(" [WARN] notify failed, Trio may not have received response");
-        } else {
-            Serial.println("");
-        }
-
-        return ok;
+        Serial.println(": characteristic is null");
+        return false;
+    }
+    if (!server || server->getConnectedCount() == 0) {
+        Serial.print("[GATT][E] ");
+        Serial.print(name);
+        Serial.println(": not connected");
+        return false;
     }
 
-private:
-    NimBLEServer* server;
-    NimBLEService* service;
-    NimBLECharacteristic* readChr;
-    NimBLECharacteristic* writeChr;
-    PumpServerCallbacks* pServerCallbacks;
-    PumpCharacteristicCallbacks* pChrCallbacks;
-};
+    // 重试机制: HVN 队列满时等待
+    bool ok = false;
+    for (int retry = 0; retry < 50; retry++) {
+        ok = chr->notify(data, len);
+        if (ok) break;
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    Serial.print("[GATT][I] ");
+    Serial.print(name);
+    Serial.print(" sent, len=");
+    Serial.print(len);
+    Serial.print(" result=");
+    Serial.print(ok ? "OK" : "FAIL");
+    if (!ok) {
+        Serial.println(" [WARN] notify failed, Trio may not have received response");
+    } else {
+        Serial.println("");
+    }
+
+    return ok;
+}
 
 } // namespace M640GKit
 
