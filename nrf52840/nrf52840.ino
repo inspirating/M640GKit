@@ -162,4 +162,8 @@ void loop() {
             digitalWrite(LED_BUILTIN, ledOn ? LOW : HIGH);  // LOW=亮, HIGH=灭
         }
     }
+
+    // 让 CPU 短暂 sleep, 避免 loop() 空转耗电。
+    // 10ms 足够短, 不影响 200ms 的 simulator update 和 LED 闪烁精度。
+    delay(10);
 }
